@@ -1,0 +1,129 @@
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource/titillium-web/latin-400.css";
+@import "@fontsource/titillium-web/latin-600.css";
+@import "@fontsource/titillium-web/latin-700.css";
+@import "tailwindcss";
+
+/* ==========================================================================
+   Mijn Skool - designtokens
+   Overgenomen uit de huisstijl van skoolworkshop.nl (Elementor global kit):
+     ink        #0B0B0B   primaire donkere kleur / logo
+     navy       #000080   donkere achtergrondkleur uit de huisstijl
+     accent     #F49700   accentkleur (oranje)
+     accent-2   #F5B44A   zachte accentkleur
+     gold       #FFD700   knopkleur van de marketingsite
+     muted      #606060   bodytekst grijs
+     line       #DADADA   randen
+     surface-2  #F7F7F7   lichte achtergrond
+   Koppen in Titillium Web, lopende tekst in Inter, net als op de website.
+   Het portaal is bewust rustiger en functioneler dan de marketingsite.
+   ========================================================================== */
+
+@theme {
+  --color-ink: #0b0b0b;
+  --color-ink-soft: #1c1c1f;
+  --color-navy: #000080;
+  --color-navy-deep: #000047;
+  --color-accent: #f49700;
+  --color-accent-strong: #d97f00;
+  --color-accent-soft: #f5b44a;
+  --color-accent-wash: #fff5e6;
+  --color-gold: #ffd700;
+
+  --color-muted: #606060;
+  --color-muted-soft: #8a8a8a;
+  --color-line: #dadada;
+  --color-line-soft: #ececec;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f7f7;
+  --color-surface-3: #f0f0f0;
+
+  --color-success: #0f7b4f;
+  --color-success-wash: #e8f5ef;
+  --color-warning: #9a6200;
+  --color-warning-wash: #fdf3e2;
+  --color-danger: #b3261e;
+  --color-danger-wash: #fdecea;
+  --color-info: #1a4fa0;
+  --color-info-wash: #eaf1fb;
+
+  --font-display: "Titillium Web", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter Variable", Inter, "Segoe UI", system-ui, sans-serif;
+
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgb(11 11 11 / 0.05), 0 8px 24px -16px rgb(11 11 11 / 0.25);
+  --shadow-raise: 0 2px 4px rgb(11 11 11 / 0.06), 0 16px 40px -24px rgb(11 11 11 / 0.35);
+}
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  border-color: var(--color-line-soft);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-surface-2);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--color-ink);
+}
+
+/* Zichtbare focus voor toetsenbordgebruikers (WCAG 2.4.7). */
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--color-accent-wash);
+  color: var(--color-ink);
+}
+
+/* Sla-over-link voor schermlezers en toetsenbordnavigatie. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.75rem 1.25rem;
+  background: var(--color-ink);
+  color: #fff;
+  border-radius: 0 0 var(--radius-card) 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
