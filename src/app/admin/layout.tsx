@@ -11,9 +11,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-dvh bg-surface-2">
       <header className="border-b border-line-soft bg-ink text-white">
+        <div aria-hidden className="h-1 bg-accent" />
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-4">
-            <Logo tone="light" showPortalName={false} />
+            <Logo tone="light" showPortalName={false} height={26} />
             <span className="font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-accent-soft">
               Beheer
             </span>

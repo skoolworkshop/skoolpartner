@@ -52,6 +52,7 @@ export default async function SkoolPartnerPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Loyaliteitsprogramma"
         title={settings.program_name}
         description={settings.how_it_works_text || undefined}
         action={

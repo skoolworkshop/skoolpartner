@@ -16,6 +16,7 @@ export default async function AccountPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Uw gegevens"
         title="Account"
         description="Uw gegevens en uw koppeling met de organisatie."
       />

@@ -23,7 +23,7 @@ export default async function PortalLayout({ children }: { children: React.React
       {/* Zijbalk op desktop */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line-soft bg-white px-5 py-6 lg:flex">
         <Link href="/dashboard" className="mb-7 block">
-          <Logo />
+          <Logo height={28} />
         </Link>
 
         <OrgSwitcher organizations={organizations} activeId={session.activeOrganizationId} />
@@ -68,7 +68,7 @@ export default async function PortalLayout({ children }: { children: React.React
         {/* Bovenbalk op mobiel */}
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line-soft bg-white px-4 py-3 lg:hidden">
           <Link href="/dashboard" aria-label="Mijn Skool dashboard">
-            <Logo showPortalName={false} />
+            <Logo showPortalName={false} height={26} />
           </Link>
           <div className="flex items-center gap-2">
             {session.isAdmin ? (

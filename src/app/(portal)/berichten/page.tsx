@@ -20,6 +20,7 @@ export default async function MessagesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Contact"
         title="Berichten"
         description={`De e-mailwisseling tussen uw organisatie en ${settings.support_email}. U ziet alleen gesprekken waar een geverifieerde contactpersoon van uw organisatie aan deelneemt.`}
       />

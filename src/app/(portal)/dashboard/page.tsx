@@ -42,6 +42,7 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Mijn Skool"
         title={`Welkom ${firstName(session.profile?.full_name, session.email)}`}
         description={organizationName}
         action={

@@ -65,6 +65,7 @@ export default async function BookingsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Uw workshops"
         title="Boekingen"
         description="Alle workshops van uw organisatie, van aankomend tot afgerond."
         action={

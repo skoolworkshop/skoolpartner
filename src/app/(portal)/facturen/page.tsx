@@ -18,6 +18,7 @@ export default async function InvoicesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Administratie"
         title="Facturen"
         description="Alle facturen van uw organisatie. U ziet uitsluitend facturen van de organisatie waarvoor u geautoriseerd bent."
       />
