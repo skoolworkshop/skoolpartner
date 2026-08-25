@@ -75,7 +75,10 @@ security definer
 set search_path = public
 as $$
 begin
-  if current_setting('role', true) = 'service_role' then
+  -- Zonder ingelogde gebruiker is dit geen klantactie maar een beheeractie:
+  -- de service role, een migratie of de SQL Editor. Die mogen rechten zetten.
+  -- Een klant heeft altijd een auth.uid(), dus die valt hier nooit onder.
+  if auth.uid() is null or current_setting('role', true) = 'service_role' then
     return new;
   end if;
   if (new.is_admin is distinct from old.is_admin

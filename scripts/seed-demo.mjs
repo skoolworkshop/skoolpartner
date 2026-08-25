@@ -100,44 +100,49 @@ async function main() {
   console.log(`\n  Demodata klaarzetten op ${url}\n`);
 
   /* --- Organisatie ------------------------------------------------------- */
-  const { data: org } = await db
+  // Let op: verschillende unieke indexen staan op een expressie, bijvoorbeeld
+  // lower(slug) of lower(email). Daar werkt upsert met onConflict niet op, dus
+  // zoeken we eerst en voegen we alleen toe wanneer het record ontbreekt.
+  let orgId;
+  const { data: existingOrg } = await db
     .from("organizations")
-    .upsert(
-      {
+    .select("id")
+    .eq("slug", ORG_SLUG)
+    .maybeSingle();
+
+  if (existingOrg) {
+    orgId = existingOrg.id;
+  } else {
+    const { data: created, error } = await db
+      .from("organizations")
+      .insert({
         name: ORG_NAME,
         slug: ORG_SLUG,
         kind: "school",
         status: "active",
         city: "Gouda",
         contact_email: customerEmail,
-      },
-      { onConflict: "slug" }
-    )
-    .select("id")
-    .single();
-
-  if (!org) {
-    // upsert op een unieke index op lower(slug) werkt niet altijd; dan ophalen.
-    const { data: found } = await db
-      .from("organizations")
+      })
       .select("id")
-      .eq("slug", ORG_SLUG)
       .single();
-    if (!found) {
-      console.error("  organisatie kon niet worden aangemaakt");
-      process.exit(1);
-    }
-    org.id = found.id;
+    check("organisatie aanmaken", { error });
+    orgId = created.id;
   }
-  const orgId = org.id;
   console.log(`  organisatie   ${ORG_NAME}`);
 
-  await db
+  const { data: existingDomain } = await db
     .from("organization_domains")
-    .upsert(
-      { organization_id: orgId, domain: ORG_DOMAIN, is_verified: true, verified_at: new Date().toISOString() },
-      { onConflict: "domain" }
-    );
+    .select("id")
+    .eq("domain", ORG_DOMAIN)
+    .maybeSingle();
+  if (!existingDomain) {
+    await db.from("organization_domains").insert({
+      organization_id: orgId,
+      domain: ORG_DOMAIN,
+      is_verified: true,
+      verified_at: new Date().toISOString(),
+    });
+  }
 
   /* --- Gebruikers -------------------------------------------------------- */
   const adminId = await ensureUser(adminEmail, "Beheerder Skool Workshop");
@@ -168,20 +173,34 @@ async function main() {
   );
   console.log(`  klant         ${customerEmail}`);
 
-  check(
-    "contactpersoon",
-    await db.from("organization_contacts").upsert(
-      {
+  const { data: existingContact } = await db
+    .from("organization_contacts")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("email", customerEmail)
+    .maybeSingle();
+
+  if (existingContact) {
+    check(
+      "contactpersoon bijwerken",
+      await db
+        .from("organization_contacts")
+        .update({ is_verified: true, user_id: customerId })
+        .eq("id", existingContact.id)
+    );
+  } else {
+    check(
+      "contactpersoon",
+      await db.from("organization_contacts").insert({
         organization_id: orgId,
         email: customerEmail,
         full_name: "Sanne de Vries",
         user_id: customerId,
         is_verified: true,
         verified_at: new Date().toISOString(),
-      },
-      { onConflict: "organization_id,email" }
-    )
-  );
+      })
+    );
+  }
 
   /* --- SkoolPartner ------------------------------------------------------ */
   const { data: accountId } = await db.rpc("ensure_loyalty_account", {
@@ -353,17 +372,23 @@ async function main() {
   ];
 
   for (const transaction of transactions) {
-    await db.from("loyalty_transactions").upsert(
-      {
-        organization_id: orgId,
-        account_id: accountId,
-        point_value_cents_per_100: 250,
-        points_per_hour_at_time: 100,
-        source: "seed",
-        ...transaction,
-      },
-      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
-    );
+    const { data: existingTx } = await db
+      .from("loyalty_transactions")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("type", transaction.type)
+      .eq("external_reference", transaction.external_reference)
+      .maybeSingle();
+    if (existingTx) continue;
+
+    await db.from("loyalty_transactions").insert({
+      organization_id: orgId,
+      account_id: accountId,
+      point_value_cents_per_100: 250,
+      points_per_hour_at_time: 100,
+      source: "seed",
+      ...transaction,
+    });
   }
   console.log("  skoolpoints   650 beschikbaar, 300 in behandeling");
 
