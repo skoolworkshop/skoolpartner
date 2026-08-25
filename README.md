@@ -19,7 +19,7 @@ Productiedomein: `https://mijn.skoolworkshop.nl`
 3. [Lokaal draaien](#lokaal-draaien)
 4. [Supabase inrichten](#supabase-inrichten)
 5. [Environment variables](#environment-variables)
-6. [Eerste beheerder aanmaken](#eerste-beheerder-aanmaken)
+6. [Inloggen en testen](#inloggen-en-testen)
 7. [Integraties koppelen](#integraties-koppelen)
 8. [Deployen naar Vercel](#deployen-naar-vercel)
 9. [Custom domein](#custom-domein)
@@ -178,22 +178,77 @@ variabele aan voor welke omgevingen hij geldt (Development, Preview, Production)
 
 ---
 
-## Eerste beheerder aanmaken
+## Inloggen en testen
 
-1. Registreer jezelf op `/registreren` met je Skool Workshop-adres.
-2. Zet je account op beheerder via de SQL-editor in Supabase:
+Er zijn twee manieren om binnen te komen. De eerste is het snelst als je gewoon
+wilt rondkijken.
 
-   ```sql
-   update public.profiles
-   set is_admin = true, is_super_admin = true
-   where lower(email) = 'jouwnaam@skoolworkshop.nl';
-   ```
+### 1. Testomgeving met één commando
 
-3. Ga naar `/admin`. Alleen een hoofdbeheerder (`is_super_admin`) kan andere accounts
-   blokkeren of adminrechten toekennen; dat is bewust niet vanuit de interface mogelijk
-   zonder die rol.
+Het seedscript maakt een demo-organisatie met boekingen, facturen, SkoolPoints en
+een e-mailgesprek, zet één account op beheerder en print twee kant-en-klare
+inloglinks. Er komt geen e-mail aan te pas.
 
----
+```bash
+npm run seed:demo
+```
+
+Je krijgt dan zoiets terug:
+
+```
+  BEHEERDER  info@skoolworkshop.nl
+  https://<project>.supabase.co/auth/v1/verify?token=...
+
+  KLANT      s.devries@goudsewaarden.nl
+  https://<project>.supabase.co/auth/v1/verify?token=...
+```
+
+Plak een link in je browser en je bent binnen. Elke link werkt één keer en is
+60 minuten geldig; draai het script opnieuw voor verse links. Gebruik hiervoor
+twee browservensters (of één normaal en één incognito), dan kun je klant en
+beheerder naast elkaar bekijken.
+
+Wat je als **klant** ziet: dashboard met 650 beschikbare en 300 wachtende
+SkoolPoints, drie boekingen, twee facturen, één gesprek en een werkend
+inwisselformulier.
+Wat je als **beheerder** ziet: `/admin` met de controlewachtrij, de volledige
+ledger, de organisatie en alle instellingen.
+
+Aanpassen kan met environment variables:
+
+```bash
+SEED_ADMIN_EMAIL=jij@skoolworkshop.nl SEED_CUSTOMER_EMAIL=test@school.nl npm run seed:demo
+```
+
+Het script is idempotent en gebruikt uitsluitend duidelijk herkenbare demodata.
+Draai het op een ontwikkel- of testproject, nooit op productie met echte
+klantgegevens.
+
+### 2. De gewone route, zoals een echte klant
+
+1. Ga naar `/registreren` en vul je naam en zakelijke e-mailadres in.
+2. Je ontvangt een e-mail met een inloglink én een 6-cijferige code. Werkt de
+   link niet, klik dan op "Werkt de link niet?" en vul de code in.
+3. Kies of vraag je organisatie aan. Je komt dan op het wachtscherm te staan.
+4. Een beheerder keurt je goed via **Beheer > Gebruikers**. Daarna heb je
+   toegang, en is de organisatie aangemeld voor SkoolPartner.
+
+Let op: op het gratis Supabase-plan is het aantal verstuurde mails per uur
+beperkt. Voor testen is het seedscript daarom praktischer.
+
+### Een account beheerder maken
+
+Het seedscript doet dit automatisch voor `SEED_ADMIN_EMAIL`. Handmatig kan het
+via de SQL-editor in Supabase:
+
+```sql
+update public.profiles
+set is_admin = true, is_super_admin = true
+where lower(email) = 'jouwnaam@skoolworkshop.nl';
+```
+
+Alleen een hoofdbeheerder (`is_super_admin`) kan andere accounts blokkeren of
+adminrechten toekennen. Dat kan bewust niet vanuit de interface zonder die rol.
 
 ## Integraties koppelen
 
@@ -434,5 +489,3 @@ variabelen er nog nodig zijn.
 **Punten blijven op "in behandeling" staan**
 De gekoppelde factuur is nog niet volledig betaald, of er is nog geen factuur gekoppeld.
 Controleer dat in Admin > Organisaties bij de betreffende organisatie.
-
-Deployment trigger
