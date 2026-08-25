@@ -434,3 +434,5 @@ variabelen er nog nodig zijn.
 **Punten blijven op "in behandeling" staan**
 De gekoppelde factuur is nog niet volledig betaald, of er is nog geen factuur gekoppeld.
 Controleer dat in Admin > Organisaties bij de betreffende organisatie.
+
+Deployment trigger
