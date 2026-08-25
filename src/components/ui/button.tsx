@@ -3,27 +3,36 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "accent" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "accent" | "ink" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
+/**
+ * Knopstijl overgenomen van skoolworkshop.nl: pilvorm, Titillium Web semibold
+ * en de accentkleur #F49700 als hoofdknop.
+ *
+ * Eén afwijking: de website zet witte tekst op oranje, wat een contrast van
+ * 2,3:1 geeft. In een portaal met formulieren en bedragen is dat te weinig,
+ * dus staat er donkere tekst op het oranje. Dat haalt 8,6:1 en blijft
+ * herkenbaar Skool Workshop.
+ */
 const base =
   "inline-flex items-center justify-center gap-2 rounded-pill font-display font-semibold " +
-  "transition-colors disabled:pointer-events-none disabled:opacity-50 select-none";
+  "tracking-[-0.01em] transition-colors select-none " +
+  "disabled:pointer-events-none disabled:opacity-50";
 
 const variants: Record<Variant, string> = {
-  // Donker en rustig: het portaal is functioneel, niet promotioneel.
-  primary: "bg-ink text-white hover:bg-ink-soft",
-  // Accent voor de belangrijkste commerciële actie (nieuwe workshop aanvragen).
+  primary: "bg-accent text-ink hover:bg-accent-strong hover:text-white",
   accent: "bg-accent text-ink hover:bg-accent-strong hover:text-white",
-  secondary: "bg-white text-ink border border-line hover:bg-surface-2",
+  ink: "bg-ink text-white hover:bg-ink-soft",
+  secondary: "bg-white text-ink border border-line hover:border-ink",
   ghost: "bg-transparent text-ink hover:bg-surface-3",
   danger: "bg-danger text-white hover:opacity-90",
 };
 
 const sizes: Record<Size, string> = {
   sm: "h-9 px-4 text-sm",
-  md: "h-11 px-5 text-[15px]",
-  lg: "h-12 px-7 text-base",
+  md: "h-12 px-7 text-base",
+  lg: "h-13 px-8 text-[17px]",
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -51,7 +60,7 @@ export function ButtonLink({
 
 export function ExternalButtonLink({
   className,
-  variant = "accent",
+  variant = "primary",
   size = "md",
   ...props
 }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { variant?: Variant; size?: Size }) {

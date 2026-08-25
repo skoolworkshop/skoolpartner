@@ -24,11 +24,22 @@ export function SidebarNav() {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-card px-3 py-2.5 text-[15px] font-medium transition-colors",
-              active ? "bg-ink text-white" : "text-ink hover:bg-surface-3"
+              "relative flex items-center gap-3 rounded-card py-2.5 pl-4 pr-3 text-[15px] transition-colors",
+              active
+                ? "bg-accent-wash font-semibold text-ink"
+                : "font-medium text-muted hover:bg-surface-2 hover:text-ink"
             )}
           >
-            <Icon aria-hidden className="size-[18px] shrink-0" />
+            {active ? (
+              <span
+                aria-hidden
+                className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-pill bg-accent"
+              />
+            ) : null}
+            <Icon
+              aria-hidden
+              className={cn("size-[18px] shrink-0", active && "text-accent-strong")}
+            />
             {label}
           </Link>
         );
@@ -56,11 +67,15 @@ export function MobileNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium",
+                  "flex flex-col items-center gap-1 px-1 pb-2.5 pt-2 text-[11px] font-medium",
                   active ? "text-ink" : "text-muted"
                 )}
               >
-                <Icon aria-hidden className={cn("size-5", active && "text-accent")} />
+                <span
+                  aria-hidden
+                  className={cn("h-0.5 w-8 rounded-pill", active ? "bg-accent" : "bg-transparent")}
+                />
+                <Icon aria-hidden className={cn("size-5", active && "text-accent-strong")} />
                 <span className="truncate">{label}</span>
               </Link>
             </li>

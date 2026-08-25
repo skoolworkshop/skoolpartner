@@ -16,7 +16,7 @@ function SubmitButton({
   size,
 }: {
   label: string;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "accent";
+  variant?: "primary" | "ink" | "secondary" | "ghost" | "danger" | "accent";
   size?: "sm" | "md" | "lg";
 }) {
   const { pending } = useFormStatus();
@@ -36,7 +36,7 @@ export function ActionForm({
   action,
   children,
   submitLabel,
-  variant = "primary",
+  variant = "ink",
   size = "sm",
   className,
   inline = false,
@@ -44,7 +44,7 @@ export function ActionForm({
   action: (prev: AdminState, formData: FormData) => Promise<AdminState>;
   children?: React.ReactNode;
   submitLabel: string;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "accent";
+  variant?: "primary" | "ink" | "secondary" | "ghost" | "danger" | "accent";
   size?: "sm" | "md" | "lg";
   className?: string;
   inline?: boolean;
