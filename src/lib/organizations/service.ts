@@ -1,0 +1,367 @@
+import "server-only";
+
+import { recordAudit } from "@/lib/audit";
+import { hashToken } from "@/lib/crypto";
+import { createServiceSupabase } from "@/lib/supabase/server";
+import { emailDomain, slugify } from "@/lib/utils";
+import type { MembershipSource, OrganizationRow } from "@/lib/types/database";
+
+export interface OrganizationSuggestion {
+  organization: Pick<OrganizationRow, "id" | "name" | "city" | "kind">;
+  reason: "verified_domain" | "invite";
+}
+
+/**
+ * Zoekt mogelijke organisaties bij een e-mailadres.
+ *
+ * Belangrijk: een domeinmatch is uitsluitend een SUGGESTIE. Er wordt nooit
+ * automatisch gekoppeld. Publieke domeinen (gmail, outlook, ...) worden
+ * volledig genegeerd; die staan bovendien geblokkeerd in de database.
+ */
+export async function suggestOrganizationsForEmail(
+  email: string
+): Promise<OrganizationSuggestion[]> {
+  const domain = emailDomain(email);
+  if (!domain) return [];
+
+  const supabase = createServiceSupabase();
+
+  const { data: isPublic } = await supabase
+    .from("public_email_domains")
+    .select("domain")
+    .eq("domain", domain)
+    .maybeSingle();
+
+  if (isPublic) return [];
+
+  const { data } = await supabase
+    .from("organization_domains")
+    .select("organization_id, is_verified, organizations!inner(id, name, city, kind, status)")
+    .eq("domain", domain)
+    .eq("is_verified", true);
+
+  const rows = (data ?? []) as unknown as {
+    organizations: OrganizationSuggestion["organization"] & { status: string };
+  }[];
+
+  return rows
+    .filter((row) => row.organizations?.status === "active")
+    .map((row) => ({ organization: row.organizations, reason: "verified_domain" as const }));
+}
+
+/** Zoekt organisaties op naam, voor de handmatige keuze in de onboarding. */
+export async function searchOrganizations(query: string, limit = 8) {
+  const term = query.trim();
+  if (term.length < 2) return [];
+
+  const supabase = createServiceSupabase();
+  const { data } = await supabase
+    .from("organizations")
+    .select("id, name, city, kind")
+    .eq("status", "active")
+    .ilike("name", `%${term}%`)
+    .order("name")
+    .limit(limit);
+
+  return data ?? [];
+}
+
+/**
+ * Vraagt lidmaatschap aan. Het lidmaatschap staat altijd op 'pending' tot een
+ * admin het goedkeurt. Dat geldt ook bij een domeinmatch.
+ */
+export async function requestMembership(params: {
+  userId: string;
+  userEmail: string;
+  organizationId: string;
+  source: MembershipSource;
+}): Promise<{ ok: boolean; message?: string }> {
+  const supabase = createServiceSupabase();
+
+  const { data: existing } = await supabase
+    .from("organization_members")
+    .select("id, status")
+    .eq("organization_id", params.organizationId)
+    .eq("user_id", params.userId)
+    .maybeSingle();
+
+  if (existing?.status === "active") {
+    return { ok: true, message: "U bent al lid van deze organisatie." };
+  }
+  if (existing?.status === "pending") {
+    return { ok: true, message: "Uw aanvraag staat al klaar voor goedkeuring." };
+  }
+
+  const { error } = await supabase.from("organization_members").upsert(
+    {
+      organization_id: params.organizationId,
+      user_id: params.userId,
+      role: "lid",
+      status: "pending",
+      source: params.source,
+    },
+    { onConflict: "organization_id,user_id" }
+  );
+
+  if (error) return { ok: false, message: "Aanvraag kon niet worden opgeslagen." };
+
+  await recordAudit({
+    actorId: params.userId,
+    actorEmail: params.userEmail,
+    actorRole: "klant",
+    action: "organization_membership.requested",
+    entityType: "organization_member",
+    entityId: params.organizationId,
+    organizationId: params.organizationId,
+    after: { status: "pending", source: params.source },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Keurt een lidmaatschap goed. Vanaf dat moment neemt de organisatie deel aan
+ * SkoolPartner: het loyalty account wordt aangemaakt met de datum van nu.
+ * Er worden nooit punten met terugwerkende kracht toegekend.
+ */
+export async function approveMembership(params: {
+  memberId: string;
+  adminId: string;
+  adminEmail: string;
+  role?: "beheerder" | "lid";
+}): Promise<{ ok: boolean; message?: string }> {
+  const supabase = createServiceSupabase();
+
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("*")
+    .eq("id", params.memberId)
+    .maybeSingle();
+
+  if (!member) return { ok: false, message: "Lidmaatschap niet gevonden." };
+
+  const { error } = await supabase
+    .from("organization_members")
+    .update({
+      status: "active",
+      role: params.role ?? member.role,
+      approved_by: params.adminId,
+      approved_at: new Date().toISOString(),
+      rejected_reason: null,
+    })
+    .eq("id", params.memberId);
+
+  if (error) return { ok: false, message: "Goedkeuren is niet gelukt." };
+
+  await supabase.rpc("ensure_loyalty_account", {
+    p_org: member.organization_id,
+    p_actor: params.adminId,
+  });
+
+  // Het e-mailadres van dit lid is nu een geverifieerde contactpersoon.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", member.user_id)
+    .maybeSingle();
+
+  if (profile?.email) {
+    await supabase.from("organization_contacts").upsert(
+      {
+        organization_id: member.organization_id,
+        email: profile.email.toLowerCase(),
+        full_name: profile.full_name,
+        user_id: member.user_id,
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+        verified_by: params.adminId,
+      },
+      { onConflict: "organization_id,email" }
+    );
+  }
+
+  await recordAudit({
+    actorId: params.adminId,
+    actorEmail: params.adminEmail,
+    action: "organization_membership.approved",
+    entityType: "organization_member",
+    entityId: params.memberId,
+    organizationId: member.organization_id,
+    before: { status: member.status },
+    after: { status: "active" },
+  });
+
+  return { ok: true };
+}
+
+export async function setMembershipStatus(params: {
+  memberId: string;
+  status: "rejected" | "removed" | "pending";
+  reason?: string;
+  adminId: string;
+  adminEmail: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const supabase = createServiceSupabase();
+
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("*")
+    .eq("id", params.memberId)
+    .maybeSingle();
+  if (!member) return { ok: false, message: "Lidmaatschap niet gevonden." };
+
+  const { error } = await supabase
+    .from("organization_members")
+    .update({ status: params.status, rejected_reason: params.reason ?? null })
+    .eq("id", params.memberId);
+
+  if (error) return { ok: false, message: "Wijzigen is niet gelukt." };
+
+  if (params.status !== "pending") {
+    // Toegang tot berichten intrekken door de contactpersoon te ontverifiëren.
+    await supabase
+      .from("organization_contacts")
+      .update({ is_verified: false })
+      .eq("organization_id", member.organization_id)
+      .eq("user_id", member.user_id);
+  }
+
+  await recordAudit({
+    actorId: params.adminId,
+    actorEmail: params.adminEmail,
+    action: `organization_membership.${params.status}`,
+    entityType: "organization_member",
+    entityId: params.memberId,
+    organizationId: member.organization_id,
+    before: { status: member.status },
+    after: { status: params.status },
+    reason: params.reason ?? null,
+  });
+
+  return { ok: true };
+}
+
+export async function createOrganization(params: {
+  name: string;
+  kind?: OrganizationRow["kind"];
+  city?: string | null;
+  contactEmail?: string | null;
+  actorId?: string | null;
+  actorEmail?: string | null;
+}): Promise<{ ok: boolean; organizationId?: string; message?: string }> {
+  const supabase = createServiceSupabase();
+  const name = params.name.trim();
+  if (name.length < 2) return { ok: false, message: "Vul een organisatienaam in." };
+
+  let slug = slugify(name);
+  const { data: clash } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (clash) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .insert({
+      name,
+      slug,
+      kind: params.kind ?? "school",
+      city: params.city ?? null,
+      contact_email: params.contactEmail ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) return { ok: false, message: "Organisatie kon niet worden aangemaakt." };
+
+  await recordAudit({
+    actorId: params.actorId ?? null,
+    actorEmail: params.actorEmail ?? null,
+    action: "organization.created",
+    entityType: "organization",
+    entityId: data.id,
+    organizationId: data.id,
+    after: { name, slug },
+  });
+
+  return { ok: true, organizationId: data.id };
+}
+
+/** Accepteert een uitnodiging. Het token zelf staat nooit in de database. */
+export async function acceptInvite(params: {
+  token: string;
+  userId: string;
+  userEmail: string;
+}): Promise<{ ok: boolean; message?: string; organizationId?: string }> {
+  const supabase = createServiceSupabase();
+  const tokenHash = hashToken(params.token);
+
+  const { data: invite } = await supabase
+    .from("organization_invites")
+    .select("*")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!invite) return { ok: false, message: "Deze uitnodiging is niet geldig." };
+  if (invite.revoked_at) return { ok: false, message: "Deze uitnodiging is ingetrokken." };
+  if (invite.accepted_at) return { ok: false, message: "Deze uitnodiging is al gebruikt." };
+  if (new Date(invite.expires_at) < new Date()) {
+    return { ok: false, message: "Deze uitnodiging is verlopen. Vraag een nieuwe aan." };
+  }
+  if (invite.email.toLowerCase() !== params.userEmail.toLowerCase()) {
+    return {
+      ok: false,
+      message: "Deze uitnodiging is voor een ander e-mailadres. Log in met dat adres.",
+    };
+  }
+
+  const { error } = await supabase.from("organization_members").upsert(
+    {
+      organization_id: invite.organization_id,
+      user_id: params.userId,
+      role: invite.role,
+      status: "active",
+      source: "invite",
+      invited_by: invite.created_by,
+      approved_by: invite.created_by,
+      approved_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id,user_id" }
+  );
+
+  if (error) return { ok: false, message: "Uitnodiging kon niet worden verwerkt." };
+
+  await supabase
+    .from("organization_invites")
+    .update({ accepted_at: new Date().toISOString(), accepted_by: params.userId })
+    .eq("id", invite.id);
+
+  await supabase.rpc("ensure_loyalty_account", {
+    p_org: invite.organization_id,
+    p_actor: params.userId,
+  });
+
+  await supabase.from("organization_contacts").upsert(
+    {
+      organization_id: invite.organization_id,
+      email: params.userEmail.toLowerCase(),
+      user_id: params.userId,
+      is_verified: true,
+      verified_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id,email" }
+  );
+
+  await recordAudit({
+    actorId: params.userId,
+    actorEmail: params.userEmail,
+    actorRole: "klant",
+    action: "organization_invite.accepted",
+    entityType: "organization_invite",
+    entityId: invite.id,
+    organizationId: invite.organization_id,
+  });
+
+  return { ok: true, organizationId: invite.organization_id };
+}
