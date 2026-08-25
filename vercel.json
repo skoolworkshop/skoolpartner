@@ -3,13 +3,7 @@
   "framework": "nextjs",
   "regions": ["fra1"],
   "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/verval-punten",
-      "schedule": "30 3 * * *"
-    }
+    { "path": "/api/cron/verval-punten", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/sync", "schedule": "0 5 * * *" }
   ]
 }
