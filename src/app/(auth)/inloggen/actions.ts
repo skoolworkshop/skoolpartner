@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 
-import { publicEnv, isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured } from "@/lib/env";
+import { resolveSiteUrl } from "@/lib/site-url";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export interface AuthFormState {
@@ -48,12 +49,13 @@ export async function sendLoginLink(
     };
   }
 
+  const siteUrl = await resolveSiteUrl();
   const supabase = await createServerSupabase();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: allowSignUp,
-      emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}`,
+      emailRedirectTo: `${siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}`,
       data: allowSignUp ? { full_name: fullName } : undefined,
     },
   });
