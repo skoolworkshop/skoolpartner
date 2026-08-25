@@ -316,11 +316,23 @@ De cron jobs staan in `vercel.json`:
 
 | Pad | Schema | Doel |
 | --- | --- | --- |
-| `/api/cron/sync` | ieder uur | Gmail, Moneybird en HubSpot synchroniseren |
-| `/api/cron/verval-punten` | dagelijks 03:30 | verlopen SkoolPoints registreren |
+| `/api/cron/verval-punten` | dagelijks, rond 03:00 UTC | verlopen SkoolPoints registreren |
+| `/api/cron/sync` | dagelijks, rond 05:00 UTC | Gmail, Moneybird en HubSpot synchroniseren |
+
+Beide staan bewust op één keer per dag. Het Vercel Hobby-plan staat namelijk maximaal één
+uitvoering per dag toe: een expressie als `0 * * * *` laat de deployment mislukken met de
+melding *"Hobby accounts are limited to daily cron jobs"*. Hobby garandeert bovendien geen
+exact tijdstip; een job die op 03:00 staat, kan ergens tussen 03:00 en 03:59 draaien. Daarom
+staat de minuut op 0 en zit er een uur tussen beide jobs.
+
+Wil je later vaker synchroniseren, bijvoorbeeld ieder uur, dan is een upgrade naar het
+Pro-plan nodig. De betaalstatus uit Moneybird komt overigens niet alleen via deze dagelijkse
+synchronisatie binnen: de webhook op `/api/webhooks/moneybird` blijft direct werken, dus
+punten komen nog steeds vlak na betaling beschikbaar.
 
 Vercel stuurt automatisch `Authorization: Bearer $CRON_SECRET` mee, mits `CRON_SECRET` als
-environment variable is ingesteld. Handmatig aanroepen kan met dezelfde header:
+environment variable is ingesteld. Tussendoor handmatig synchroniseren kan altijd via
+**Admin > Integraties > Nu synchroniseren**, of met dezelfde header:
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" https://mijn.skoolworkshop.nl/api/cron/sync
