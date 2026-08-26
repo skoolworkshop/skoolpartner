@@ -253,6 +253,8 @@ export async function createOrganization(params: {
   organizationId?: string;
   message?: string;
   alreadyExisted?: boolean;
+  /** Alleen voor de serverlog en voor beheerders. Nooit voor een klant. */
+  technicalReason?: string;
 }> {
   const supabase = createServiceSupabase();
   const name = params.name.trim();
@@ -297,6 +299,7 @@ export async function createOrganization(params: {
       ok: false,
       message:
         "Het aanmaken lukte niet. Neem contact op met Skool Workshop, dan zetten wij uw organisatie klaar.",
+      technicalReason: error?.message ?? "onbekende fout",
     };
   }
 

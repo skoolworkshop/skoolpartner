@@ -95,6 +95,8 @@ export async function requireMember(): Promise<
 > {
   const context = await requireUser();
   if (context.memberships.length === 0) {
+    // Een beheerder hoort niet in de klantonboarding thuis.
+    if (context.isAdmin) redirect("/admin");
     redirect(context.pendingMemberships.length > 0 ? "/wachten" : "/aanmelden");
   }
 
