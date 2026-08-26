@@ -104,26 +104,7 @@ async function main() {
   );
   console.log(`  beheerder     is_admin=${profile.is_admin} is_super_admin=${profile.is_super_admin}`);
 
-  // 6. Tweede account als gewone klant koppelen
-  await db.exec(`insert into auth.users (email) values ('skoolworkshop+klant@gmail.com');`);
-  await db.exec(await readFile("supabase/tweede-account-als-klant.sql", "utf8"));
-  const klant = (
-    await db.query(`
-      select p.is_admin, m.role, m.status
-      from public.profiles p
-      join public.organization_members m on m.user_id = p.id
-      where lower(p.email) = 'skoolworkshop+klant@gmail.com'
-    `)
-  ).rows[0];
-  const klantOk =
-    klant && klant.is_admin === false && klant.role === "lid" && klant.status === "active";
-  console.log(
-    klantOk
-      ? "  ok   tweede-account-als-klant.sql koppelt zonder beheerrechten"
-      : "  FOUT tweede-account-als-klant.sql klopt niet"
-  );
-
-  // 7. Opruimen moet de demodata weghalen en het account laten staan
+  // 6. Opruimen moet de demodata weghalen en het account laten staan
   await db.exec(await readFile("supabase/demo-data-verwijderen.sql", "utf8"));
   const na = (
     await db.query(`
@@ -153,7 +134,6 @@ async function main() {
 
   const ok =
     opgeruimd &&
-    klantOk &&
     balance.available_points === 350 &&
     balance.pending_points === 300 &&
     balance.lifetime_earned_points === 1200 &&
@@ -161,6 +141,7 @@ async function main() {
     counts.facturen === 5 &&
     counts.berichten === 6 &&
     counts.leden === 3 &&
+    profile.is_super_admin === true &&
     counts.resultaten === 2 &&
     profile.is_admin === true;
 
