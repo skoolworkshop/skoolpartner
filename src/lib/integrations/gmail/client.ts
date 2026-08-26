@@ -6,10 +6,22 @@ import { serverEnv } from "@/lib/env";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { withRetry } from "@/lib/integrations/sync-state";
+import type { SendAsEntry } from "./identity";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
-/** Minimale scopes: lezen en versturen. Meer is niet nodig. */
+/**
+ * Minimale scopes: lezen en versturen. Meer is niet nodig.
+ *
+ * gmail.readonly geeft ook toegang tot users.settings.sendAs.list, waarmee wij
+ * controleren of er namens het boekingenadres verzonden mag worden. Daar is dus
+ * GEEN extra scope voor nodig, en gmail.settings.basic is bewust niet
+ * toegevoegd: die zou ook het recht geven om instellingen te WIJZIGEN, en dat
+ * hoort SkoolPartner niet te kunnen.
+ *
+ * Wat deze twee scopes niet geven: geen toegang tot Drive, Agenda, Contacten of
+ * andere Google-diensten, en geen recht om mail te verwijderen of te wijzigen.
+ */
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
@@ -110,6 +122,15 @@ export class GmailClient {
     return new GmailClient(token);
   }
 
+  /**
+   * Voor het moment vlak na de OAuth-flow, als er nog niets in de database
+   * staat. Zo kunnen wij eerst vragen wie er nu eigenlijk heeft ingelogd,
+   * voordat wij dat opslaan.
+   */
+  static fromAccessToken(accessToken: string): GmailClient {
+    return new GmailClient(accessToken);
+  }
+
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     return withRetry(async () => {
       const response = await fetch(`${GMAIL_API}${path}`, {
@@ -144,6 +165,18 @@ export class GmailClient {
 
   async listLabels() {
     return this.request<{ labels: { id: string; name: string }[] }>("/labels");
+  }
+
+  /**
+   * De adressen waarmee dit account mag verzenden.
+   *
+   * Hiermee controleren wij of boekingen@skoolworkshop.nl een geldige
+   * send-as identiteit is onder het gekoppelde account. Alleen lezen: wij
+   * wijzigen nooit iets aan iemands Gmail-instellingen.
+   */
+  async listSendAs() {
+    const antwoord = await this.request<{ sendAs?: SendAsEntry[] }>("/settings/sendAs");
+    return antwoord.sendAs ?? [];
   }
 
   async listMessages(query: string, pageToken?: string) {

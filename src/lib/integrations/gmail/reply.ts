@@ -4,6 +4,7 @@ import { integrationMode, serverEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
 import { buildReplyMime, GmailClient } from "./client";
+import { checkSendAs } from "./identity";
 import { uniqueStrings } from "@/lib/utils";
 
 export interface ReplyResult {
@@ -132,6 +133,36 @@ export async function sendPortalReply(params: {
   try {
     const client = await GmailClient.create();
     if (!client) throw new Error("Gmail is nog niet geautoriseerd");
+
+    /*
+      Mogen wij namens het boekingenadres verzenden?
+
+      Dit moet vóór het versturen worden gecontroleerd, niet erna. Gmail
+      weigert een bericht met een onbekend From-adres namelijk niet: het
+      vervangt de afzender stilletjes door het ingelogde account. Bij Skool
+      Workshop zou een klant dan opeens post krijgen van het persoonlijke adres
+      van Clinten in plaats van van boekingen@skoolworkshop.nl.
+
+      Liever niet versturen dan versturen vanaf het verkeerde adres. De
+      beheerder ziet in Admin > Integraties precies wat er dan moet gebeuren.
+    */
+    const sendAs = checkSendAs(await client.listSendAs(), mailbox);
+    if (!sendAs.ready) {
+      await supabase
+        .from("outbound_messages")
+        .update({
+          status: "failed",
+          last_error: `Verzenden als ${mailbox} is niet ingesteld: ${sendAs.message}`.slice(0, 500),
+          attempts: 1,
+        })
+        .eq("id", outbound.id);
+
+      return {
+        ok: false,
+        message:
+          "Uw bericht is niet verstuurd. De mailkoppeling staat nog niet helemaal goed; wij hebben er bericht van gekregen en pakken het op.",
+      };
+    }
 
     const raw = buildReplyMime({
       from: `SkoolPartner <${mailbox}>`,

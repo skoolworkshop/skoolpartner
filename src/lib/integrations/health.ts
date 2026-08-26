@@ -2,6 +2,12 @@ import "server-only";
 
 import { integrationMode, serverEnv, type IntegrationName } from "@/lib/env";
 import { GmailClient, createOAuthClient } from "@/lib/integrations/gmail/client";
+import {
+  checkSendAs,
+  normalizeEmail,
+  sendAsInstructie,
+  type SendAsCheck,
+} from "@/lib/integrations/gmail/identity";
 import { MoneybirdClient } from "@/lib/integrations/moneybird/client";
 import { createServiceSupabase } from "@/lib/supabase/server";
 
@@ -144,8 +150,9 @@ export async function testGmail(): Promise<HealthCheck> {
   details.push("Er staat een versleutelde refresh token klaar.");
 
   try {
-    // GmailClient.create() wisselt de refresh token om voor een access token.
-    // Lukt dat, dan werkt de vernieuwing van tokens dus ook.
+    // 1 en 7. GmailClient.create() wisselt de refresh token om voor een access
+    // token. Lukt dat, dan is de OAuth-koppeling geldig én werkt het vernieuwen
+    // van tokens. Dat zijn meteen twee controles in één.
     const client = await GmailClient.create();
     if (!client) {
       return {
@@ -154,28 +161,134 @@ export async function testGmail(): Promise<HealthCheck> {
         details: [...details, "Koppel Gmail opnieuw."],
       };
     }
-    details.push("Token vernieuwen werkt.");
+    details.push("Refresh token werkt: er is een geldig toegangstoken opgehaald.");
 
+    // 2, 3 en 4. Gmail is bereikbaar, wie is er gekoppeld, en kan de mailbox
+    // worden gelezen?
     const profiel = await client.getProfile();
-    details.push(`Mailbox bereikbaar: ${profiel.emailAddress}.`);
-    details.push(`Berichten in de mailbox: ${profiel.messagesTotal}.`);
+    const account = profiel.emailAddress;
+    details.push(`Gmail API bereikbaar.`);
+    details.push(`Google-account: ${account}.`);
+    details.push(`Mailbox leesbaar: ${profiel.messagesTotal} berichten, ${profiel.threadsTotal} gesprekken.`);
 
-    const verwacht = serverEnv.google.mailbox?.toLowerCase();
-    if (verwacht && profiel.emailAddress.toLowerCase() !== verwacht) {
+    const mailbox = serverEnv.google.mailbox;
+    if (!mailbox) {
       return {
         ok: false,
-        summary: `Er is gekoppeld met ${profiel.emailAddress}, maar GMAIL_MAILBOX staat op ${verwacht}.`,
-        details: [...details, "Koppel opnieuw en log in met de juiste mailbox."],
+        summary: "GMAIL_MAILBOX is niet ingesteld, dus wij weten niet welk adres het boekingenadres is.",
+        details,
       };
     }
 
-    return { ok: true, summary: `Verbonden met ${profiel.emailAddress}.`, details };
+    /*
+      5 en 6. Is het boekingenadres herkenbaar, en mag er namens verzonden
+      worden?
+
+      Dit is het punt waarop de oude versie stukliep. Die eiste dat het
+      ingelogde account gelijk was aan GMAIL_MAILBOX, en bij Skool Workshop is
+      dat bewust niet zo: er wordt ingelogd met een persoonlijk account en
+      gemaild vanaf een boekingenadres. Een verschil tussen die twee is dus
+      geen fout, zolang het boekingenadres maar een geldige send-as identiteit
+      is.
+    */
+    const sendAsLijst = await client.listSendAs();
+    details.push(
+      `Verzendadressen in dit account: ${
+        sendAsLijst.map((s) => s.sendAsEmail).join(", ") || "geen gevonden"
+      }.`
+    );
+
+    const zelfdeAccount = normalizeEmail(account) === normalizeEmail(mailbox);
+    const sendAs = checkSendAs(sendAsLijst, mailbox);
+
+    if (zelfdeAccount) {
+      details.push(`Het boekingenadres is hier hetzelfde als het Google-account.`);
+    } else {
+      details.push(
+        `Boekingenadres ${mailbox} is bewust een ander adres dan het Google-account. Dat is goed.`
+      );
+    }
+
+    if (!sendAs.ready) {
+      return {
+        ok: false,
+        summary: `Verbonden met ${account}, maar verzenden als ${mailbox} kan nog niet.`,
+        details: [
+          ...details,
+          sendAs.message,
+          "Wat er in Gmail moet gebeuren:",
+          ...sendAsInstructie(sendAs, mailbox, account).map((regel) => `  ${regel}`),
+          "Zolang dit niet klopt, verstuurt SkoolPartner geen enkel bericht. Er gaat dus nooit per ongeluk post uit vanaf het verkeerde adres.",
+        ],
+      };
+    }
+
+    details.push(sendAs.message);
+    if (sendAs.entry?.displayName) {
+      details.push(`Weergavenaam bij dat adres: ${sendAs.entry.displayName}.`);
+    }
+
+    return {
+      ok: true,
+      summary: zelfdeAccount
+        ? `Verbonden met ${account}. Verzenden als ${mailbox} is gereed.`
+        : `Verbonden met ${account}, verzenden als ${mailbox} is gereed.`,
+      details,
+    };
   } catch (error) {
     return {
       ok: false,
       summary: "Gmail gaf een fout terug.",
       details: [...details, veiligeFout(error)],
     };
+  }
+}
+
+export interface GmailStatus {
+  connected: boolean;
+  /** Het Google-account waarmee is ingelogd. */
+  accountEmail: string | null;
+  /** Het adres waarmee wij met klanten mailen. */
+  mailbox: string;
+  /** Zijn dit bewust twee verschillende adressen? */
+  apartAdres: boolean;
+  /** null als wij het (nog) niet hebben kunnen ophalen. */
+  sendAs: SendAsCheck | null;
+  connectedAt: string | null;
+}
+
+/**
+ * Alles wat Admin > Integraties over Gmail moet tonen, in één keer.
+ *
+ * Faalt nooit hard: kan de send-as lijst niet worden opgehaald, dan blijft die
+ * gewoon leeg en toont het scherm dat het nog niet bekend is. Een pagina die
+ * omvalt omdat Google even hikt, helpt niemand.
+ */
+export async function getGmailStatus(): Promise<GmailStatus> {
+  const mailbox = serverEnv.google.mailbox ?? "";
+  const koppeling = await isGmailConnected();
+
+  const basis: GmailStatus = {
+    connected: koppeling.connected,
+    accountEmail: koppeling.accountEmail,
+    mailbox,
+    apartAdres:
+      Boolean(koppeling.accountEmail) &&
+      normalizeEmail(koppeling.accountEmail) !== normalizeEmail(mailbox),
+    sendAs: null,
+    connectedAt: koppeling.connectedAt,
+  };
+
+  if (!koppeling.connected || !mailbox) return basis;
+
+  try {
+    const client = await GmailClient.create();
+    if (!client) return basis;
+
+    const lijst = await client.listSendAs();
+    return { ...basis, sendAs: checkSendAs(lijst, mailbox) };
+  } catch {
+    return basis;
   }
 }
 

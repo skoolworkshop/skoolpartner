@@ -13,6 +13,12 @@ import {
 } from "@/lib/integrations/sync-state";
 import { uniqueStrings } from "@/lib/utils";
 import {
+  betreftMailbox,
+  betreftMailboxReden,
+  buildScopedQuery,
+  isUitgaand,
+} from "./identity";
+import {
   attachmentMeta,
   extractBodies,
   GmailClient,
@@ -133,8 +139,17 @@ export async function resolveThreadVisibility(participants: string[]): Promise<{
   };
 }
 
-/** Slaat één e-mail op als bericht in het berichtencentrum. */
-export async function storeEmail(email: NormalizedEmail): Promise<{ stored: boolean; reason?: string }> {
+/**
+ * Slaat één e-mail op als bericht in het berichtencentrum.
+ *
+ * oauthAccount is het Google-account waarmee is gekoppeld. Dat is bij Skool
+ * Workshop een ander adres dan het boekingenadres, en wij hebben het nodig om
+ * te bepalen of een bericht in- of uitgaand is.
+ */
+export async function storeEmail(
+  email: NormalizedEmail,
+  options: { oauthAccount?: string | null } = {}
+): Promise<{ stored: boolean; reason?: string }> {
   const supabase = createServiceSupabase();
 
   const { data: existing } = await supabase
@@ -143,6 +158,26 @@ export async function storeEmail(email: NormalizedEmail): Promise<{ stored: bool
     .eq("gmail_message_id", email.gmailMessageId)
     .maybeSingle();
   if (existing) return { stored: false, reason: "Al aanwezig" };
+
+  /*
+    SLOT 1: hoort dit bericht bij het boekingenadres?
+
+    Wij koppelen met een persoonlijke Gmail-mailbox, en daar zit veel in wat
+    niets met klanten te maken heeft: privémail, sollicitaties, overleg met
+    docenten, post van andere klanten. Alleen wat aantoonbaar via
+    boekingen@skoolworkshop.nl loopt, komt in aanmerking.
+
+    Wij kijken daarvoor naar alle adresvelden die ertoe kunnen doen, niet
+    alleen naar To. Bij een alias staat het adres soms alleen in Delivered-To,
+    en bij doorgestuurde post soms alleen in Reply-To.
+
+    Slot 2 is de geverifieerde contactpersoon hieronder. Een bericht moet door
+    beide sloten heen.
+  */
+  const mailbox = serverEnv.google.mailbox;
+  if (!betreftMailbox(email.headers, mailbox)) {
+    return { stored: false, reason: betreftMailboxReden(email.headers, mailbox) };
+  }
 
   const participants = uniqueStrings([email.from, ...email.to, ...email.cc]);
   const visibility = await resolveThreadVisibility(participants);
@@ -186,8 +221,12 @@ export async function storeEmail(email: NormalizedEmail): Promise<{ stored: bool
 
   if (!thread) return { stored: false, reason: "Thread kon niet worden opgeslagen" };
 
-  const mailbox = serverEnv.google.mailbox.toLowerCase();
-  const direction = email.from === mailbox ? "outbound" : "inbound";
+  // Post van het boekingenadres én van het gekoppelde Google-account telt als
+  // uitgaand. Anders zou een bericht dat Clinten per ongeluk vanaf zijn eigen
+  // adres stuurt bij de klant als binnenkomend bericht verschijnen.
+  const direction = isUitgaand(email.from, mailbox, options.oauthAccount ?? null)
+    ? "outbound"
+    : "inbound";
 
   const { error } = await supabase.from("messages").insert({
     thread_id: thread.id,
@@ -239,7 +278,14 @@ export async function syncGmail(): Promise<SyncResult> {
         labels: message.labels ?? [],
         hasAttachments: false,
         attachments: [],
-        headers: {},
+        // Ook in testmodus echte headers opbouwen, anders zou de controle op
+        // het boekingenadres hieronder alles wegfilteren en zie je in de
+        // demo-omgeving een leeg berichtencentrum.
+        headers: {
+          from: message.from ?? "",
+          to: message.to.join(", "),
+          cc: (message.cc ?? []).join(", "),
+        },
       }));
     } else {
       const client = await GmailClient.create();
@@ -248,7 +294,10 @@ export async function syncGmail(): Promise<SyncResult> {
           "Gmail is nog niet geautoriseerd. Doorloop eerst Admin > Integraties > Gmail koppelen."
         );
       }
-      const list = await client.listMessages(settings.gmail_sync_query);
+      // De zoekopdracht wordt beperkt tot het boekingenadres. Wat niet bij
+      // boekingen hoort, verlaat Google dus niet eens.
+      const query = buildScopedQuery(serverEnv.google.mailbox, settings.gmail_sync_query);
+      const list = await client.listMessages(query);
       const ids = (list.messages ?? []).map((m) => m.id);
       for (const id of ids) {
         const message = await client.getMessage(id);
@@ -256,11 +305,20 @@ export async function syncGmail(): Promise<SyncResult> {
       }
     }
 
+    // Eén keer opzoeken met welk Google-account is gekoppeld, niet per bericht.
+    const { data: koppeling } = await createServiceSupabase()
+      .from("integration_credentials")
+      .select("account_email")
+      .eq("integration", "gmail")
+      .eq("label", "default")
+      .maybeSingle();
+    const oauthAccount = koppeling?.account_email ?? null;
+
     let storedCount = 0;
     let bookingCount = 0;
 
     for (const email of emails) {
-      const result = await storeEmail(email);
+      const result = await storeEmail(email, { oauthAccount });
       if (result.stored) storedCount += 1;
 
       // Bevestigingsmails apart verwerken naar boekingen.

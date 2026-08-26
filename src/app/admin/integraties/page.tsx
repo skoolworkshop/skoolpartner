@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
 import { ActionForm } from "@/components/admin/action-form";
+import {
+  GmailApartAdresUitleg,
+  GmailIdentityRows,
+  GmailSendAsNotice,
+} from "@/components/admin/gmail-details";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -8,7 +13,7 @@ import { Alert } from "@/components/ui/feedback";
 import { requireAdmin } from "@/lib/auth/session";
 import { integrationMode, missingCredentials, publicEnv } from "@/lib/env";
 import { getSyncStates } from "@/lib/integrations/sync-state";
-import { isGmailConnected } from "@/lib/integrations/health";
+import { getGmailStatus } from "@/lib/integrations/health";
 import { formatDateTime } from "@/lib/format";
 import { runSyncAction, testIntegrationAction } from "../actions";
 import type { IntegrationSyncStateRow } from "@/lib/types/database";
@@ -19,7 +24,7 @@ const LABELS: Record<string, { title: string; description: string }> = {
   gmail: {
     title: "Gmail",
     description:
-      "Leest de centrale mailbox boekingen@skoolworkshop.nl. Bron voor het berichtencentrum en voor het herkennen van definitieve boekingsbevestigingen.",
+      "Leest en verstuurt de klantcommunicatie van het boekingenadres. Bron voor het berichtencentrum en voor het herkennen van definitieve boekingsbevestigingen.",
   },
   moneybird: {
     title: "Moneybird",
@@ -42,7 +47,7 @@ export default async function AdminIntegrationsPage({
   const params = await searchParams;
   const [states, gmail] = await Promise.all([
     getSyncStates() as Promise<IntegrationSyncStateRow[]>,
-    isGmailConnected(),
+    getGmailStatus(),
   ]);
 
   return (
@@ -91,14 +96,7 @@ export default async function AdminIntegrationsPage({
                     <dt className="text-muted">Laatst gesynchroniseerd</dt>
                     <dd className="font-medium">{formatDateTime(state?.last_success_at)}</dd>
                   </div>
-                  {name === "gmail" && gmail.connected ? (
-                    <div className="col-span-2">
-                      <dt className="text-muted">Gekoppelde mailbox</dt>
-                      <dd className="font-medium break-all">
-                        {gmail.accountEmail ?? "onbekend"}
-                      </dd>
-                    </div>
-                  ) : null}
+                  {name === "gmail" ? <GmailIdentityRows status={gmail} /> : null}
                   <div>
                     <dt className="text-muted">Verwerkt</dt>
                     <dd className="font-medium">{state?.items_processed ?? 0}</dd>
@@ -150,6 +148,13 @@ export default async function AdminIntegrationsPage({
                   Een verbindingstest leest alleen. Er wordt nooit iets aangemaakt, gewijzigd of
                   verstuurd.
                 </p>
+
+                {name === "gmail" ? (
+                  <>
+                    <GmailSendAsNotice status={gmail} />
+                    <GmailApartAdresUitleg status={gmail} />
+                  </>
+                ) : null}
 
                 {name === "gmail" ? (
                   <p className="text-xs text-muted">
