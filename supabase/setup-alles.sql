@@ -1847,7 +1847,7 @@ insert into public.app_settings (key, value, label, description, group_name, val
   ('support_email', '"boekingen@skoolworkshop.nl"'::jsonb, 'Centrale mailbox',
    'Alle klantcommunicatie loopt via dit adres.', 'programma', 'text', true, 150),
 
-  ('rules_text', '"SkoolPoints worden toegekend over de daadwerkelijk afgenomen workshopuren van een definitieve boeking. Reiskosten, starttarief, materiaalkosten, extra deelnemers en toeslagen tellen niet mee.\n\nPunten komen beschikbaar zodra de bijbehorende factuur volledig is voldaan. Tot die tijd staan ze als punten in behandeling in uw overzicht.\n\nSkoolPoints horen bij uw organisatie en niet bij een individuele medewerker. Ze zijn niet overdraagbaar naar een andere organisatie, niet uitbetaalbaar en niet inwisselbaar voor contant geld.\n\nPunten zijn te gebruiken als voordeel op een volgende boeking. U dient daarvoor een inwisselverzoek in via SkoolPartner. Zolang een verzoek loopt, zijn die punten gereserveerd.\n\nDeelname begint op het moment van registratie. Boekingen van voor uw registratie leveren geen punten op."'::jsonb,
+  ('rules_text', '"SkoolPoints worden toegekend over de daadwerkelijk afgenomen workshopuren van een definitieve boeking. Reiskosten, starttarief, materiaalkosten, extra deelnemers en toeslagen tellen niet mee.\n\nPunten komen beschikbaar zodra de bijbehorende factuur volledig is voldaan. Tot die tijd staan ze als punten in behandeling in uw overzicht.\n\nSkoolPoints horen bij uw organisatie en niet bij een individuele medewerker. Ze zijn niet overdraagbaar naar een andere organisatie, niet uitbetaalbaar en niet inwisselbaar voor contant geld.\n\nPunten zijn te gebruiken als voordeel op een volgende boeking. U dient daarvoor een inwisselverzoek in via SkoolPartner. Zolang een verzoek loopt, zijn die punten gereserveerd.\n\nU spaart SkoolPoints op kwalificerende nieuwe workshopboekingen vanaf het moment dat uw SkoolPartner-account is geactiveerd. Boekingen en facturen van voor uw deelname tellen niet mee. Wij kijken daarbij naar het moment waarop de boeking tot stand kwam, niet naar de factuurdatum."'::jsonb,
    'Spelregels SkoolPartner', 'Getoond op de SkoolPartner-pagina.', 'teksten', 'longtext', true, 160),
 
   ('how_it_works_text', '"U boekt een workshop via de gebruikelijke offerteaanvraag. Zodra de boeking definitief is bevestigd, rekenen wij de workshopuren om naar SkoolPoints. Na betaling van de factuur komen die punten beschikbaar in SkoolPartner. Bij een volgende aanvraag geeft u aan hoeveel punten u wilt gebruiken."'::jsonb,
@@ -2176,4 +2176,307 @@ where verified_at is null;
 
 create index if not exists organizations_unverified_idx
   on public.organizations (created_at desc) where verified_at is null;
+
+-- >>> 20260826120000_inwisselen_op_boeking.sql
+
+-- =============================================================================
+-- SkoolPartner - 016 - Inwisselen koppelen aan een bevestigde boeking
+-- =============================================================================
+-- Een inwisselverzoek hing tot nu toe aan een vrij ingetypte boekingsreferentie.
+-- Daardoor kon een klant punten koppelen aan iets wat niet doorgaat, en konden
+-- wij achteraf niet aantonen op welke factuur de korting is verwerkt.
+--
+-- Hierna wijst een verzoek naar een echte boeking, die van dezelfde organisatie
+-- moet zijn, de status 'confirmed' moet hebben en in de toekomst moet liggen.
+--
+-- Bestaande verzoeken houden hun booking_reference en blijven werken.
+-- =============================================================================
+-- -----------------------------------------------------------------------------
+-- 1. Extra kolommen
+-- -----------------------------------------------------------------------------
+alter table public.redemption_requests
+  add column if not exists booking_id uuid references public.bookings (id) on delete set null,
+  add column if not exists invoice_number text,
+  add column if not exists moneybird_invoice_id text,
+  add column if not exists applied_by uuid references public.profiles (id) on delete set null;
+
+comment on column public.redemption_requests.booking_id is
+  'De bevestigde toekomstige boeking waarop dit voordeel wordt verrekend.';
+comment on column public.redemption_requests.invoice_number is
+  'Factuurnummer waarop de korting daadwerkelijk is verwerkt. Bewijs achteraf.';
+comment on column public.redemption_requests.applied_by is
+  'De beheerder die het voordeel daadwerkelijk heeft verwerkt.';
+
+create index if not exists redemption_requests_booking_idx
+  on public.redemption_requests (booking_id) where booking_id is not null;
+
+-- -----------------------------------------------------------------------------
+-- 2. request_redemption met controle op de boeking
+-- -----------------------------------------------------------------------------
+drop function if exists public.request_redemption(uuid, integer, text, text);
+
+create or replace function public.request_redemption(
+  p_org uuid,
+  p_points integer,
+  p_booking_id uuid default null,
+  p_booking_reference text default null,
+  p_note text default null
+)
+returns public.redemption_requests
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_account   uuid;
+  v_available integer;
+  v_min       integer;
+  v_max       integer;
+  v_value     integer;
+  v_active    boolean;
+  v_booking   public.bookings;
+  v_request   public.redemption_requests;
+  v_tx        uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Niet ingelogd';
+  end if;
+
+  if not public.has_organization_access(p_org) then
+    raise exception 'Geen toegang tot deze organisatie';
+  end if;
+
+  v_active := public.get_setting_bool('loyalty_enabled', true);
+  if not v_active then
+    raise exception 'SkoolPartner is momenteel niet actief';
+  end if;
+
+  if p_points is null or p_points <= 0 then
+    raise exception 'Kies een geldig aantal punten';
+  end if;
+
+  v_min   := public.get_setting_int('redemption_minimum_points', 500);
+  v_max   := public.get_setting_int('redemption_maximum_points_per_booking', 0);
+  v_value := public.get_setting_int('point_value_cents_per_100', 250);
+
+  if p_points < v_min then
+    raise exception 'Minimaal % SkoolPoints per verzoek', v_min;
+  end if;
+
+  if v_max > 0 and p_points > v_max then
+    raise exception 'Maximaal % SkoolPoints per boeking', v_max;
+  end if;
+
+  -- NIEUW: het voordeel moet naar een boeking die echt doorgaat.
+  if p_booking_id is not null then
+    select * into v_booking from public.bookings where id = p_booking_id;
+
+    if v_booking.id is null then
+      raise exception 'Deze boeking bestaat niet';
+    end if;
+    if v_booking.organization_id <> p_org then
+      raise exception 'Deze boeking hoort niet bij uw organisatie';
+    end if;
+    if v_booking.status <> 'confirmed' then
+      raise exception 'U kunt punten alleen gebruiken voor een bevestigde workshop';
+    end if;
+    if v_booking.scheduled_date is null or v_booking.scheduled_date < current_date then
+      raise exception 'U kunt punten alleen gebruiken voor een workshop die nog moet komen';
+    end if;
+  end if;
+
+  -- Vergrendel het account zodat gelijktijdige verzoeken niet hetzelfde saldo zien.
+  select id into v_account from public.loyalty_accounts
+  where organization_id = p_org
+  for update;
+
+  if v_account is null then
+    raise exception 'Deze organisatie neemt nog niet deel aan SkoolPartner';
+  end if;
+
+  v_available := public.loyalty_available_points(p_org);
+  if p_points > v_available then
+    raise exception 'Onvoldoende saldo: % beschikbaar, % gevraagd', v_available, p_points;
+  end if;
+
+  insert into public.redemption_requests (
+    organization_id, requested_by, points, value_cents,
+    point_value_cents_per_100, booking_id, booking_reference, note, status
+  )
+  values (
+    p_org, auth.uid(), p_points, (p_points * v_value) / 100,
+    v_value, p_booking_id,
+    coalesce(
+      nullif(trim(coalesce(p_booking_reference, '')), ''),
+      v_booking.reference
+    ),
+    nullif(trim(coalesce(p_note, '')), ''), 'requested'
+  )
+  returning * into v_request;
+
+  insert into public.loyalty_transactions (
+    organization_id, account_id, type, status, points,
+    point_value_cents_per_100, description, source, redemption_id,
+    booking_id, created_by
+  )
+  values (
+    p_org, v_account, 'redemption_reserve', 'reserved', -p_points,
+    v_value,
+    coalesce(
+      'Gereserveerd voor ' || v_booking.workshop_name,
+      'Gereserveerd voor inwisselverzoek'
+    ),
+    'portal', v_request.id, p_booking_id, auth.uid()
+  )
+  returning id into v_tx;
+
+  update public.redemption_requests
+  set reserve_transaction_id = v_tx
+  where id = v_request.id
+  returning * into v_request;
+
+  return v_request;
+end;
+$$;
+
+grant execute on function public.request_redemption(uuid, integer, uuid, text, text) to authenticated;
+
+-- >>> 20260826120100_email_kolom_vastzetten.sql
+
+-- =============================================================================
+-- SkoolPartner - 017 - Het e-mailadres in profiles vastzetten
+-- =============================================================================
+-- De policy profiles_update_self kijkt naar welke rij je bijwerkt, niet naar
+-- welke kolom. Zonder deze trigger kan iemand die rechtstreeks met de API praat
+-- zijn eigen profiles.email op een willekeurig adres zetten. Toegang hangt daar
+-- niet aan, maar het bepaalt wel welke school als suggestie verschijnt en met
+-- welke bron een aanvraag binnenkomt. Die schijn van betrouwbaarheid willen wij
+-- niet.
+--
+-- Wisselen van inlogadres loopt via Supabase Auth. Die draait als service_role
+-- en heeft geen auth.uid(), dus die mag het adres wel bijwerken.
+-- =============================================================================
+
+create or replace function public.guard_profile_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Alleen ingrijpen als een gewone gebruiker zichzelf bijwerkt.
+  -- service_role heeft geen auth.uid() en mag het adres wél zetten.
+  if auth.uid() is not null and auth.uid() = new.id then
+    if new.email is distinct from old.email then
+      new.email := old.email;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_pin_email on public.profiles;
+create trigger profiles_pin_email
+  before update on public.profiles
+  for each row execute function public.guard_profile_email();
+
+-- >>> 20260826120200_registratie_en_startmoment.sql
+
+-- =============================================================================
+-- SkoolPartner - 018 - Registratiegegevens en het echte boekingsmoment
+-- =============================================================================
+-- Hoort bij de regel dat SkoolPartner pas begint bij een afgeronde registratie
+-- en dat er niets met terugwerkende kracht meetelt.
+--
+-- Het startmoment zelf staat al in loyalty_accounts.enrolled_at. Dat blijft de
+-- enige bron. Hier komen alleen de gegevens bij die het registratieformulier en
+-- de puntenregel nodig hebben:
+--
+--   bookings.booked_at        wanneer de boeking tot stand kwam, niet wanneer
+--                             wij hem binnenhaalden
+--   profiles.first_name/last_name
+--   organizations.street / house_number / house_number_addition
+--   organization_members.requested_details
+--                             wat een aanvrager invulde over een BESTAANDE
+--                             organisatie, pas overnemen na goedkeuring
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. Wanneer kwam de boeking tot stand
+-- -----------------------------------------------------------------------------
+alter table public.bookings
+  add column if not exists booked_at timestamptz;
+
+comment on column public.bookings.booked_at is
+  'Moment waarop de boeking bij Skool Workshop tot stand kwam. Bepaalt of de boeking binnen de SkoolPartner-periode van de klant valt. Niet de factuurdatum en niet het moment van importeren.';
+
+-- Bestaande boekingen krijgen wat er nu ook al voor werd gebruikt.
+update public.bookings
+set booked_at = created_at
+where booked_at is null;
+
+create index if not exists bookings_booked_at_idx
+  on public.bookings (organization_id, booked_at);
+
+-- -----------------------------------------------------------------------------
+-- 2. Voornaam en achternaam
+-- -----------------------------------------------------------------------------
+alter table public.profiles
+  add column if not exists first_name text,
+  add column if not exists last_name  text;
+
+-- full_name blijft leidend voor alles wat er nu mee werkt. Is het gevuld en de
+-- twee nieuwe velden niet, dan splitsen wij het één keer voorzichtig: alles tot
+-- de eerste spatie is de voornaam, de rest de achternaam. Namen met een
+-- tussenvoegsel blijven zo netjes heel ("de Vries").
+update public.profiles
+set first_name = nullif(split_part(trim(full_name), ' ', 1), ''),
+    last_name  = nullif(trim(substring(trim(full_name) from position(' ' in trim(full_name)) + 1)), '')
+where full_name is not null
+  and position(' ' in trim(full_name)) > 0
+  and first_name is null
+  and last_name is null;
+
+-- -----------------------------------------------------------------------------
+-- 3. Adres in losse velden
+-- -----------------------------------------------------------------------------
+alter table public.organizations
+  add column if not exists street                text,
+  add column if not exists house_number          text,
+  add column if not exists house_number_addition text;
+
+comment on column public.organizations.street is
+  'Straatnaam. address_line blijft bestaan en wordt hieruit samengesteld.';
+
+-- address_line automatisch bijhouden zodra de losse velden gevuld zijn, zodat
+-- er nooit twee versies van hetzelfde adres naast elkaar staan.
+create or replace function public.organizations_compose_address()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.street is not null and length(trim(new.street)) > 0 then
+    new.address_line :=
+      trim(new.street) ||
+      coalesce(' ' || nullif(trim(coalesce(new.house_number, '')), ''), '') ||
+      coalesce(' ' || nullif(trim(coalesce(new.house_number_addition, '')), ''), '');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists organizations_compose_address on public.organizations;
+create trigger organizations_compose_address
+  before insert or update on public.organizations
+  for each row execute function public.organizations_compose_address();
+
+-- -----------------------------------------------------------------------------
+-- 4. Wat iemand invult over een bestaande organisatie
+-- -----------------------------------------------------------------------------
+alter table public.organization_members
+  add column if not exists requested_details jsonb;
+
+comment on column public.organization_members.requested_details is
+  'Wat de aanvrager bij registratie invulde over de organisatie. Wordt pas naar organizations geschreven nadat een beheerder de aanvraag goedkeurt.';
 

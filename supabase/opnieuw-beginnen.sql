@@ -16,6 +16,11 @@
 --   in de beheeromgeving ook klanten ziet die zelf nog niet inloggen.
 --   Boekingen in elke status, facturen, SkoolPoints, berichten en resultaten.
 --
+--   Het SkoolPartner-startmoment van De Goudse Waarden ligt twintig dagen terug.
+--   Daardoor staan er twee vergelijkbare boekingen klaar: SW-2026-0401 kwam tot
+--   stand vóór de deelname en levert geen punten op, SW-2026-0402 kwam erna tot
+--   stand en levert wel punten op. Zo kun je de belangrijkste regel echt zien.
+--
 -- Instellingen blijven staan. Die horen bij de inrichting, niet bij de klanten.
 --
 -- Plak het hele bestand in Supabase, SQL Editor, en klik op Run. Onderaan zie
@@ -177,20 +182,30 @@ begin
 
   -- De beheerder. Ziet alles van alle klanten via de beheeromgeving en is
   -- bewust van geen enkele organisatie lid.
-  insert into public.profiles (id, email, full_name, phone, job_title, is_admin, is_super_admin)
-  values (v_beheerder, v_beheer, 'Skool Workshop', '+31850653923', 'Beheer', true, true)
+  insert into public.profiles (
+    id, email, full_name, first_name, last_name, phone, job_title, is_admin, is_super_admin
+  )
+  values (
+    v_beheerder, v_beheer, 'Skool Workshop', 'Skool', 'Workshop',
+    '+31850653923', 'Beheer', true, true
+  )
   on conflict (id) do update
     set is_admin = true, is_super_admin = true, is_blocked = false,
-        full_name = 'Skool Workshop', phone = '+31850653923',
-        job_title = 'Beheer', deactivated_at = null;
+        full_name = 'Skool Workshop', first_name = 'Skool', last_name = 'Workshop',
+        phone = '+31850653923', job_title = 'Beheer', deactivated_at = null;
 
   -- De klant. Een gewone docent zonder beheerrechten.
-  insert into public.profiles (id, email, full_name, phone, job_title, is_admin, is_super_admin)
-  values (v_user, v_email, 'Sanne de Vries', '+31612345678', 'Cultuurcoordinator', false, false)
+  insert into public.profiles (
+    id, email, full_name, first_name, last_name, phone, job_title, is_admin, is_super_admin
+  )
+  values (
+    v_user, v_email, 'Sanne de Vries', 'Sanne', 'de Vries',
+    '+31612345678', 'Cultuurcoordinator', false, false
+  )
   on conflict (id) do update
     set is_admin = false, is_super_admin = false, is_blocked = false,
-        full_name = 'Sanne de Vries', phone = '+31612345678',
-        job_title = 'Cultuurcoordinator', deactivated_at = null;
+        full_name = 'Sanne de Vries', first_name = 'Sanne', last_name = 'de Vries',
+        phone = '+31612345678', job_title = 'Cultuurcoordinator', deactivated_at = null;
 
   ---------------------------------------------------------------------------
   -- 2. Drie demo-organisaties
@@ -216,6 +231,21 @@ begin
             'Rotterdam', v_email)
     returning id into v_org3;
   end if;
+
+  -- Adressen in de losse velden. address_line wordt daaruit samengesteld.
+  update public.organizations
+  set street = 'Kanaalstraat', house_number = '5', postal_code = '2801 AB', city = 'Gouda',
+      phone = '+31182123456'
+  where id = v_org1 and street is null;
+
+  update public.organizations
+  set street = 'Zonstraat', house_number = '12', house_number_addition = 'B',
+      postal_code = '3581 AB', city = 'Utrecht'
+  where id = v_org2 and street is null;
+
+  update public.organizations
+  set street = 'Zuidplein', house_number = '3', postal_code = '3083 CW', city = 'Rotterdam'
+  where id = v_org3 and street is null;
 
   -- Domeinen. De unieke index staat op lower(domain), daar werkt on conflict niet.
   if not exists (select 1 from public.organization_domains where domain = 'goudsewaarden.nl') then
@@ -267,6 +297,17 @@ begin
   v_acc1 := public.ensure_loyalty_account(v_org1, v_user);
   v_acc2 := public.ensure_loyalty_account(v_org2, v_user);
   v_acc3 := public.ensure_loyalty_account(v_org3, v_user);
+
+  -- Om de belangrijkste regel te kunnen testen zetten wij het startmoment van
+  -- de demo-organisaties twintig dagen terug. Zo bestaan er straks boekingen
+  -- van vóór en van ná de deelname.
+  update public.loyalty_accounts
+  set enrolled_at = now() - interval '20 days'
+  where organization_id in (v_org1, v_org2, v_org3);
+
+  update public.organizations
+  set skoolpartner_enrolled_at = now() - interval '20 days'
+  where id in (v_org1, v_org2, v_org3);
 
   ---------------------------------------------------------------------------
   -- 4. Boekingen
@@ -380,6 +421,41 @@ begin
 
   -- Buurtcentrum De Zuidhoek krijgt bewust nog geen boekingen: zo zie je hoe
   -- het portaal eruitziet voor een organisatie die net begint.
+
+  ---------------------------------------------------------------------------
+  -- 4b. Twee boekingen om de belangrijkste regel te kunnen zien
+  ---------------------------------------------------------------------------
+  -- Deze twee lijken op elkaar, maar de een kwam tot stand vóór de deelname en
+  -- de ander erna. Alleen de tweede levert SkoolPoints op.
+  if not exists (select 1 from public.bookings where reference = 'SW-2026-0401') then
+    insert into public.bookings (
+      organization_id, reference, workshop_name, workshop_count, minutes_per_workshop,
+      qualifying_minutes, scheduled_date, start_time, end_time, location, participants,
+      status, origin, booked_at, contact_email, contact_name, created_by
+    ) values (
+      v_org1, 'SW-2026-0401', 'CKV cultuurdag (geboekt voor deelname)', 4, 90, 360,
+      current_date + 24, '09:00', '15:00', 'Kanaalstraat 5, Gouda', 96,
+      'confirmed', 'admin_manual', now() - interval '40 days', v_email, 'Sanne de Vries', v_user
+    );
+  end if;
+
+  if not exists (select 1 from public.bookings where reference = 'SW-2026-0402') then
+    insert into public.bookings (
+      organization_id, reference, workshop_name, workshop_count, minutes_per_workshop,
+      qualifying_minutes, scheduled_date, start_time, end_time, location, participants,
+      status, origin, booked_at, contact_email, contact_name, created_by
+    ) values (
+      v_org1, 'SW-2026-0402', 'CKV cultuurdag', 4, 90, 360,
+      current_date + 38, '09:00', '15:00', 'Kanaalstraat 5, Gouda', 96,
+      'confirmed', 'admin_manual', now() - interval '10 days', v_email, 'Sanne de Vries', v_user
+    );
+  end if;
+
+  -- Alle overige demoboekingen kwamen ná de deelname tot stand.
+  update public.bookings
+  set booked_at = now() - interval '10 days'
+  where organization_id in (v_org1, v_org2, v_org3)
+    and booked_at is null;
 
   ---------------------------------------------------------------------------
   -- 5. Facturen, factuurregels en koppelingen

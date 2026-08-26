@@ -107,6 +107,16 @@ async function main() {
     `)
   )[0];
 
+  const periode = (
+    await q(`
+      select
+        count(*) filter (where b.booked_at < a.enrolled_at)::int as voor_deelname,
+        count(*) filter (where b.booked_at >= a.enrolled_at)::int as na_deelname
+      from public.bookings b
+      join public.loyalty_accounts a on a.organization_id = b.organization_id
+    `)
+  )[0];
+
   const counts = (
     await q(`
       select
@@ -131,6 +141,9 @@ async function main() {
   console.log(
     `  testdata      ${counts.organisaties} organisaties, ${counts.boekingen} boekingen (${counts.bevestigd} bevestigd), ${counts.facturen} facturen, ${counts.berichten} berichten, ${counts.resultaten} resultatensets`
   );
+  console.log(
+    `  startmoment   ${periode.voor_deelname} boeking van vóór de deelname, ${periode.na_deelname} van erna`
+  );
 
   const ok =
     accounts.length === 2 &&
@@ -149,8 +162,12 @@ async function main() {
     balance.available_points === 350 &&
     balance.pending_points === 300 &&
     balance.lifetime_earned_points === 1200 &&
-    counts.boekingen === 8 &&
-    counts.bevestigd === 2 &&
+    counts.boekingen === 10 &&
+    counts.bevestigd === 4 &&
+    // De demonstratie van de belangrijkste regel: één boeking van vóór de
+    // deelname en één van erna.
+    periode.voor_deelname === 1 &&
+    periode.na_deelname === 9 &&
     counts.facturen === 5 &&
     counts.berichten === 6 &&
     counts.resultaten === 2;
