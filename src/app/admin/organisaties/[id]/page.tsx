@@ -15,6 +15,7 @@ import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import {
+  addMemberByEmailAction,
   addOrganizationDomainAction,
   deleteOrganizationAction,
   inviteMemberAction,
@@ -168,6 +169,28 @@ export default async function OrganizationDetailPage({
                 </Field>
                 <Field label="Rol" htmlFor="invite-role">
                   <Select id="invite-role" name="role" defaultValue="lid">
+                    <option value="lid">Lid</option>
+                    <option value="beheerder">Beheerder</option>
+                  </Select>
+                </Field>
+              </div>
+            </ActionForm>
+
+            <p className="mb-3 mt-6 text-sm font-semibold">
+              Bestaand account direct toevoegen
+            </p>
+            <p className="mb-3 text-sm text-muted">
+              Heeft deze persoon al een account in SkoolPartner? Dan hoeft er geen uitnodiging
+              heen: voeg het adres hier toe en de toegang staat meteen open.
+            </p>
+            <ActionForm action={addMemberByEmailAction} submitLabel="Direct toevoegen">
+              <input type="hidden" name="organization_id" value={detail.organization.id} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="E-mailadres" htmlFor="direct-email" required>
+                  <Input id="direct-email" name="email" type="email" required />
+                </Field>
+                <Field label="Rol" htmlFor="direct-role">
+                  <Select id="direct-role" name="role" defaultValue="lid">
                     <option value="lid">Lid</option>
                     <option value="beheerder">Beheerder</option>
                   </Select>

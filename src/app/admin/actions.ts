@@ -785,3 +785,113 @@ export async function deleteOrganizationAction(
     ? { status: "ok", message: result.message }
     : { status: "error", message: result.message };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Rechten en lidmaatschappen, zonder SQL                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Maakt van een account een klant, een beheerder of een hoofdbeheerder. */
+export async function setUserRoleAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+
+  if (!session.profile?.is_super_admin) {
+    return { status: "error", message: "Alleen een hoofdbeheerder kan rechten wijzigen." };
+  }
+
+  const userId = String(formData.get("user_id") ?? "");
+  const role = String(formData.get("rol") ?? "klant");
+
+  if (userId === session.userId) {
+    return {
+      status: "error",
+      message: "U kunt uw eigen rechten niet wijzigen. Vraag een andere hoofdbeheerder.",
+    };
+  }
+
+  const rechten =
+    role === "hoofdbeheerder"
+      ? { is_admin: true, is_super_admin: true }
+      : role === "beheerder"
+        ? { is_admin: true, is_super_admin: false }
+        : { is_admin: false, is_super_admin: false };
+
+  const supabase = createServiceSupabase();
+  const { error } = await supabase.from("profiles").update(rechten).eq("id", userId);
+
+  if (error) return { status: "error", message: `Wijzigen is niet gelukt: ${error.message}` };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "user.role_changed",
+    entityType: "profile",
+    entityId: userId,
+    after: { rol: role },
+  });
+
+  revalidatePath("/admin/gebruikers");
+  return { status: "ok", message: `Rechten aangepast naar ${role}.` };
+}
+
+/** Voegt een bestaand account direct toe aan een organisatie. */
+export async function addMemberByEmailAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+
+  const organizationId = String(formData.get("organization_id") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const role = String(formData.get("role") ?? "lid") === "beheerder" ? "beheerder" : "lid";
+
+  if (!email) return { status: "error", message: "Vul een e-mailadres in." };
+
+  const supabase = createServiceSupabase();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, email")
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (!profile) {
+    return {
+      status: "error",
+      message:
+        "Dit adres heeft nog geen account. Gebruik hierboven Uitnodigen, dan krijgt deze persoon een link om zich aan te melden.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("organization_members")
+    .upsert(
+      {
+        organization_id: organizationId,
+        user_id: profile.id,
+        role,
+        status: "active",
+        source: "admin_manual",
+        approved_by: session.userId,
+        approved_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,user_id" }
+    );
+
+  if (error) return { status: "error", message: `Toevoegen is niet gelukt: ${error.message}` };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "membership.added_by_admin",
+    entityType: "organization_members",
+    entityId: profile.id,
+    organizationId,
+    after: { email: profile.email, rol: role },
+  });
+
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  revalidatePath("/admin/gebruikers");
+  return { status: "ok", message: `${profile.email} is toegevoegd als ${role}.` };
+}

@@ -14,6 +14,7 @@ import {
   deleteUserAction,
   rejectMembershipAction,
   setUserBlockedAction,
+  setUserRoleAction,
 } from "../actions";
 
 export const metadata: Metadata = { title: "Gebruikers" };
@@ -138,7 +139,33 @@ export default async function AdminUsersPage({
                     <td className="px-5 py-2.5">{user.email}</td>
                     <td className="px-5 py-2.5">{user.full_name ?? "—"}</td>
                     <td className="px-5 py-2.5">
-                      {user.is_super_admin ? (
+                      {session.profile?.is_super_admin && user.id !== session.userId ? (
+                        <ActionForm
+                          action={setUserRoleAction}
+                          submitLabel="Opslaan"
+                          variant="secondary"
+                          inline
+                        >
+                          <input type="hidden" name="user_id" value={user.id} />
+                          <Field label="Rol" htmlFor={`rol-${user.id}`} className="w-44">
+                            <Select
+                              id={`rol-${user.id}`}
+                              name="rol"
+                              defaultValue={
+                                user.is_super_admin
+                                  ? "hoofdbeheerder"
+                                  : user.is_admin
+                                    ? "beheerder"
+                                    : "klant"
+                              }
+                            >
+                              <option value="klant">Klant</option>
+                              <option value="beheerder">Beheerder</option>
+                              <option value="hoofdbeheerder">Hoofdbeheerder</option>
+                            </Select>
+                          </Field>
+                        </ActionForm>
+                      ) : user.is_super_admin ? (
                         <Badge tone="accent">Hoofdbeheerder</Badge>
                       ) : user.is_admin ? (
                         <Badge tone="info">Beheerder</Badge>
