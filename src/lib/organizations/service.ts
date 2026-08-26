@@ -70,6 +70,47 @@ export async function searchOrganizations(query: string, limit = 8) {
  * Vraagt lidmaatschap aan. Het lidmaatschap staat altijd op 'pending' tot een
  * admin het goedkeurt. Dat geldt ook bij een domeinmatch.
  */
+/**
+ * Zet iemand meteen als actief lid neer. Gebruikt bij zelf aanmelden met een
+ * eigen, nieuwe organisatie: die persoon is per definitie de eerste van die
+ * school, dus er valt niets te beschermen. Er hangen nog geen boekingen,
+ * facturen of punten aan.
+ */
+export async function joinAsFirstMember(params: {
+  userId: string;
+  userEmail: string;
+  organizationId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const supabase = createServiceSupabase();
+
+  const { error } = await supabase.from("organization_members").upsert(
+    {
+      organization_id: params.organizationId,
+      user_id: params.userId,
+      role: "beheerder",
+      status: "active",
+      source: "self_request",
+      approved_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id,user_id" }
+  );
+
+  if (error) return { ok: false, message: "Aanmelden kon niet worden opgeslagen." };
+
+  await recordAudit({
+    actorId: params.userId,
+    actorEmail: params.userEmail,
+    actorRole: "klant",
+    action: "organization_membership.self_started",
+    entityType: "organization_member",
+    entityId: params.organizationId,
+    organizationId: params.organizationId,
+    after: { status: "active", rol: "beheerder" },
+  });
+
+  return { ok: true };
+}
+
 export async function requestMembership(params: {
   userId: string;
   userEmail: string;
@@ -248,6 +289,8 @@ export async function createOrganization(params: {
   contactEmail?: string | null;
   actorId?: string | null;
   actorEmail?: string | null;
+  /** Door een beheerder aangemaakt? Dan hoeft er niets meer gecontroleerd te worden. */
+  verified?: boolean;
 }): Promise<{
   ok: boolean;
   organizationId?: string;
@@ -281,6 +324,8 @@ export async function createOrganization(params: {
       kind: params.kind ?? "school",
       city: params.city ?? null,
       contact_email: params.contactEmail ?? null,
+      verified_at: params.verified ? new Date().toISOString() : null,
+      verified_by: params.verified ? (params.actorId ?? null) : null,
     })
     .select("id")
     .single();
@@ -295,6 +340,20 @@ export async function createOrganization(params: {
       hint: error?.hint,
       code: error?.code,
     });
+    await recordAudit({
+      actorId: params.actorId ?? null,
+      actorEmail: params.actorEmail ?? null,
+      action: "organization.create_failed",
+      entityType: "organization",
+      after: {
+        naam: name,
+        slug,
+        melding: error?.message ?? "onbekende fout",
+        details: error?.details ?? null,
+        code: error?.code ?? null,
+      },
+    });
+
     return {
       ok: false,
       message:

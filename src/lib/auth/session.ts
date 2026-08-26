@@ -6,7 +6,10 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import type { MembershipRole, OrganizationRow, ProfileRow } from "@/lib/types/database";
 
 export interface ActiveMembership {
-  organization: Pick<OrganizationRow, "id" | "name" | "slug" | "kind" | "status" | "skoolpartner_enrolled_at">;
+  organization: Pick<
+    OrganizationRow,
+    "id" | "name" | "slug" | "kind" | "status" | "skoolpartner_enrolled_at" | "verified_at"
+  >;
   role: MembershipRole;
 }
 
@@ -40,7 +43,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
   const { data: memberRows } = await supabase
     .from("organization_members")
     .select(
-      "role, status, organization_id, organizations!inner(id, name, slug, kind, status, skoolpartner_enrolled_at)"
+      "role, status, organization_id, organizations!inner(id, name, slug, kind, status, skoolpartner_enrolled_at, verified_at)"
     )
     .eq("user_id", user.id);
 

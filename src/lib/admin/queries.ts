@@ -65,6 +65,18 @@ export async function getBookingSource(id: string) {
   return data;
 }
 
+/** Scholen die zich zelf hebben aangemeld en nog gekoppeld moeten worden. */
+export async function listUnverifiedOrganizations() {
+  const supabase = createServiceSupabase();
+  const { data } = await supabase
+    .from("organizations")
+    .select("*")
+    .is("verified_at", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  return data ?? [];
+}
+
 export async function listOrganizations(query?: string) {
   const supabase = createServiceSupabase();
   let request = supabase
