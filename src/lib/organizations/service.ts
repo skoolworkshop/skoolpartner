@@ -248,18 +248,28 @@ export async function createOrganization(params: {
   contactEmail?: string | null;
   actorId?: string | null;
   actorEmail?: string | null;
-}): Promise<{ ok: boolean; organizationId?: string; message?: string }> {
+}): Promise<{
+  ok: boolean;
+  organizationId?: string;
+  message?: string;
+  alreadyExisted?: boolean;
+}> {
   const supabase = createServiceSupabase();
   const name = params.name.trim();
   if (name.length < 2) return { ok: false, message: "Vul een organisatienaam in." };
 
-  let slug = slugify(name);
-  const { data: clash } = await supabase
+  // Bestaat deze organisatie al? Dan is aanmaken niet de bedoeling, maar
+  // aansluiten. Anders loopt iemand vast op een foutmelding zonder uitweg.
+  const slug = slugify(name);
+  const { data: existing } = await supabase
     .from("organizations")
     .select("id")
     .eq("slug", slug)
     .maybeSingle();
-  if (clash) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+
+  if (existing) {
+    return { ok: true, organizationId: existing.id, alreadyExisted: true };
+  }
 
   const { data, error } = await supabase
     .from("organizations")
@@ -273,7 +283,22 @@ export async function createOrganization(params: {
     .select("id")
     .single();
 
-  if (error || !data) return { ok: false, message: "Organisatie kon niet worden aangemaakt." };
+  if (error || !data) {
+    // De echte reden hoort niet op een klantpagina, maar wel in de serverlog.
+    console.error("[organisatie aanmaken] mislukt", {
+      naam: name,
+      slug,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+      code: error?.code,
+    });
+    return {
+      ok: false,
+      message:
+        "Het aanmaken lukte niet. Neem contact op met Skool Workshop, dan zetten wij uw organisatie klaar.",
+    };
+  }
 
   await recordAudit({
     actorId: params.actorId ?? null,
