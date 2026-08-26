@@ -92,7 +92,7 @@ export function LoginForm({
         </h1>
         <p className="mt-2 text-[15px] text-muted">
           {mode === "register"
-            ? "Maak een account aan met uw zakelijke e-mailadres. U kiest daarna uw organisatie."
+            ? "Stap 1 van 2. Wij sturen u een link om uw e-mailadres te bevestigen. Daarna vult u uw organisatie- en adresgegevens in."
             : "Vul uw e-mailadres in. U ontvangt een inloglink, u hoeft geen wachtwoord te onthouden."}
         </p>
       </div>
@@ -104,15 +104,26 @@ export function LoginForm({
         {mode === "register" ? <input type="hidden" name="registreren" value="1" /> : null}
 
         {mode === "register" ? (
-          <Field label="Uw naam" htmlFor="full_name" required>
-            <Input
-              id="full_name"
-              name="full_name"
-              autoComplete="name"
-              placeholder="Sanne de Vries"
-              required
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Voornaam" htmlFor="first_name" required>
+              <Input
+                id="first_name"
+                name="first_name"
+                autoComplete="given-name"
+                placeholder="Sanne"
+                required
+              />
+            </Field>
+            <Field label="Achternaam" htmlFor="last_name" required>
+              <Input
+                id="last_name"
+                name="last_name"
+                autoComplete="family-name"
+                placeholder="de Vries"
+                required
+              />
+            </Field>
+          </div>
         ) : null}
 
         <Field

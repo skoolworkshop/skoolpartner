@@ -25,18 +25,26 @@ export async function requestRedemption(
 ): Promise<RedemptionState> {
   const session = await requireMember();
   const points = Number.parseInt(String(formData.get("points") ?? ""), 10);
-  const reference = String(formData.get("booking_reference") ?? "").trim() || null;
+  const bookingId = String(formData.get("booking_id") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
 
   if (!Number.isFinite(points) || points <= 0) {
     return { status: "error", message: "Vul een geldig aantal punten in." };
   }
 
+  if (!bookingId) {
+    return {
+      status: "error",
+      message: "Kies eerst de bevestigde workshop waarvoor u de punten wilt gebruiken.",
+    };
+  }
+
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.rpc("request_redemption", {
     p_org: session.activeOrganizationId,
     p_points: points,
-    p_booking_reference: reference,
+    p_booking_id: bookingId,
+    p_booking_reference: null,
     p_note: note,
   });
 
@@ -52,7 +60,7 @@ export async function requestRedemption(
     entityType: "redemption_request",
     entityId: (data as { id?: string } | null)?.id ?? null,
     organizationId: session.activeOrganizationId,
-    after: { points, booking_reference: reference },
+    after: { points, booking_id: bookingId },
   });
 
   revalidatePath("/skoolpartner");
@@ -106,6 +114,15 @@ function vertaalDatabaseFout(message: string): string {
   if (message.includes("Geen toegang")) return "U heeft geen toegang tot deze organisatie.";
   if (message.includes("neemt nog niet deel")) {
     return "Uw organisatie neemt nog niet deel aan SkoolPartner.";
+  }
+  if (message.includes("bevestigde workshop")) {
+    return "U kunt punten alleen gebruiken voor een bevestigde workshop.";
+  }
+  if (message.includes("nog moet komen")) {
+    return "U kunt punten alleen gebruiken voor een workshop die nog moet komen.";
+  }
+  if (message.includes("hoort niet bij uw organisatie") || message.includes("bestaat niet")) {
+    return "Deze workshop staat niet op naam van uw organisatie.";
   }
   return "Uw verzoek kon niet worden verwerkt. Probeer het later opnieuw.";
 }

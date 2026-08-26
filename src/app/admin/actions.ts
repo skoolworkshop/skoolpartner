@@ -260,6 +260,9 @@ export async function approveBookingSourceAction(
     organizationId,
     origin: "email_parser",
     createdBy: session.userId,
+    // De boeking kwam tot stand op het moment van de bevestigingsmail, niet nu
+    // dat een beheerder hem goedkeurt.
+    bookedAt: source.received_at,
     extracted: {
       organizationName: null,
       contactName: source.from_name,
@@ -403,6 +406,7 @@ export async function decideRedemptionAction(
   const id = String(formData.get("request_id") ?? "");
   const decision = String(formData.get("decision") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
+  const invoiceNumber = String(formData.get("invoice_number") ?? "").trim() || null;
 
   const supabase = createServiceSupabase();
   const { data: request } = await supabase
@@ -413,6 +417,24 @@ export async function decideRedemptionAction(
 
   if (!request) return { status: "error", message: "Verzoek niet gevonden." };
 
+  // Een afgehandeld verzoek blijft afgehandeld. Anders zouden punten die al
+  // zijn vrijgegeven opnieuw kunnen worden afgeschreven, of andersom.
+  if (request.status !== "requested" && request.status !== "approved") {
+    return {
+      status: "error",
+      message: "Dit verzoek is al afgehandeld en kan niet opnieuw worden gewijzigd.",
+    };
+  }
+
+  // Verwerkt betekent: de korting staat echt op een factuur. Zonder
+  // factuurnummer kunnen wij dat later niet aantonen.
+  if (decision === "applied" && !invoiceNumber) {
+    return {
+      status: "error",
+      message: "Vul het factuurnummer in waarop de korting is verwerkt.",
+    };
+  }
+
   if (decision === "approved") {
     await supabase
       .from("redemption_requests")
@@ -421,6 +443,7 @@ export async function decideRedemptionAction(
         decided_by: session.userId,
         decided_at: new Date().toISOString(),
         decision_note: note,
+        invoice_number: invoiceNumber ?? request.invoice_number,
       })
       .eq("id", id);
   } else if (decision === "applied") {
@@ -429,17 +452,24 @@ export async function decideRedemptionAction(
       .update({
         status: "applied",
         applied_at: new Date().toISOString(),
-        decided_by: session.userId,
-        decided_at: new Date().toISOString(),
-        decision_note: note,
+        applied_by: session.userId,
+        decided_by: request.decided_by ?? session.userId,
+        decided_at: request.decided_at ?? new Date().toISOString(),
+        decision_note: note ?? request.decision_note,
+        invoice_number: invoiceNumber,
       })
       .eq("id", id);
 
     // De reservering wordt definitief: de punten zijn nu daadwerkelijk gebruikt.
+    // De punten- en eurowaarde op de transactie blijven staan zoals ze bij het
+    // verzoek golden, ook als de puntwaarde later wordt aangepast.
     if (request.reserve_transaction_id) {
       await supabase
         .from("loyalty_transactions")
-        .update({ status: "redeemed", reason: note ?? "Voordeel verwerkt op boeking" })
+        .update({
+          status: "redeemed",
+          reason: `Voordeel verwerkt op factuur ${invoiceNumber}`,
+        })
         .eq("id", request.reserve_transaction_id);
     }
   } else if (decision === "rejected") {
@@ -470,13 +500,33 @@ export async function decideRedemptionAction(
     entityType: "redemption_request",
     entityId: id,
     organizationId: request.organization_id,
-    before: { status: request.status },
-    after: { status: decision },
+    before: {
+      status: request.status,
+      factuurnummer: request.invoice_number,
+    },
+    after: {
+      status: decision,
+      punten: request.points,
+      waarde_centen: request.value_cents,
+      punt_waarde_per_100: request.point_value_cents_per_100,
+      boeking_id: request.booking_id,
+      factuurnummer: decision === "applied" ? invoiceNumber : (invoiceNumber ?? request.invoice_number),
+      punten_vrijgegeven: decision === "rejected",
+    },
     reason: note,
   });
 
   revalidatePath("/admin/inwisselen");
-  return { status: "ok", message: "Verzoek bijgewerkt." };
+  revalidatePath("/skoolpartner");
+  return {
+    status: "ok",
+    message:
+      decision === "applied"
+        ? `Verwerkt en vastgelegd op factuur ${invoiceNumber}.`
+        : decision === "rejected"
+          ? "Afgewezen. De gereserveerde punten zijn weer beschikbaar."
+          : "Goedgekeurd. De punten blijven gereserveerd tot u het voordeel verwerkt.",
+  };
 }
 
 /* -------------------------------------------------------------------------- */

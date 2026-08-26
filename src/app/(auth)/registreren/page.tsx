@@ -11,8 +11,9 @@ export default function RegisterPage() {
       <LoginForm mode="register" next="/aanmelden" />
       <div className="mt-8 space-y-3 text-sm text-muted">
         <p>
-          Door te registreren doet u mee aan SkoolPartner. U spaart SkoolPoints vanaf het moment
-          van registratie. Boekingen van vóór uw registratie leveren geen punten op.
+          SkoolPartner is een programma waar u zelf voor kiest. U spaart SkoolPoints op nieuwe
+          workshopboekingen vanaf het moment dat uw registratie is afgerond. Boekingen en facturen
+          van vóór uw deelname tellen niet mee.
         </p>
         <p>
           Heeft u al een account?{" "}

@@ -7,6 +7,8 @@ import { Alert } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
 import { checkProfile, missingLabel } from "@/lib/account";
 import { formatPhone } from "@/lib/phone";
+import { formatDate } from "@/lib/format";
+import { getEnrolledAt } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
 import { LeaveOrganizationForm, ProfileForm } from "./account-forms";
 
@@ -15,6 +17,8 @@ export const metadata: Metadata = { title: "Account" };
 export default async function AccountPage() {
   const session = await requireMember();
   const settings = await getSettings();
+
+  const enrolledAt = await getEnrolledAt(session.activeOrganizationId);
 
   // Het inlogadres uit Supabase Auth is leidend, niet het veld in profiles.
   const status = checkProfile({
@@ -39,6 +43,22 @@ export default async function AccountPage() {
           zelf aan. Klopt uw e-mailadres niet? Mail ons op {settings.support_email}, want dat adres
           is ook uw inlogadres.
         </Alert>
+      ) : null}
+
+      {enrolledAt ? (
+        <Card className="mb-5">
+          <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Badge tone="success">SkoolPartner actief</Badge>
+            <p className="text-[15px]">
+              Actief sinds <strong>{formatDate(enrolledAt)}</strong>
+            </p>
+            <p className="w-full text-sm text-muted">
+              U spaart SkoolPoints op kwalificerende nieuwe workshopboekingen vanaf het moment dat
+              uw SkoolPartner-account is geactiveerd. Boekingen en facturen van vóór uw deelname
+              tellen niet mee.
+            </p>
+          </CardBody>
+        </Card>
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">

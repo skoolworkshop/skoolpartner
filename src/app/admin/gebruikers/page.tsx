@@ -9,6 +9,8 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { requireAdmin } from "@/lib/auth/session";
 import { listPendingMembers, listUsers } from "@/lib/admin/queries";
 import { formatShortDate } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
+import type { RegistrationDetails } from "@/lib/types/database";
 import {
   approveMembershipAction,
   deleteUserAction,
@@ -23,6 +25,7 @@ interface PendingRow {
   id: string;
   created_at: string;
   source: string;
+  requested_details: RegistrationDetails | null;
   profiles: { email: string; full_name: string | null } | null;
   organizations: { name: string } | null;
 }
@@ -73,6 +76,42 @@ export default async function AdminUsersPage({
                       <span className="text-sm text-muted">{formatShortDate(row.created_at)}</span>
                     </div>
                   </div>
+
+                  {row.requested_details ? (
+                    <div className="rounded-card border border-line-soft bg-surface-1 px-4 py-3 text-sm">
+                      <p className="mb-1 font-semibold">Ingevuld bij registratie</p>
+                      <p className="text-muted">
+                        {[
+                          row.requested_details.job_title,
+                          row.requested_details.phone
+                            ? formatPhone(row.requested_details.phone)
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                      <p className="text-muted">
+                        {[
+                          [
+                            row.requested_details.street,
+                            row.requested_details.house_number,
+                            row.requested_details.house_number_addition,
+                          ]
+                            .filter(Boolean)
+                            .join(" "),
+                          [row.requested_details.postal_code, row.requested_details.city]
+                            .filter(Boolean)
+                            .join(" "),
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                      <p className="mt-1.5 text-muted">
+                        Deze gegevens vullen bij goedkeuren alleen lege velden van de organisatie
+                        aan. Wat er al stond, blijft staan.
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-wrap gap-4">
                     <ActionForm action={approveMembershipAction} submitLabel="Goedkeuren" inline>

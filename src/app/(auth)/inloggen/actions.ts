@@ -31,14 +31,16 @@ export async function sendLoginLink(
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const next = sanitizeNext(formData.get("volgende"));
-  const fullName = String(formData.get("full_name") ?? "").trim();
+  const firstName = String(formData.get("first_name") ?? "").trim();
+  const lastName = String(formData.get("last_name") ?? "").trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
   const allowSignUp = String(formData.get("registreren") ?? "") === "1";
 
   if (!EMAIL_PATTERN.test(email)) {
     return { status: "error", message: "Vul een geldig e-mailadres in.", email };
   }
-  if (allowSignUp && fullName.length < 2) {
-    return { status: "error", message: "Vul uw naam in.", email };
+  if (allowSignUp && (firstName.length < 2 || lastName.length < 2)) {
+    return { status: "error", message: "Vul uw voor- en achternaam in.", email };
   }
   if (!isSupabaseConfigured()) {
     return {
@@ -56,7 +58,9 @@ export async function sendLoginLink(
     options: {
       shouldCreateUser: allowSignUp,
       emailRedirectTo: `${siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}`,
-      data: allowSignUp ? { full_name: fullName } : undefined,
+      data: allowSignUp
+        ? { full_name: fullName, first_name: firstName, last_name: lastName }
+        : undefined,
     },
   });
 

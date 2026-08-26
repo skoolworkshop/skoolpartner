@@ -6,9 +6,9 @@ import { hasServiceRole } from "@/lib/env";
 import { suggestOrganizationsForEmail } from "@/lib/organizations/service";
 import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
-import { JoinForm } from "./join-form";
+import { RegistrationForm } from "./registration-form";
 
-export const metadata: Metadata = { title: "Organisatie kiezen" };
+export const metadata: Metadata = { title: "Registratie afronden" };
 
 export default async function JoinPage() {
   const session = await requireUser();
@@ -30,12 +30,26 @@ export default async function JoinPage() {
     id: s.organization.id,
     name: s.organization.name,
     city: s.organization.city,
-    reason: s.reason,
   }));
+
+  // Wat wij al weten vullen wij vast in. Meestal is dat alleen de naam die
+  // iemand bij het aanmaken van het account heeft opgegeven.
+  const profiel = session.profile;
+  const naam = (profiel?.full_name ?? "").trim();
+  const spatie = naam.indexOf(" ");
 
   return (
     <div className="space-y-6">
-      <JoinForm suggestions={suggestions} />
+      <RegistrationForm
+        email={session.email}
+        suggestions={suggestions}
+        prefill={{
+          firstName: profiel?.first_name ?? (spatie > 0 ? naam.slice(0, spatie) : naam),
+          lastName: profiel?.last_name ?? (spatie > 0 ? naam.slice(spatie + 1) : ""),
+          jobTitle: profiel?.job_title ?? "",
+          phone: profiel?.phone ?? "",
+        }}
+      />
 
       {/* Wie ben ik nu? Handig bij meerdere accounts, en de enige uitweg op
           deze pagina als je met het verkeerde adres bent ingelogd. */}

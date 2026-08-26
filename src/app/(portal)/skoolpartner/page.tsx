@@ -11,12 +11,13 @@ import { ExternalButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
-import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
+import { formatDate, formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import {
   getLoyaltyBalance,
   getLoyaltyTransactions,
   getRedemptionRequests,
+  getUpcomingBookings,
 } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
 import { RedeemForm } from "./redeem-form";
@@ -28,10 +29,13 @@ export default async function SkoolPartnerPage() {
   const settings = await getSettings();
   const organizationId = session.activeOrganizationId;
 
-  const [balance, transactions, redemptions] = await Promise.all([
+  const [balance, transactions, redemptions, upcoming] = await Promise.all([
     getLoyaltyBalance(organizationId),
     getLoyaltyTransactions(organizationId),
     getRedemptionRequests(organizationId),
+    // Alleen bevestigde workshops in de toekomst. Precies waar de klant zijn
+    // punten aan mag koppelen, en waar de database ook op controleert.
+    getUpcomingBookings(organizationId, 25),
   ]);
 
   const organizationName = session.activeMembership.organization.name;
@@ -134,6 +138,12 @@ export default async function SkoolPartnerPage() {
               maximumPoints={settings.redemption_maximum_points_per_booking}
               pointValueCentsPer100={settings.point_value_cents_per_100}
               pointsName={settings.points_name}
+              bookings={upcoming.map((booking) => ({
+                id: booking.id,
+                workshopName: booking.workshop_name,
+                scheduledDate: booking.scheduled_date,
+                reference: booking.reference,
+              }))}
             />
           </CardBody>
         </Card>
@@ -154,9 +164,25 @@ export default async function SkoolPartnerPage() {
                       {formatEuroCents(request.value_cents)}
                     </p>
                     <p className="text-sm text-muted">
-                      {formatShortDate(request.created_at)}
-                      {request.booking_reference ? ` · ${request.booking_reference}` : ""}
+                      Aangevraagd op {formatShortDate(request.created_at)}
+                      {request.bookings
+                        ? ` · voor ${request.bookings.workshop_name}${
+                            request.bookings.scheduled_date
+                              ? `, ${formatDate(request.bookings.scheduled_date)}`
+                              : ""
+                          }`
+                        : request.booking_reference
+                          ? ` · ${request.booking_reference}`
+                          : ""}
                     </p>
+                    {request.status === "applied" ? (
+                      <p className="text-sm text-muted">
+                        Verwerkt op {formatShortDate(request.applied_at ?? request.updated_at)}
+                        {request.invoice_number ? ` op factuur ${request.invoice_number}` : ""}. De
+                        waarde van {formatEuroCents(request.value_cents)} staat vast op de koers van
+                        het moment van inwisselen.
+                      </p>
+                    ) : null}
                   </div>
                   <RedemptionStatusBadge status={request.status} />
                 </li>

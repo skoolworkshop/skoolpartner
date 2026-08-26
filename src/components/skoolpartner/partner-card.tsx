@@ -76,7 +76,7 @@ export function PartnerCard({
 
         <footer className="flex flex-wrap items-end justify-between gap-3 border-t border-white/10 pt-4 text-[13px]">
           <p className="text-white/60">
-            Lid sinds{" "}
+            Actief sinds{" "}
             <span className="font-semibold text-white/85">{formatShortDate(memberSince)}</span>
           </p>
           {pendingPoints > 0 ? (
