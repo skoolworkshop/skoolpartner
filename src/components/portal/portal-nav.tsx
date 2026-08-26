@@ -58,16 +58,17 @@ export function MobileNav() {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line-soft bg-white/95 backdrop-blur lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="grid grid-cols-6">
-        {portalNav.map(({ href, label, icon: Icon }) => {
+      <ul className="grid grid-cols-7">
+        {portalNav.map(({ href, label, mobileLabel, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
             <li key={href}>
               <Link
                 href={href}
+                aria-label={label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-1 pb-2.5 pt-2 text-[11px] font-medium",
+                  "flex flex-col items-center gap-1 px-0.5 pb-2.5 pt-2 text-[10px] font-medium",
                   active ? "text-ink" : "text-muted"
                 )}
               >
@@ -76,7 +77,7 @@ export function MobileNav() {
                   className={cn("h-0.5 w-8 rounded-pill", active ? "bg-accent" : "bg-transparent")}
                 />
                 <Icon aria-hidden className={cn("size-5", active && "text-accent-strong")} />
-                <span className="truncate">{label}</span>
+                <span className="w-full truncate text-center">{mobileLabel}</span>
               </Link>
             </li>
           );
