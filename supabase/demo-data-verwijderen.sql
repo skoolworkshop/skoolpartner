@@ -24,6 +24,10 @@ begin
   if array_length(v_orgs, 1) is null then
     raise notice 'Geen demo-organisaties gevonden, er valt niets op te ruimen.';
   else
+    delete from public.workshop_result_files
+    where result_id in (select id from public.workshop_results where organization_id = any(v_orgs));
+    delete from public.workshop_results       where organization_id = any(v_orgs);
+
     delete from public.messages
     where thread_id in (select id from public.message_threads where organization_id = any(v_orgs));
     delete from public.message_threads where organization_id = any(v_orgs);

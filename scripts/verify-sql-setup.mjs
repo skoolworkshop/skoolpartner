@@ -91,7 +91,8 @@ async function main() {
         (select count(*) from public.bookings)::int as boekingen,
         (select count(*) from public.invoices)::int as facturen,
         (select count(*) from public.messages)::int as berichten,
-        (select count(*) from public.organization_members where status = 'active')::int as leden
+        (select count(*) from public.organization_members where status = 'active')::int as leden,
+        (select count(*) from public.workshop_results)::int as resultaten
     `)
   ).rows[0];
 
@@ -99,7 +100,7 @@ async function main() {
     `\n  saldo         ${balance.available_points} beschikbaar, ${balance.pending_points} in behandeling, ${balance.lifetime_earned_points} totaal`
   );
   console.log(
-    `  demodata      ${counts.boekingen} boekingen, ${counts.facturen} facturen, ${counts.berichten} berichten, ${counts.leden} actief lid`
+    `  demodata      ${counts.boekingen} boekingen, ${counts.facturen} facturen, ${counts.berichten} berichten, ${counts.leden} actief lid, ${counts.resultaten} resultatensets`
   );
   console.log(`  beheerder     is_admin=${profile.is_admin} is_super_admin=${profile.is_super_admin}`);
 
@@ -132,6 +133,7 @@ async function main() {
         (select count(*) from public.loyalty_transactions)::int as transacties,
         (select count(*) from public.messages)::int as berichten,
         (select count(*) from public.booking_sources)::int as bronnen,
+        (select count(*) from public.workshop_results)::int as resultaten,
         (select count(*) from public.profiles)::int as profielen
     `)
   ).rows[0];
@@ -141,6 +143,7 @@ async function main() {
     na.transacties === 0 &&
     na.berichten === 0 &&
     na.bronnen === 0 &&
+    na.resultaten === 0 &&
     na.profielen > 0;
   console.log(
     opgeruimd
@@ -158,6 +161,7 @@ async function main() {
     counts.facturen === 5 &&
     counts.berichten === 6 &&
     counts.leden === 3 &&
+    counts.resultaten === 2 &&
     profile.is_admin === true;
 
   await db.close();

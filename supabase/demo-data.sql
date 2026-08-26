@@ -58,6 +58,7 @@ declare
 
   v_rev      uuid;
   v_thread   uuid;
+  v_res      uuid;
 begin
   ---------------------------------------------------------------------------
   -- 1. Account opzoeken en beheerder maken
@@ -635,6 +636,50 @@ begin
     0.81, 'needs_review',
     array['Workshopduur onder het minimum van 90 minuten'], v_org1
   );
+  end if;
+
+  ---------------------------------------------------------------------------
+  -- 11. Resultaten van workshops
+  ---------------------------------------------------------------------------
+  -- Eén set die klaarstaat en één die net verlopen is, zodat je beide kanten
+  -- ziet. De bestanden zijn alleen links, want in demodata zetten we niets in
+  -- de opslag.
+  select id into v_res from public.workshop_results
+  where organization_id = v_org1 and title = 'Cultuurdag Graffiti';
+
+  if v_res is null then
+    insert into public.workshop_results (
+      organization_id, booking_id, title, description, status,
+      published_at, expires_at, purge_at, notified_at, notified_email, created_by
+    ) values (
+      v_org1, v_b2, 'Cultuurdag Graffiti',
+      'De foto''s en de aftermovie van de workshopdag. Demodata, dus de links wijzen naar voorbeeldadressen.',
+      'published', now() - interval '2 days', now() + interval '5 days',
+      now() + interval '12 days', now() - interval '2 days', v_email, v_user
+    ) returning id into v_res;
+
+    insert into public.workshop_result_files
+      (result_id, kind, external_url, file_name, position, created_by)
+    values
+      (v_res, 'link', 'https://example.com/demo-fotos', 'Foto''s van de dag', 0, v_user),
+      (v_res, 'link', 'https://example.com/demo-aftermovie', 'Aftermovie via WeTransfer', 1, v_user);
+  end if;
+
+  select id into v_res from public.workshop_results
+  where organization_id = v_org1 and title = 'Podcastdag maart';
+
+  if v_res is null then
+    insert into public.workshop_results (
+      organization_id, booking_id, title, description, status,
+      published_at, expires_at, purge_at, notified_at, notified_email,
+      files_removed_at, created_by
+    ) values (
+      v_org1, v_b1, 'Podcastdag maart',
+      'De opnames van de podcastworkshop. Demodata.',
+      'expired', now() - interval '12 days', now() - interval '5 days',
+      now() + interval '2 days', now() - interval '12 days', v_email,
+      now() - interval '5 days', v_user
+    ) returning id into v_res;
   end if;
 
   raise notice 'Klaar. % is beheerder en lid van drie demo-organisaties.', v_email;
