@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { publicEnv } from "@/lib/env";
 
 /**
- * Het adres waarop Mijn Skool nu draait, voor gebruik in e-maillinks.
+ * Het adres waarop SkoolPartner nu draait, voor gebruik in e-maillinks.
  *
  * Volgorde:
  *  1. NEXT_PUBLIC_SITE_URL, als die is ingesteld. Dat is de bedoelde situatie.

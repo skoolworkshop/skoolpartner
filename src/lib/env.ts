@@ -32,7 +32,7 @@ export const publicEnv = {
   supabaseUrl: requiredPublic("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseAnonKey: requiredPublic("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   siteUrl: requiredPublic("NEXT_PUBLIC_SITE_URL", "http://localhost:3000"),
-  appName: requiredPublic("NEXT_PUBLIC_APP_NAME", "Mijn Skool"),
+  appName: requiredPublic("NEXT_PUBLIC_APP_NAME", "SkoolPartner"),
 };
 
 export const serverEnv = {

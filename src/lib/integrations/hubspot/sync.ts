@@ -18,7 +18,7 @@ import {
 import { MOCK_COMPANIES, MOCK_CONTACTS } from "./mock";
 
 /**
- * Koppelt een HubSpot-company aan een organisatie in Mijn Skool.
+ * Koppelt een HubSpot-company aan een organisatie in SkoolPartner.
  *
  * Nooit alleen op bedrijfsnaam: dat is te onbetrouwbaar. Een geverifieerd
  * domein is het enige signaal dat automatisch mag koppelen. Lukt dat niet, dan

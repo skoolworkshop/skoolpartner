@@ -13,7 +13,7 @@ export interface ReplyResult {
 }
 
 /**
- * Verstuurt een antwoord van een klant vanuit Mijn Skool.
+ * Verstuurt een antwoord van een klant vanuit SkoolPartner.
  *
  * Het bericht gaat technisch altijd via boekingen@skoolworkshop.nl en blijft
  * onderdeel van dezelfde Gmail-thread. De klant krijgt nooit rechtstreeks
@@ -102,7 +102,7 @@ export async function sendPortalReply(params: {
 
   // De klant schrijft naar Skool Workshop; het bericht komt dus binnen in de
   // centrale mailbox en blijft in dezelfde thread staan.
-  const signature = `\n\n—\nVerstuurd via Mijn Skool door ${params.userEmail}`;
+  const signature = `\n\n—\nVerstuurd via SkoolPartner door ${params.userEmail}`;
   const fullBody = `${body}${signature}`;
 
   if (integrationMode("gmail") === "mock") {
@@ -134,9 +134,9 @@ export async function sendPortalReply(params: {
     if (!client) throw new Error("Gmail is nog niet geautoriseerd");
 
     const raw = buildReplyMime({
-      from: `Mijn Skool <${mailbox}>`,
+      from: `SkoolPartner <${mailbox}>`,
       to: recipients.length > 0 ? recipients : [mailbox],
-      subject: thread.subject ?? "Bericht via Mijn Skool",
+      subject: thread.subject ?? "Bericht via SkoolPartner",
       inReplyTo: lastMessage?.gmail_message_id ?? null,
       references: lastMessage?.gmail_message_id ?? null,
       bodyText: fullBody,

@@ -147,7 +147,7 @@ export async function storeEmail(email: NormalizedEmail): Promise<{ stored: bool
   const visibility = await resolveThreadVisibility(participants);
 
   // Geen geverifieerde contactpersoon: niets opslaan. Dat is dataminimalisatie
-  // én de sterkste garantie dat interne mail nooit in Mijn Skool belandt.
+  // én de sterkste garantie dat interne mail nooit in SkoolPartner belandt.
   if (visibility.visibility === "blocked") {
     return { stored: false, reason: visibility.reason };
   }
