@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { hasServiceRole } from "@/lib/env";
 import { suggestOrganizationsForEmail } from "@/lib/organizations/service";
 import { Alert } from "@/components/ui/feedback";
+import { Button } from "@/components/ui/button";
 import { JoinForm } from "./join-form";
 
 export const metadata: Metadata = { title: "Organisatie kiezen" };
@@ -31,5 +32,22 @@ export default async function JoinPage() {
     reason: s.reason,
   }));
 
-  return <JoinForm suggestions={suggestions} />;
+  return (
+    <div className="space-y-6">
+      <JoinForm suggestions={suggestions} />
+
+      {/* Wie ben ik nu? Handig bij meerdere accounts, en de enige uitweg op
+          deze pagina als je met het verkeerde adres bent ingelogd. */}
+      <div className="flex flex-wrap items-center gap-3 border-t border-line-soft pt-5 text-sm text-muted">
+        <span>
+          Ingelogd als <strong className="text-ink">{session.email}</strong>
+        </span>
+        <form action="/auth/uitloggen" method="post">
+          <Button type="submit" variant="ghost" size="sm">
+            Uitloggen
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
 }

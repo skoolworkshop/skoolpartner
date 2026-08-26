@@ -77,6 +77,12 @@ export async function sendLoginLink(
         email,
       };
     }
+    // De echte oorzaak hoort niet op een openbare inlogpagina thuis, maar wel
+    // in de serverlog. Zo is een SMTP-probleem terug te vinden in Vercel.
+    console.error("[inloggen] versturen mislukt", {
+      status: error.status,
+      message: error.message,
+    });
     return {
       status: "error",
       message: "Versturen is niet gelukt. Probeer het opnieuw.",
