@@ -14,6 +14,8 @@ import { requireAdmin } from "@/lib/auth/session";
 import { integrationMode, missingCredentials, publicEnv } from "@/lib/env";
 import { getSyncStates } from "@/lib/integrations/sync-state";
 import { getGmailStatus } from "@/lib/integrations/health";
+import { diagnoseGmail } from "@/lib/integrations/gmail/diagnose";
+import { GmailDiagnose } from "@/components/admin/gmail-diagnose";
 import { koppelfout } from "@/lib/integrations/gmail/koppelfouten";
 import { formatDateTime } from "@/lib/format";
 import { runSyncAction, testIntegrationAction } from "../actions";
@@ -46,9 +48,10 @@ export default async function AdminIntegrationsPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [states, gmail] = await Promise.all([
+  const [states, gmail, diagnose] = await Promise.all([
     getSyncStates() as Promise<IntegrationSyncStateRow[]>,
     getGmailStatus(),
+    diagnoseGmail(),
   ]);
 
   return (
@@ -166,6 +169,7 @@ export default async function AdminIntegrationsPage({
                   <>
                     <GmailSendAsNotice status={gmail} />
                     <GmailApartAdresUitleg status={gmail} />
+                    <GmailDiagnose diagnose={diagnose} />
                   </>
                 ) : null}
 
