@@ -183,36 +183,43 @@ variabele aan voor welke omgevingen hij geldt (Development, Preview, Production)
 Er zijn twee manieren om binnen te komen. De eerste is het snelst als je gewoon
 wilt rondkijken.
 
-### 1. Testomgeving met één commando
+### 1. Schoon opnieuw beginnen met twee accounts
 
-Het seedscript maakt een demo-organisatie met boekingen, facturen, SkoolPoints en
-een e-mailgesprek, zet één account op beheerder en print twee kant-en-klare
-inloglinks. Er komt geen e-mail aan te pas.
+`supabase/opnieuw-beginnen.sql` maakt de database leeg en zet twee accounts
+klaar met testdata. Plak het bestand in Supabase, SQL Editor, en klik op Run.
+
+| Account | Rol | Waar kom je terecht |
+| --- | --- | --- |
+| `contact@skoolworkshop.nl` | beheerder en hoofdbeheerder | `/admin`, met alles van alle klanten |
+| `planning@skoolworkshop.nl` | klant bij De Goudse Waarden | `/dashboard`, het klantportaal |
+
+Inloggen gaat met een inloglink per e-mail; er is geen wachtwoord. Gebruik twee
+browservensters, of één normaal en één incognito, dan kun je klant en beheerder
+naast elkaar bekijken.
+
+Wat er klaarstaat: drie organisaties waarvan er twee bewust geen gebruiker
+hebben, acht boekingen in alle statussen, vijf facturen, SkoolPoints in elke
+status, twee inwisselverzoeken, zes berichten en twee resultatensets.
+
+Let op: dit script gooit **alle** gegevens weg, inclusief alle accounts. Draai
+het alleen op een ontwikkel- of testproject. Opnieuw draaien mag; je krijgt dan
+weer dezelfde uitgangssituatie.
+
+Controleren of het bestand foutloos draait, zonder Supabase aan te raken:
+
+```bash
+node scripts/verify-sql-setup.mjs
+```
+
+### 1b. Testomgeving met één commando
+
+Werk je lokaal met de service-role key in `.env.local`, dan kan het ook zonder
+SQL-editor. Het seedscript zet dezelfde soort demodata neer en print twee
+kant-en-klare inloglinks, zonder dat er e-mail aan te pas komt.
 
 ```bash
 npm run seed:demo
 ```
-
-Je krijgt dan zoiets terug:
-
-```
-  BEHEERDER  info@skoolworkshop.nl
-  https://<project>.supabase.co/auth/v1/verify?token=...
-
-  KLANT      s.devries@goudsewaarden.nl
-  https://<project>.supabase.co/auth/v1/verify?token=...
-```
-
-Plak een link in je browser en je bent binnen. Elke link werkt één keer en is
-60 minuten geldig; draai het script opnieuw voor verse links. Gebruik hiervoor
-twee browservensters (of één normaal en één incognito), dan kun je klant en
-beheerder naast elkaar bekijken.
-
-Wat je als **klant** ziet: dashboard met 650 beschikbare en 300 wachtende
-SkoolPoints, drie boekingen, twee facturen, één gesprek en een werkend
-inwisselformulier.
-Wat je als **beheerder** ziet: `/admin` met de controlewachtrij, de volledige
-ledger, de organisatie en alle instellingen.
 
 Aanpassen kan met environment variables:
 

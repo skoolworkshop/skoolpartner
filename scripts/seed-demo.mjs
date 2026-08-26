@@ -10,8 +10,8 @@
  *   NEXT_PUBLIC_SITE_URL          (bijv. http://localhost:3000)
  *
  * Optioneel:
- *   SEED_ADMIN_EMAIL              standaard info@skoolworkshop.nl
- *   SEED_CUSTOMER_EMAIL           standaard s.devries@goudsewaarden.nl
+ *   SEED_ADMIN_EMAIL              standaard contact@skoolworkshop.nl
+ *   SEED_CUSTOMER_EMAIL           standaard planning@skoolworkshop.nl
  *
  * Het script is idempotent: opnieuw draaien werkt de bestaande demodata bij
  * in plaats van dubbele records aan te maken. Draai dit uitsluitend op een
@@ -34,9 +34,9 @@ if (existsSync(".env.local")) {
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "info@skoolworkshop.nl").toLowerCase();
+const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "contact@skoolworkshop.nl").toLowerCase();
 const customerEmail = (
-  process.env.SEED_CUSTOMER_EMAIL ?? "s.devries@goudsewaarden.nl"
+  process.env.SEED_CUSTOMER_EMAIL ?? "planning@skoolworkshop.nl"
 ).toLowerCase();
 
 if (!url || !serviceKey) {
