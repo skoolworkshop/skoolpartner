@@ -11,6 +11,7 @@ import { listPendingMembers, listUsers } from "@/lib/admin/queries";
 import { formatShortDate } from "@/lib/format";
 import {
   approveMembershipAction,
+  deleteUserAction,
   rejectMembershipAction,
   setUserBlockedAction,
 } from "../actions";
@@ -110,6 +111,7 @@ export default async function AdminUsersPage({
         <Card>
           <CardHeader
             title="Alle gebruikers"
+            description="Blokkeren is omkeerbaar. Definitief verwijderen niet: het account en het lidmaatschap verdwijnen uit de database. Boekingen, facturen en SkoolPoints blijven staan, want die horen bij de organisatie."
             action={
               <form className="flex gap-2">
                 <label htmlFor="q" className="sr-only">
@@ -148,15 +150,45 @@ export default async function AdminUsersPage({
                     <td className="px-5 py-2.5 text-muted">{formatShortDate(user.created_at)}</td>
                     <td className="px-5 py-2.5">
                       {session.profile?.is_super_admin && user.id !== session.userId ? (
-                        <ActionForm
-                          action={setUserBlockedAction}
-                          submitLabel={user.is_blocked ? "Deblokkeren" : "Blokkeren"}
-                          variant="secondary"
-                          inline
-                        >
-                          <input type="hidden" name="user_id" value={user.id} />
-                          <input type="hidden" name="blocked" value={user.is_blocked ? "0" : "1"} />
-                        </ActionForm>
+                        <div className="flex flex-wrap items-end gap-3">
+                          <ActionForm
+                            action={setUserBlockedAction}
+                            submitLabel={user.is_blocked ? "Deblokkeren" : "Blokkeren"}
+                            variant="secondary"
+                            inline
+                          >
+                            <input type="hidden" name="user_id" value={user.id} />
+                            <input
+                              type="hidden"
+                              name="blocked"
+                              value={user.is_blocked ? "0" : "1"}
+                            />
+                          </ActionForm>
+
+                          {user.is_super_admin ? null : (
+                            <ActionForm
+                              action={deleteUserAction}
+                              submitLabel="Definitief verwijderen"
+                              variant="danger"
+                              inline
+                            >
+                              <input type="hidden" name="user_id" value={user.id} />
+                              <input type="hidden" name="verwacht" value={user.email} />
+                              <Field
+                                label="Bevestig met het e-mailadres"
+                                htmlFor={`bevestig-${user.id}`}
+                                className="min-w-64"
+                              >
+                                <Input
+                                  id={`bevestig-${user.id}`}
+                                  name="bevestiging"
+                                  autoComplete="off"
+                                  placeholder={user.email}
+                                />
+                              </Field>
+                            </ActionForm>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-muted">—</span>
                       )}

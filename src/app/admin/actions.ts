@@ -14,6 +14,10 @@ import {
 } from "@/lib/organizations/service";
 import { generateToken, hashToken } from "@/lib/crypto";
 import {
+  deleteOrganizationPermanently,
+  deleteUserPermanently,
+} from "@/lib/admin/delete";
+import {
   addExternalLink,
   publishResult,
   RESULTS_BUCKET,
@@ -700,4 +704,84 @@ export async function deleteResultFileAction(
 
   revalidatePath("/admin/resultaten");
   return { status: "ok", message: "Bestand verwijderd." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Definitief verwijderen                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Beide acties zijn onomkeerbaar. Daarom drie sloten:
+ *  1. alleen een super admin mag ze uitvoeren
+ *  2. de beheerder moet het e-mailadres of de organisatienaam letterlijk
+ *     overtypen, zodat een misklik nooit genoeg is
+ *  3. er gaat altijd eerst een regel in het auditlogboek
+ */
+
+export async function deleteUserAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+
+  if (!session.profile?.is_super_admin) {
+    return { status: "error", message: "Alleen een super admin mag accounts verwijderen." };
+  }
+
+  const userId = String(formData.get("user_id") ?? "");
+  const typed = String(formData.get("bevestiging") ?? "").trim().toLowerCase();
+  const expected = String(formData.get("verwacht") ?? "").trim().toLowerCase();
+
+  if (!expected || typed !== expected) {
+    return {
+      status: "error",
+      message: `Typ ter bevestiging het volledige e-mailadres over: ${formData.get("verwacht")}`,
+    };
+  }
+
+  const result = await deleteUserPermanently({
+    userId,
+    actorId: session.userId,
+    actorEmail: session.email,
+  });
+
+  revalidatePath("/admin/gebruikers");
+  revalidatePath("/admin");
+  return result.ok
+    ? { status: "ok", message: result.message }
+    : { status: "error", message: result.message };
+}
+
+export async function deleteOrganizationAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+
+  if (!session.profile?.is_super_admin) {
+    return { status: "error", message: "Alleen een super admin mag organisaties verwijderen." };
+  }
+
+  const organizationId = String(formData.get("organization_id") ?? "");
+  const typed = String(formData.get("bevestiging") ?? "").trim().toLowerCase();
+  const expected = String(formData.get("verwacht") ?? "").trim().toLowerCase();
+
+  if (!expected || typed !== expected) {
+    return {
+      status: "error",
+      message: `Typ ter bevestiging de volledige naam over: ${formData.get("verwacht")}`,
+    };
+  }
+
+  const result = await deleteOrganizationPermanently({
+    organizationId,
+    actorId: session.userId,
+    actorEmail: session.email,
+  });
+
+  revalidatePath("/admin/organisaties");
+  revalidatePath("/admin");
+  return result.ok
+    ? { status: "ok", message: result.message }
+    : { status: "error", message: result.message };
 }

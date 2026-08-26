@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { ActionForm } from "@/components/admin/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select } from "@/components/ui/form";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { requireAdmin } from "@/lib/auth/session";
@@ -15,6 +16,7 @@ import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import {
   addOrganizationDomainAction,
+  deleteOrganizationAction,
   inviteMemberAction,
   manualAdjustmentAction,
 } from "../../actions";
@@ -33,7 +35,7 @@ export default async function OrganizationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { id } = await params;
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
@@ -263,6 +265,41 @@ export default async function OrganizationDetailPage({
             ) : null}
           </ul>
         </Card>
+
+        {session.profile?.is_super_admin ? (
+          <Card className="lg:col-span-2 border-danger/40">
+            <CardHeader
+              title="Organisatie definitief verwijderen"
+              description="Onomkeerbaar. Alles van deze organisatie verdwijnt uit de database: boekingen, facturen, factuurregels, SkoolPoints, inwisselverzoeken, reviews, berichten en resultaten, inclusief de bestanden in de opslag. De accounts van de medewerkers blijven bestaan, alleen hun lidmaatschap verdwijnt."
+            />
+            <CardBody className="space-y-4">
+              <Alert tone="warning" title="Denk aan uw administratieplicht">
+                Facturen moet u zeven jaar bewaren. Zorg dat de administratie in Moneybird op orde
+                is voordat u dit doet, want deze kopieën in SkoolPartner zijn daarna weg.
+              </Alert>
+
+              <ActionForm
+                action={deleteOrganizationAction}
+                submitLabel="Definitief verwijderen"
+                variant="danger"
+              >
+                <input type="hidden" name="organization_id" value={detail.organization.id} />
+                <input type="hidden" name="verwacht" value={detail.organization.name} />
+                <Field
+                  label={`Typ ter bevestiging de naam over: ${detail.organization.name}`}
+                  htmlFor="bevestig-organisatie"
+                >
+                  <Input
+                    id="bevestig-organisatie"
+                    name="bevestiging"
+                    autoComplete="off"
+                    placeholder={detail.organization.name}
+                  />
+                </Field>
+              </ActionForm>
+            </CardBody>
+          </Card>
+        ) : null}
       </div>
     </>
   );
