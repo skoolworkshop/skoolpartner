@@ -14,6 +14,7 @@ export default async function JoinPage() {
   const session = await requireUser();
 
   if (session.memberships.length > 0) redirect("/dashboard");
+  if (session.isAdmin) redirect("/admin");
   if (session.pendingMemberships.length > 0) redirect("/wachten");
 
   if (!hasServiceRole()) {

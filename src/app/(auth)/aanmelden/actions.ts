@@ -82,7 +82,16 @@ export async function requestNewOrganizationAction(
   });
 
   if (!created.ok || !created.organizationId) {
-    return { status: "error", message: created.message ?? "Aanmaken is niet gelukt." };
+    // Een beheerder mag de technische reden zien, een klant niet. Zo kunnen
+    // jullie zelf achterhalen wat er speelt zonder in de logs te duiken.
+    const extra =
+      session.isAdmin && created.technicalReason
+        ? ` (technische melding: ${created.technicalReason})`
+        : "";
+    return {
+      status: "error",
+      message: `${created.message ?? "Aanmaken is niet gelukt."}${extra}`,
+    };
   }
 
   await requestMembership({
