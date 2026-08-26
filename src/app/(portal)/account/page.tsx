@@ -71,7 +71,7 @@ export default async function AccountPage() {
           <Card>
             <CardHeader
               title="Privacy en gegevens"
-              description="Mijn Skool bewaart alleen wat nodig is voor uw boekingen, facturen en communicatie."
+              description="SkoolPartner bewaart alleen wat nodig is voor uw boekingen, facturen en communicatie."
             />
             <CardBody className="space-y-5 text-sm text-muted">
               <p>

@@ -16,14 +16,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         <Logo tone="light" height={34} />
         <div className="relative max-w-md">
-          <p className="eyebrow mb-4 text-accent-soft">Mijn Skool</p>
+          <p className="eyebrow mb-4 text-accent-soft">SkoolPartner</p>
           <h1 className="font-display text-[46px] font-bold leading-[1] tracking-[-0.04em] text-white">
             Uw workshops, facturen en berichten op één plek.
           </h1>
           <p className="mt-5 text-[15px] leading-relaxed text-white/70">
-            Mijn Skool is de klantomgeving van Skool Workshop. Bekijk uw aankomende workshops,
-            vind uw facturen terug, houd contact met ons team en spaar SkoolPoints via
-            SkoolPartner.
+            SkoolPartner is de klantomgeving van Skool Workshop. Bekijk uw aankomende
+            workshops, vind uw facturen terug, houd contact met ons team en spaar SkoolPoints.
           </p>
         </div>
         <p className="relative text-[13px] text-white/50">

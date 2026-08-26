@@ -88,7 +88,7 @@ export function LoginForm({
     <div className="space-y-6">
       <div>
         <h1 className="text-[28px]">
-          {mode === "register" ? "Account aanmaken" : "Inloggen op Mijn Skool"}
+          {mode === "register" ? "Account aanmaken" : "Inloggen op SkoolPartner"}
         </h1>
         <p className="mt-2 text-[15px] text-muted">
           {mode === "register"

@@ -66,7 +66,7 @@ export async function sendLoginLink(
       return {
         status: "error",
         message:
-          "Dit e-mailadres is nog niet bekend in Mijn Skool. Registreer u eerst of neem contact met ons op.",
+          "Dit e-mailadres is nog niet bekend in SkoolPartner. Maak een account aan of neem contact met ons op.",
         email,
       };
     }

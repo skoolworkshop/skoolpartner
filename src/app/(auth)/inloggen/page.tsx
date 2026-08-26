@@ -22,7 +22,7 @@ export default async function LoginPage({
           href="/registreren"
           className="font-semibold text-ink underline underline-offset-4 hover:text-accent-strong"
         >
-          Registreer u voor Mijn Skool
+          Account aanmaken
         </Link>
       </p>
     </>

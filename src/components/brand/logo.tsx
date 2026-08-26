@@ -45,7 +45,7 @@ export function Logo({
               isLight ? "text-white/70" : "text-muted"
             )}
           >
-            Mijn Skool
+            SkoolPartner
           </span>
         </>
       ) : null}

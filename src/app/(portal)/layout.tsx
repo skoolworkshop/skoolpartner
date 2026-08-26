@@ -4,6 +4,7 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { MobileNav, SidebarNav } from "@/components/portal/portal-nav";
 import { OrgSwitcher } from "@/components/portal/org-switcher";
+import { ChatFloatingButton } from "@/components/portal/chat-cta";
 import { ExternalButtonLink } from "@/components/ui/button";
 import { requireMember } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
@@ -67,7 +68,7 @@ export default async function PortalLayout({ children }: { children: React.React
       <div className="flex min-w-0 flex-col">
         {/* Bovenbalk op mobiel */}
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line-soft bg-white px-4 py-3 lg:hidden">
-          <Link href="/dashboard" aria-label="Mijn Skool dashboard">
+          <Link href="/dashboard" aria-label="SkoolPartner dashboard">
             <Logo showPortalName={false} height={26} />
           </Link>
           <div className="flex items-center gap-2">
@@ -108,6 +109,12 @@ export default async function PortalLayout({ children }: { children: React.React
           {children}
         </main>
       </div>
+
+      <ChatFloatingButton
+        enabled={settings.chat_enabled}
+        url={settings.chat_whatsapp_url}
+        label={settings.chat_label}
+      />
 
       <MobileNav />
     </div>

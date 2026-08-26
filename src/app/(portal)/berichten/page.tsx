@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 
+import { ChatCard } from "@/components/portal/chat-cta";
 import { PageHeader } from "@/components/portal/page-header";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
@@ -24,6 +25,15 @@ export default async function MessagesPage() {
         title="Berichten"
         description={`De e-mailwisseling tussen uw organisatie en ${settings.support_email}. U ziet alleen gesprekken waar een geverifieerde contactpersoon van uw organisatie aan deelneemt.`}
       />
+
+      <div className="mb-5">
+        <ChatCard
+          enabled={settings.chat_enabled}
+          url={settings.chat_whatsapp_url}
+          label={settings.chat_label}
+          helpText={settings.chat_help_text}
+        />
+      </div>
 
       <Card>
         {threads.length > 0 ? (

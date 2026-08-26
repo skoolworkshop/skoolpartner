@@ -18,7 +18,7 @@ export default async function WaitingPage() {
         <p className="mt-2 text-[15px] text-muted">
           We controleren of u bij{" "}
           <strong className="text-ink">{session.pendingMemberships[0].organizationName}</strong>{" "}
-          hoort. Zodra dat rond is, krijgt u toegang tot Mijn Skool. Meestal is dat binnen één
+          hoort. Zodra dat rond is, krijgt u toegang tot SkoolPartner. Meestal is dat binnen één
           werkdag geregeld.
         </p>
       </div>

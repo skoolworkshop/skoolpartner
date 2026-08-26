@@ -3,6 +3,7 @@ import { CalendarDays } from "lucide-react";
 
 import { PageHeader } from "@/components/portal/page-header";
 import { BookingStatusBadge } from "@/components/portal/status-badges";
+import { WorkshopThumb } from "@/components/portal/workshop-photo";
 import { ExternalButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
@@ -10,11 +11,20 @@ import { requireMember } from "@/lib/auth/session";
 import { formatDate, formatDuration, formatTime, relativeDay } from "@/lib/format";
 import { getPastBookings, getUpcomingBookings } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
+import { parseWorkshopImages, type WorkshopImageMap } from "@/lib/workshop-images";
 import type { BookingRow } from "@/lib/types/database";
 
 export const metadata: Metadata = { title: "Boekingen" };
 
-function BookingRowItem({ booking, ctaUrl }: { booking: BookingRow; ctaUrl: string }) {
+function BookingRowItem({
+  booking,
+  ctaUrl,
+  images,
+}: {
+  booking: BookingRow;
+  ctaUrl: string;
+  images: WorkshopImageMap;
+}) {
   const timeRange =
     booking.start_time && booking.end_time
       ? `${formatTime(booking.start_time)}–${formatTime(booking.end_time)}`
@@ -22,7 +32,9 @@ function BookingRowItem({ booking, ctaUrl }: { booking: BookingRow; ctaUrl: stri
 
   return (
     <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
+      <div className="flex min-w-0 items-start gap-4">
+        <WorkshopThumb workshopName={booking.workshop_name} images={images} />
+        <div className="min-w-0">
         <p className="font-display text-[17px] leading-snug">{booking.workshop_name}</p>
         <p className="mt-1 text-sm text-muted">
           {formatDate(booking.scheduled_date)}
@@ -34,6 +46,7 @@ function BookingRowItem({ booking, ctaUrl }: { booking: BookingRow; ctaUrl: stri
           {formatDuration(booking.minutes_per_workshop)}
           {booking.participants ? ` · ${booking.participants} deelnemers` : ""}
         </p>
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <span className="text-sm text-muted sm:hidden">{relativeDay(booking.scheduled_date)}</span>
@@ -57,6 +70,7 @@ function BookingRowItem({ booking, ctaUrl }: { booking: BookingRow; ctaUrl: stri
 export default async function BookingsPage() {
   const session = await requireMember();
   const settings = await getSettings();
+  const workshopImages = parseWorkshopImages(settings.workshop_images);
   const [upcoming, past] = await Promise.all([
     getUpcomingBookings(session.activeOrganizationId, 25),
     getPastBookings(session.activeOrganizationId, 50),
@@ -85,6 +99,7 @@ export default async function BookingsPage() {
                   key={booking.id}
                   booking={booking}
                   ctaUrl={settings.new_booking_cta_url}
+                  images={workshopImages}
                 />
               ))}
             </ul>
@@ -111,6 +126,7 @@ export default async function BookingsPage() {
                   key={booking.id}
                   booking={booking}
                   ctaUrl={settings.new_booking_cta_url}
+                  images={workshopImages}
                 />
               ))}
             </ul>
@@ -118,7 +134,7 @@ export default async function BookingsPage() {
             <EmptyState
               icon={CalendarDays}
               title="Nog geen eerdere boekingen"
-              description="Mijn Skool toont boekingen vanaf de start van het portaal. Oudere workshops staan hier niet automatisch bij."
+              description="SkoolPartner toont boekingen vanaf de start van het portaal. Oudere workshops staan hier niet automatisch bij."
             />
           )}
         </Card>

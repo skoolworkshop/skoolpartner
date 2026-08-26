@@ -4,13 +4,13 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Mijn Skool",
-    template: "%s · Mijn Skool",
+    default: "SkoolPartner",
+    template: "%s · SkoolPartner",
   },
   description:
     "De klantomgeving van Skool Workshop. Bekijk uw boekingen, facturen, berichten en SkoolPoints op één plek.",
   robots: { index: false, follow: false },
-  applicationName: "Mijn Skool",
+  applicationName: "SkoolPartner",
 };
 
 export const viewport: Viewport = {

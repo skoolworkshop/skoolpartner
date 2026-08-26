@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, FileText, MessageSquare } from "lucide-react";
 
+import { DashboardHighlight } from "@/components/portal/dashboard-highlight";
 import { PageHeader } from "@/components/portal/page-header";
+import { WorkshopPhoto } from "@/components/portal/workshop-photo";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { PartnerCard } from "@/components/skoolpartner/partner-card";
 import { ExternalButtonLink } from "@/components/ui/button";
@@ -18,9 +20,11 @@ import {
   firstName,
   relativeDay,
 } from "@/lib/format";
+import { buildHighlight, greetingForTime } from "@/lib/greeting";
 import { nextMilestone } from "@/lib/loyalty/calc";
 import { getDashboardData } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
+import { parseWorkshopImages } from "@/lib/workshop-images";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -39,11 +43,23 @@ export default async function DashboardPage() {
   const latestInvoice = invoices[0];
   const latestThread = threads[0];
 
+  const workshopImages = parseWorkshopImages(settings.workshop_images);
+
+  const highlight = buildHighlight({
+    nextBookingName: nextBooking?.workshop_name,
+    nextBookingDate: nextBooking?.scheduled_date,
+    availablePoints: balance.available_points,
+    pendingPoints: balance.pending_points,
+    lastEarnedAt: balance.last_earned_at,
+    pointsName: settings.points_name,
+    loyaltyEnabled: settings.loyalty_enabled,
+  });
+
   return (
     <>
       <PageHeader
-        eyebrow="Mijn Skool"
-        title={`Welkom ${firstName(session.profile?.full_name, session.email)}`}
+        eyebrow="SkoolPartner"
+        title={`${greetingForTime()} ${firstName(session.profile?.full_name, session.email)}`}
         description={organizationName}
         action={
           <ExternalButtonLink href={settings.new_booking_cta_url} target="_blank">
@@ -51,6 +67,8 @@ export default async function DashboardPage() {
           </ExternalButtonLink>
         }
       />
+
+      <DashboardHighlight highlight={highlight} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         {settings.loyalty_enabled ? (
@@ -147,7 +165,12 @@ export default async function DashboardPage() {
             }
           />
           {nextBooking ? (
-            <CardBody className="space-y-2">
+            <CardBody className="space-y-3">
+              <WorkshopPhoto
+                workshopName={nextBooking.workshop_name}
+                images={workshopImages}
+                priority
+              />
               <p className="font-display text-lg">{nextBooking.workshop_name}</p>
               <p className="text-sm text-muted">
                 {formatDate(nextBooking.scheduled_date)} · {relativeDay(nextBooking.scheduled_date)}
