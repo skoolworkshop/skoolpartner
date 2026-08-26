@@ -15,6 +15,13 @@ export interface ActiveMembership {
 
 export interface SessionContext {
   userId: string;
+  /**
+   * Het e-mailadres waarmee daadwerkelijk is ingelogd, uit Supabase Auth.
+   *
+   * Bewust niet het adres uit profiles: dat veld kan een gebruiker zelf
+   * aanpassen. Zou je dat gebruiken voor toegang, dan zou iemand met een
+   * zelfgekozen adres bij een andere school in beeld kunnen komen.
+   */
   email: string;
   profile: ProfileRow | null;
   memberships: ActiveMembership[];
@@ -67,7 +74,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
 
   return {
     userId: user.id,
-    email: profile?.email ?? user.email ?? "",
+    email: user.email ?? profile?.email ?? "",
     profile: profile ?? null,
     memberships,
     pendingMemberships,

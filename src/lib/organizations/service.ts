@@ -200,18 +200,26 @@ export async function approveMembership(params: {
   });
 
   // Het e-mailadres van dit lid is nu een geverifieerde contactpersoon.
+  //
+  // Wij nemen hier bewust het inlogadres uit Supabase Auth en niet het adres
+  // uit profiles. Aan een geverifieerd contact hangt de zichtbaarheid van
+  // e-mailthreads, en dat mag nooit afhangen van een veld dat de gebruiker
+  // zelf kan aanpassen.
   const { data: profile } = await supabase
     .from("profiles")
     .select("email, full_name")
     .eq("id", member.user_id)
     .maybeSingle();
 
-  if (profile?.email) {
+  const { data: authUser } = await supabase.auth.admin.getUserById(member.user_id);
+  const loginEmail = authUser?.user?.email ?? profile?.email ?? null;
+
+  if (loginEmail) {
     await supabase.from("organization_contacts").upsert(
       {
         organization_id: member.organization_id,
-        email: profile.email.toLowerCase(),
-        full_name: profile.full_name,
+        email: loginEmail.toLowerCase(),
+        full_name: profile?.full_name ?? null,
         user_id: member.user_id,
         is_verified: true,
         verified_at: new Date().toISOString(),

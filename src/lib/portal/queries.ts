@@ -42,6 +42,13 @@ export async function getLoyaltyBalance(organizationId: string): Promise<Loyalty
   return data ?? { ...EMPTY_BALANCE, organization_id: organizationId };
 }
 
+/**
+ * Aankomende workshops: uitsluitend boekingen waarvan vaststaat dat ze
+ * doorgaan. Aanvragen, offertes, concepten en annuleringen horen hier niet
+ * thuis, want die kan een klant niet als zekerheid inplannen. In de database
+ * is dat precies status 'confirmed'; 'concept' dekt alles wat nog in
+ * voorbereiding is en 'cancelled' spreekt voor zich.
+ */
 export async function getUpcomingBookings(organizationId: string, limit = 5) {
   const supabase = await createServerSupabase();
   const today = new Date().toISOString().slice(0, 10);
@@ -49,7 +56,26 @@ export async function getUpcomingBookings(organizationId: string, limit = 5) {
     .from("bookings")
     .select("*")
     .eq("organization_id", organizationId)
-    .in("status", ["confirmed", "concept"])
+    .eq("status", "confirmed")
+    .gte("scheduled_date", today)
+    .order("scheduled_date", { ascending: true })
+    .limit(limit);
+  return (data ?? []) as BookingRow[];
+}
+
+/**
+ * Wat er nog in voorbereiding is: aanvragen en concepten met een datum in de
+ * toekomst. Bewust apart, zodat het niet als zekerheid overkomt maar ook niet
+ * ongemerkt verdwijnt.
+ */
+export async function getBookingsInPreparation(organizationId: string, limit = 25) {
+  const supabase = await createServerSupabase();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "concept")
     .gte("scheduled_date", today)
     .order("scheduled_date", { ascending: true })
     .limit(limit);
