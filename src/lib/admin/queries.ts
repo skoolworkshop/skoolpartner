@@ -256,11 +256,19 @@ export async function listLoyaltyTransactions(organizationId?: string) {
   return data ?? [];
 }
 
+/**
+ * Alle inwisselverzoeken, met alles wat de beheerder nodig heeft om te
+ * beoordelen en om het achteraf te kunnen aantonen: klant, organisatie,
+ * boeking, workshopdatum, punten, euro's, aanvraagdatum, status en de
+ * gekoppelde factuur.
+ */
 export async function listRedemptions() {
   const supabase = createServiceSupabase();
   const { data } = await supabase
     .from("redemption_requests")
-    .select("*, organizations(name), profiles!redemption_requests_requested_by_fkey(email)")
+    .select(
+      "*, organizations(name), profiles!redemption_requests_requested_by_fkey(email, full_name), bookings(workshop_name, scheduled_date, reference)"
+    )
     .order("created_at", { ascending: false })
     .limit(150);
   return data ?? [];

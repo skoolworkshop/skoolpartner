@@ -217,6 +217,8 @@ export async function ingestConfirmationEmail(input: ParserInput): Promise<Inges
     organizationId: resolution.organizationId!,
     extracted: parsed.extracted,
     origin: "email_parser",
+    // De bevestigingsmail is het moment waarop de boeking tot stand kwam.
+    bookedAt: input.receivedAt ?? new Date().toISOString(),
   });
 
   await supabase
@@ -238,6 +240,13 @@ export async function createBookingFromSource(params: {
   createdBy?: string | null;
   needsReview?: boolean;
   reviewReasons?: string[];
+  /**
+   * Wanneer de boeking bij Skool Workshop tot stand kwam. Bij een
+   * bevestigingsmail is dat de datum van die mail, niet het moment waarop wij
+   * hem inlezen. Dit bepaalt of de boeking binnen de SkoolPartner-periode van
+   * de klant valt.
+   */
+  bookedAt?: string | null;
 }): Promise<string> {
   const supabase = createServiceSupabase();
   const workshopCount = params.extracted.workshopCount ?? 1;
@@ -264,6 +273,7 @@ export async function createBookingFromSource(params: {
       contact_name: params.extracted.contactName,
       needs_review: params.needsReview ?? false,
       review_reasons: params.reviewReasons ?? [],
+      booked_at: params.bookedAt ?? new Date().toISOString(),
       created_by: params.createdBy ?? null,
     })
     .select("id")

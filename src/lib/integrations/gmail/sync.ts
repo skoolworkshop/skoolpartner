@@ -2,6 +2,7 @@ import "server-only";
 
 import { integrationMode, serverEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/server";
+import { isWithinPartnerPeriod } from "@/lib/loyalty/period";
 import { getSettingsWithServiceRole } from "@/lib/settings";
 import { ingestConfirmationEmail } from "@/lib/bookings/ingest";
 import {
@@ -150,6 +151,20 @@ export async function storeEmail(email: NormalizedEmail): Promise<{ stored: bool
   // én de sterkste garantie dat interne mail nooit in SkoolPartner belandt.
   if (visibility.visibility === "blocked") {
     return { stored: false, reason: visibility.reason };
+  }
+
+  // Mailhistorie van vóór de deelname hoort niet bij SkoolPartner. Wij slaan
+  // die niet op, ook niet verborgen: wat er niet is, kan ook niet uitlekken.
+  if (visibility.organizationId) {
+    const { data: account } = await supabase
+      .from("loyalty_accounts")
+      .select("enrolled_at")
+      .eq("organization_id", visibility.organizationId)
+      .maybeSingle();
+
+    if (account?.enrolled_at && !isWithinPartnerPeriod(email.sentAt, account.enrolled_at)) {
+      return { stored: false, reason: "Bericht dateert van vóór deelname aan SkoolPartner" };
+    }
   }
 
   const { data: thread } = await supabase

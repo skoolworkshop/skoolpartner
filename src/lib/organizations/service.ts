@@ -199,6 +199,45 @@ export async function approveMembership(params: {
     p_actor: params.adminId,
   });
 
+  // Wat de aanvrager invulde over deze organisatie stond geparkeerd. Nu een
+  // beheerder de aanvraag goedkeurt, mogen die gegevens erin. Alleen lege
+  // velden worden aangevuld: wat de organisatie al had, blijft staan.
+  const gevraagd = member.requested_details;
+  if (gevraagd) {
+    const { data: organisatie } = await supabase
+      .from("organizations")
+      .select("street, house_number, house_number_addition, postal_code, city, phone")
+      .eq("id", member.organization_id)
+      .maybeSingle();
+
+    if (organisatie) {
+      const aanvulling: Partial<OrganizationRow> = {};
+      const vul = (veld: keyof typeof organisatie, waarde?: string) => {
+        if (!organisatie[veld] && waarde) aanvulling[veld] = waarde;
+      };
+      vul("street", gevraagd.street);
+      vul("house_number", gevraagd.house_number);
+      vul("house_number_addition", gevraagd.house_number_addition);
+      vul("postal_code", gevraagd.postal_code);
+      vul("city", gevraagd.city);
+      vul("phone", gevraagd.phone);
+
+      if (Object.keys(aanvulling).length > 0) {
+        await supabase.from("organizations").update(aanvulling).eq("id", member.organization_id);
+        await recordAudit({
+          actorId: params.adminId,
+          actorEmail: params.adminEmail,
+          action: "organization.details_completed",
+          entityType: "organization",
+          entityId: member.organization_id,
+          organizationId: member.organization_id,
+          after: aanvulling,
+          reason: "Aangevuld vanuit een goedgekeurde registratie",
+        });
+      }
+    }
+  }
+
   // Het e-mailadres van dit lid is nu een geverifieerde contactpersoon.
   //
   // Wij nemen hier bewust het inlogadres uit Supabase Auth en niet het adres

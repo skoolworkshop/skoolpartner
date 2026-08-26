@@ -2,6 +2,7 @@ import "server-only";
 
 import { integrationMode } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/server";
+import { isWithinPartnerPeriod } from "@/lib/loyalty/period";
 import {
   markSyncError,
   markSyncStart,
@@ -57,6 +58,33 @@ export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
 }> {
   const supabase = createServiceSupabase();
   const organizationId = await resolveOrganizationId(invoice.contact_id);
+
+  // Wij halen de bestaande administratie van een klant niet binnen. Hoort deze
+  // factuur bij een organisatie die meedoet, en dateert zij van vóór haar
+  // SkoolPartner-startmoment, dan slaan wij haar niet op. Een factuur die er al
+  // stond werken wij wel gewoon bij, bijvoorbeeld als er betaald wordt.
+  if (organizationId) {
+    const { data: bestaat } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("moneybird_invoice_id", invoice.id)
+      .maybeSingle();
+
+    if (!bestaat) {
+      const { data: account } = await supabase
+        .from("loyalty_accounts")
+        .select("enrolled_at")
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+
+      if (
+        account?.enrolled_at &&
+        !isWithinPartnerPeriod(invoice.invoice_date, account.enrolled_at)
+      ) {
+        return { invoiceId: null, releasedTransactions: 0 };
+      }
+    }
+  }
 
   const totalIncl = amountToCents(invoice.total_price_incl_tax);
   const totalPaid = amountToCents(invoice.total_paid);

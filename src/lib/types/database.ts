@@ -37,6 +37,8 @@ export type ProfileRow = {
   id: string;
   email: string;
   full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone: string | null;
   job_title: string | null;
   is_admin: boolean;
@@ -59,6 +61,9 @@ export type OrganizationRow = {
   phone: string | null;
   website: string | null;
   address_line: string | null;
+  street: string | null;
+  house_number: string | null;
+  house_number_addition: string | null;
   postal_code: string | null;
   city: string | null;
   country: string;
@@ -91,8 +96,22 @@ export type OrganizationMemberRow = {
   approved_by: string | null;
   approved_at: string | null;
   rejected_reason: string | null;
+  /** Wat de aanvrager invulde over de organisatie. Pas overnemen na goedkeuring. */
+  requested_details: RegistrationDetails | null;
   created_at: string;
   updated_at: string;
+};
+
+/** De organisatiegegevens zoals iemand ze bij registratie invulde. */
+export type RegistrationDetails = {
+  organization_name?: string;
+  street?: string;
+  house_number?: string;
+  house_number_addition?: string;
+  postal_code?: string;
+  city?: string;
+  phone?: string;
+  job_title?: string;
 };
 
 export type OrganizationInviteRow = {
@@ -128,6 +147,8 @@ export type BookingRow = {
   id: string;
   organization_id: string;
   reference: string | null;
+  /** Wanneer de boeking bij Skool Workshop tot stand kwam. Bepaalt of hij binnen de SkoolPartner-periode valt. */
+  booked_at: string | null;
   workshop_name: string;
   workshop_count: number;
   minutes_per_workshop: number;
@@ -332,7 +353,10 @@ export type RedemptionRequestRow = {
   points: number;
   value_cents: number;
   point_value_cents_per_100: number;
+  booking_id: string | null;
   booking_reference: string | null;
+  invoice_number: string | null;
+  moneybird_invoice_id: string | null;
   note: string | null;
   status: RedemptionStatus;
   reserve_transaction_id: string | null;
@@ -340,6 +364,7 @@ export type RedemptionRequestRow = {
   decided_at: string | null;
   decision_note: string | null;
   applied_at: string | null;
+  applied_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -554,7 +579,13 @@ export type Database = {
     };
     Functions: {
       request_redemption: {
-        Args: { p_org: string; p_points: number; p_booking_reference?: string | null; p_note?: string | null };
+        Args: {
+          p_org: string;
+          p_points: number;
+          p_booking_id?: string | null;
+          p_booking_reference?: string | null;
+          p_note?: string | null;
+        };
         Returns: RedemptionRequestRow;
       };
       cancel_redemption: {

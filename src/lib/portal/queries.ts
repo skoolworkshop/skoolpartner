@@ -1,6 +1,11 @@
 import "server-only";
 
 import { createServerSupabase } from "@/lib/supabase/server";
+import {
+  bookingMoment,
+  bookingQualifiesForPoints,
+  invoiceBelongsToPeriod,
+} from "@/lib/loyalty/period";
 import type {
   BookingRow,
   InvoiceRow,
@@ -29,7 +34,23 @@ const EMPTY_BALANCE: LoyaltyBalanceRow = {
  * Security in Supabase bepaalt wat er terugkomt: een organisatie-ID dat niet
  * bij de gebruiker hoort levert altijd een leeg resultaat op, ook als iemand
  * dat ID handmatig invult.
+ *
+ * Daarnaast geldt overal de SkoolPartner-periode: wat van vóór het startmoment
+ * van deze organisatie dateert, tonen wij niet. Dat is geen technische keuze
+ * maar een afspraak met de klant. Het startmoment staat in
+ * loyalty_accounts.enrolled_at en wordt hier opgehaald via enrolledAt().
  */
+
+/** Het startmoment van deze organisatie, of null als zij niet deelneemt. */
+export async function getEnrolledAt(organizationId: string): Promise<string | null> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("loyalty_accounts")
+    .select("enrolled_at")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  return data?.enrolled_at ?? null;
+}
 
 export async function getLoyaltyBalance(organizationId: string): Promise<LoyaltyBalanceRow> {
   const supabase = await createServerSupabase();
@@ -56,6 +77,9 @@ export async function getLoyaltyBalance(organizationId: string): Promise<Loyalty
  */
 export async function getUpcomingBookings(organizationId: string, limit = 5) {
   const supabase = await createServerSupabase();
+  const enrolledAt = await getEnrolledAt(organizationId);
+  if (!enrolledAt) return [];
+
   const today = new Date().toISOString().slice(0, 10);
   const { data } = await supabase
     .from("bookings")
@@ -64,12 +88,27 @@ export async function getUpcomingBookings(organizationId: string, limit = 5) {
     .eq("status", "confirmed")
     .gte("scheduled_date", today)
     .order("scheduled_date", { ascending: true })
-    .limit(limit);
-  return (data ?? []) as BookingRow[];
+    .limit(limit + 25);
+
+  return withinPeriod(data as BookingRow[] | null, enrolledAt).slice(0, limit);
+}
+
+/**
+ * Filtert boekingen op de SkoolPartner-periode.
+ *
+ * Wij halen er iets meer op dan nodig en filteren daarna, omdat de grens op
+ * booked_at ligt en de sortering op de workshopdatum. Zonder die marge zou een
+ * oude boeking een nieuwe uit de lijst kunnen duwen.
+ */
+function withinPeriod(rows: BookingRow[] | null, enrolledAt: string): BookingRow[] {
+  return (rows ?? []).filter((booking) => bookingQualifiesForPoints(booking, enrolledAt));
 }
 
 export async function getPastBookings(organizationId: string, limit = 50) {
   const supabase = await createServerSupabase();
+  const enrolledAt = await getEnrolledAt(organizationId);
+  if (!enrolledAt) return [];
+
   const today = new Date().toISOString().slice(0, 10);
   const { data } = await supabase
     .from("bookings")
@@ -77,19 +116,50 @@ export async function getPastBookings(organizationId: string, limit = 50) {
     .eq("organization_id", organizationId)
     .or(`scheduled_date.lt.${today},status.eq.completed,status.eq.cancelled`)
     .order("scheduled_date", { ascending: false })
-    .limit(limit);
-  return (data ?? []) as BookingRow[];
+    .limit(limit + 25);
+
+  return withinPeriod(data as BookingRow[] | null, enrolledAt).slice(0, limit);
 }
 
+/**
+ * Facturen binnen de SkoolPartner-periode.
+ *
+ * Een factuur hoort erbij als de boeking waaruit zij voortkomt binnen de
+ * periode valt. Is er geen boeking gekoppeld, dan kijken wij naar de
+ * factuurdatum. De boeking gaat voor: een factuur van 20 september bij een
+ * boeking van 1 september hoort niet bij SkoolPartner, ook al ligt de
+ * factuurdatum na het startmoment.
+ */
 export async function getInvoices(organizationId: string, limit = 50) {
   const supabase = await createServerSupabase();
+  const enrolledAt = await getEnrolledAt(organizationId);
+  if (!enrolledAt) return [];
+
   const { data } = await supabase
     .from("invoices")
-    .select("*")
+    .select("*, booking_invoices(bookings(booked_at, created_at))")
     .eq("organization_id", organizationId)
     .order("invoice_date", { ascending: false, nullsFirst: false })
     .limit(limit);
-  return (data ?? []) as InvoiceRow[];
+
+  const rows = (data ?? []) as unknown as (InvoiceRow & {
+    booking_invoices?: { bookings: { booked_at: string | null; created_at: string } | null }[];
+  })[];
+
+  return rows
+    .filter((invoice) => {
+      const boeking = invoice.booking_invoices?.find((link) => link.bookings)?.bookings;
+      return invoiceBelongsToPeriod(
+        invoice,
+        enrolledAt,
+        boeking ? bookingMoment(boeking) : undefined
+      );
+    })
+    .map((invoice) => {
+      const kopie = { ...invoice } as Partial<typeof invoice>;
+      delete kopie.booking_invoices;
+      return kopie as InvoiceRow;
+    });
 }
 
 export async function getLoyaltyTransactions(organizationId: string, limit = 50) {
@@ -105,24 +175,34 @@ export async function getLoyaltyTransactions(organizationId: string, limit = 50)
   return (data ?? []) as LoyaltyTransactionRow[];
 }
 
+/** Inwisselverzoeken met de workshop erbij, zodat de klant ziet waar het voordeel heen ging. */
 export async function getRedemptionRequests(organizationId: string, limit = 20) {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("redemption_requests")
-    .select("*")
+    .select("*, bookings(workshop_name, scheduled_date)")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data ?? []) as RedemptionRequestRow[];
+  return (data ?? []) as unknown as RedemptionWithBooking[];
 }
 
+export type RedemptionWithBooking = RedemptionRequestRow & {
+  bookings: { workshop_name: string; scheduled_date: string | null } | null;
+};
+
+/** Gesprekken binnen de SkoolPartner-periode. Oudere mailhistorie blijft weg. */
 export async function getMessageThreads(organizationId: string, limit = 30) {
   const supabase = await createServerSupabase();
+  const enrolledAt = await getEnrolledAt(organizationId);
+  if (!enrolledAt) return [];
+
   const { data } = await supabase
     .from("message_threads")
     .select("*")
     .eq("organization_id", organizationId)
     .in("visibility", ["auto_allowed", "manual_allowed"])
+    .gte("last_message_at", enrolledAt)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(limit);
   return (data ?? []) as MessageThreadRow[];
@@ -131,12 +211,16 @@ export async function getMessageThreads(organizationId: string, limit = 30) {
 export async function getThreadWithMessages(organizationId: string, threadId: string) {
   const supabase = await createServerSupabase();
 
+  const enrolledAt = await getEnrolledAt(organizationId);
+  if (!enrolledAt) return null;
+
   const { data: thread } = await supabase
     .from("message_threads")
     .select("*")
     .eq("id", threadId)
     .eq("organization_id", organizationId)
     .in("visibility", ["auto_allowed", "manual_allowed"])
+    .gte("last_message_at", enrolledAt)
     .maybeSingle();
 
   if (!thread) return null;

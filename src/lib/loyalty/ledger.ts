@@ -4,6 +4,7 @@ import { recordAudit } from "@/lib/audit";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { getSettingsWithServiceRole, ratesFromSettings } from "@/lib/settings";
 import { calculateBookingPoints, describeWorkshopEarning } from "@/lib/loyalty/calc";
+import { bookingQualifiesForPoints } from "@/lib/loyalty/period";
 import type { LoyaltyTransactionRow } from "@/lib/types/database";
 
 export interface AwardResult {
@@ -53,9 +54,12 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
     return { ok: false, skipped: "Organisatie neemt niet deel aan SkoolPartner" };
   }
 
-  // Geen punten met terugwerkende kracht: de boeking moet ná de deelname
-  // in het systeem zijn gekomen.
-  if (new Date(booking.created_at) < new Date(account.enrolled_at)) {
+  // Geen punten met terugwerkende kracht. Wij kijken naar het moment waarop de
+  // boeking tot stand kwam, niet naar de factuurdatum en niet naar het moment
+  // waarop wij hem binnenhaalden. Een boeking van 1 september bij een
+  // registratie van 10 september levert dus niets op, ook al komt de factuur
+  // pas op 15 september.
+  if (!bookingQualifiesForPoints(booking, account.enrolled_at)) {
     return { ok: false, skipped: "Boeking dateert van vóór deelname aan SkoolPartner" };
   }
 
