@@ -13,6 +13,12 @@ import {
   setMembershipStatus,
 } from "@/lib/organizations/service";
 import { generateToken, hashToken } from "@/lib/crypto";
+import {
+  addExternalLink,
+  publishResult,
+  RESULTS_BUCKET,
+} from "@/lib/results/service";
+import { resolveSiteUrl } from "@/lib/site-url";
 import { publicEnv } from "@/lib/env";
 import { SETTING_DEFAULTS, type SettingKey } from "@/lib/settings";
 import type { Json } from "@/lib/types/database";
@@ -568,4 +574,130 @@ export async function runSyncAction(_prev: AdminState, formData: FormData): Prom
         message: `Synchronisatie klaar (${result.mode === "mock" ? "testmodus" : "live"}): ${result.itemsProcessed} items verwerkt.`,
       }
     : { status: "error", message: result.message ?? "Synchronisatie mislukt." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Resultaten van workshops                                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function createResultAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "").trim();
+  const bookingId = String(formData.get("booking_id") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+
+  if (!organizationId) return { status: "error", message: "Kies een organisatie." };
+  if (title.length < 2) return { status: "error", message: "Vul een titel in." };
+
+  const supabase = createServiceSupabase();
+  const { error } = await supabase.from("workshop_results").insert({
+    organization_id: organizationId,
+    booking_id: bookingId || null,
+    title,
+    description: description || null,
+    status: "concept",
+    created_by: session.userId,
+  });
+
+  if (error) return { status: "error", message: error.message };
+
+  revalidatePath("/admin/resultaten");
+  return { status: "ok", message: "Set aangemaakt. Voeg nu bestanden of links toe." };
+}
+
+export async function addResultLinkAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const resultId = String(formData.get("result_id") ?? "");
+  const url = String(formData.get("url") ?? "");
+  const label = String(formData.get("label") ?? "");
+
+  const result = await addExternalLink({ resultId, url, label, userId: session.userId });
+
+  revalidatePath("/admin/resultaten");
+  return result.ok
+    ? { status: "ok", message: "Link toegevoegd." }
+    : { status: "error", message: result.error ?? "Toevoegen is niet gelukt." };
+}
+
+export async function publishResultAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const resultId = String(formData.get("result_id") ?? "");
+
+  const portalUrl = await resolveSiteUrl();
+  const result = await publishResult({ resultId, userId: session.userId, portalUrl });
+
+  revalidatePath("/admin/resultaten");
+  revalidatePath("/resultaten");
+  return result.ok
+    ? { status: "ok", message: result.message }
+    : { status: "error", message: result.message };
+}
+
+export async function deleteResultAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const resultId = String(formData.get("result_id") ?? "");
+
+  const supabase = createServiceSupabase();
+  const { data: files } = await supabase
+    .from("workshop_result_files")
+    .select("storage_path")
+    .eq("result_id", resultId);
+
+  const paths = (files ?? [])
+    .map((f) => f.storage_path)
+    .filter((p): p is string => Boolean(p));
+
+  if (paths.length > 0) {
+    await supabase.storage.from(RESULTS_BUCKET).remove(paths);
+  }
+
+  await supabase.from("workshop_results").delete().eq("id", resultId);
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "workshop_result.deleted",
+    entityType: "workshop_results",
+    entityId: resultId,
+  });
+
+  revalidatePath("/admin/resultaten");
+  revalidatePath("/resultaten");
+  return { status: "ok", message: "Set verwijderd, inclusief de bestanden." };
+}
+
+export async function deleteResultFileAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  await requireAdmin();
+  const fileId = String(formData.get("file_id") ?? "");
+
+  const supabase = createServiceSupabase();
+  const { data: file } = await supabase
+    .from("workshop_result_files")
+    .select("storage_path")
+    .eq("id", fileId)
+    .maybeSingle();
+
+  if (file?.storage_path) {
+    await supabase.storage.from(RESULTS_BUCKET).remove([file.storage_path]);
+  }
+  await supabase.from("workshop_result_files").delete().eq("id", fileId);
+
+  revalidatePath("/admin/resultaten");
+  return { status: "ok", message: "Bestand verwijderd." };
 }

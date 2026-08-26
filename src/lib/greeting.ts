@@ -43,6 +43,8 @@ export type Highlight = {
 };
 
 export function buildHighlight(input: {
+  newResultTitle?: string | null;
+  newResultExpiresAt?: string | null;
   nextBookingName?: string | null;
   nextBookingDate?: string | null;
   availablePoints: number;
@@ -54,7 +56,27 @@ export function buildHighlight(input: {
 }): Highlight | null {
   const now = input.now ?? new Date();
 
-  // 1. Er komt binnenkort een workshop aan. Dat is het belangrijkste nieuws.
+  // 1. Er staan resultaten klaar. Dat is het leukste nieuws en het is ook nog
+  //    eens tijdgebonden, dus dat gaat voor alles.
+  const resultDagen = input.newResultExpiresAt
+    ? Math.ceil((new Date(input.newResultExpiresAt).getTime() - now.getTime()) / 86_400_000)
+    : null;
+
+  if (input.newResultTitle && resultDagen !== null && resultDagen > 0) {
+    const dagen = resultDagen;
+    return {
+      tone: "feest",
+      title: `De resultaten van ${input.newResultTitle} staan klaar.`,
+      description:
+        dagen === 1
+          ? "Nog vandaag te downloaden. Sla ze op een eigen plek op."
+          : `Nog ${dagen} dagen te downloaden. Sla ze op een eigen plek op.`,
+      href: "/resultaten",
+      linkLabel: "Naar de resultaten",
+    };
+  }
+
+  // 2. Er komt binnenkort een workshop aan.
   const dagen = daysUntil(input.nextBookingDate, now);
   if (input.nextBookingName && dagen !== null && dagen >= 0 && dagen <= 10) {
     const wanneer =
@@ -70,7 +92,7 @@ export function buildHighlight(input: {
 
   if (!input.loyaltyEnabled) return null;
 
-  // 2. Er zijn kort geleden punten bijgeschreven.
+  // 3. Er zijn kort geleden punten bijgeschreven.
   if (input.lastEarnedAt && input.availablePoints > 0) {
     const dagenGeleden = Math.round(
       (now.getTime() - new Date(input.lastEarnedAt).getTime()) / 86_400_000
@@ -86,7 +108,7 @@ export function buildHighlight(input: {
     }
   }
 
-  // 3. Er staan punten klaar die nog niet beschikbaar zijn.
+  // 4. Er staan punten klaar die nog niet beschikbaar zijn.
   if (input.pendingPoints > 0) {
     return {
       tone: "rustig",

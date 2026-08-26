@@ -22,6 +22,7 @@ const GROUP_LABELS: Record<string, string> = {
   boekingen: "Boekingen en herkenning",
   berichten: "Berichten",
   contact: "Contact en chat",
+  resultaten: "Resultaten van workshops",
   algemeen: "Overig",
 };
 

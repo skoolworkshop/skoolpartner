@@ -30,6 +30,8 @@ export type ThreadVisibility = "needs_review" | "auto_allowed" | "manual_allowed
 export type MessageDirection = "inbound" | "outbound";
 export type ReviewStatus = "submitted" | "verified" | "rejected";
 export type WebhookStatus = "received" | "processed" | "failed" | "ignored";
+export type ResultStatus = "concept" | "published" | "expired";
+export type ResultItemKind = "file" | "link";
 
 export type ProfileRow = {
   id: string;
@@ -467,6 +469,40 @@ export type WebhookEventRow = {
   processed_at: string | null;
 };
 
+export type WorkshopResultRow = {
+  id: string;
+  organization_id: string;
+  booking_id: string | null;
+  title: string;
+  description: string | null;
+  status: ResultStatus;
+  published_at: string | null;
+  expires_at: string | null;
+  purge_at: string | null;
+  notified_at: string | null;
+  notified_email: string | null;
+  notify_error: string | null;
+  files_removed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkshopResultFileRow = {
+  id: string;
+  result_id: string;
+  kind: ResultItemKind;
+  storage_path: string | null;
+  external_url: string | null;
+  file_name: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  position: number;
+  removed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 type TableDef<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -508,6 +544,8 @@ export type Database = {
       app_settings: TableDef<AppSettingRow>;
       audit_logs: TableDef<AuditLogRow>;
       webhook_events: TableDef<WebhookEventRow>;
+      workshop_results: TableDef<WorkshopResultRow>;
+      workshop_result_files: TableDef<WorkshopResultFileRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;

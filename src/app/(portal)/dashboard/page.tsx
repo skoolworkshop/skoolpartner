@@ -23,6 +23,7 @@ import {
 import { buildHighlight, greetingForTime } from "@/lib/greeting";
 import { nextMilestone } from "@/lib/loyalty/calc";
 import { getDashboardData } from "@/lib/portal/queries";
+import { getResultsForOrganization } from "@/lib/results/service";
 import { getSettings } from "@/lib/settings";
 import { parseWorkshopImages } from "@/lib/workshop-images";
 
@@ -45,7 +46,15 @@ export default async function DashboardPage() {
 
   const workshopImages = parseWorkshopImages(settings.workshop_images);
 
+  // Staan er resultaten klaar? Dat is het leukste nieuws voor bovenaan.
+  const results = settings.results_enabled
+    ? await getResultsForOrganization(session.activeOrganizationId)
+    : [];
+  const openResult = results.find((r) => r.status === "published");
+
   const highlight = buildHighlight({
+    newResultTitle: openResult?.title,
+    newResultExpiresAt: openResult?.expires_at,
     nextBookingName: nextBooking?.workshop_name,
     nextBookingDate: nextBooking?.scheduled_date,
     availablePoints: balance.available_points,

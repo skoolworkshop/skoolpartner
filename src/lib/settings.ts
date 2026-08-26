@@ -33,6 +33,11 @@ export const SETTING_DEFAULTS = {
   booking_confirmation_from_domains: ["skoolworkshop.nl"] as string[],
   booking_confirmation_label: "Mijn Skool/Boekingsbevestiging",
   gmail_sync_query: "newer_than:60d -in:spam -in:trash -in:drafts",
+  results_enabled: true,
+  results_available_days: 7,
+  results_notice_days: 7,
+  results_max_upload_mb: 45,
+  results_email_subject: "De resultaten van uw workshop staan klaar",
   workshop_images: {
       "3d printerpen": "https://skoolworkshop.nl/wp-content/uploads/2024/07/MDC05556-scaled-e1781612569521-1024x382.jpg",
       "bodypercussie": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Workshop-Ghetto-Drums-10-1024x683.jpg",

@@ -284,3 +284,26 @@ export function buildReplyMime(params: {
 
   return encodeBase64Url(lines.join("\r\n"));
 }
+
+/** Bouwt een gewoon nieuw bericht, zonder "Re:" voor het onderwerp. */
+export function buildMessageMime(params: {
+  from: string;
+  to: string[];
+  cc?: string[];
+  subject: string;
+  bodyText: string;
+}): string {
+  const lines = [
+    `From: ${params.from}`,
+    `To: ${params.to.join(", ")}`,
+    ...(params.cc && params.cc.length > 0 ? [`Cc: ${params.cc.join(", ")}`] : []),
+    `Subject: =?UTF-8?B?${Buffer.from(params.subject, "utf8").toString("base64")}?=`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(params.bodyText, "utf8").toString("base64"),
+  ];
+
+  return encodeBase64Url(lines.join("\r\n"));
+}
