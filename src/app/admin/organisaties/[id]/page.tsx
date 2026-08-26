@@ -11,6 +11,7 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { requireAdmin } from "@/lib/auth/session";
 import { getOrganizationDetail } from "@/lib/admin/queries";
+import { visibilityLabel } from "@/lib/messaging/visibility";
 import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
@@ -285,6 +286,37 @@ export default async function OrganizationDetailPage({
             ))}
             {detail.invoices.length === 0 ? (
               <li className="px-5 py-4 text-sm text-muted">Nog geen facturen.</li>
+            ) : null}
+          </ul>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Berichten"
+            description="Alle e-mailgesprekken van deze organisatie, ook de gesprekken die de klant zelf niet ziet."
+          />
+          <ul className="divide-y divide-line-soft">
+            {detail.threads.map((thread) => (
+              <li key={thread.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                <span className="min-w-0">
+                  <Link
+                    href={`/admin/berichten/${thread.id}`}
+                    className="block truncate font-medium underline underline-offset-4"
+                  >
+                    {thread.subject ?? "Zonder onderwerp"}
+                  </Link>
+                  <span className="block text-sm text-muted">
+                    {formatShortDate(thread.last_message_at)} · {thread.message_count}{" "}
+                    {thread.message_count === 1 ? "bericht" : "berichten"}
+                  </span>
+                </span>
+                <Badge tone={visibilityLabel(thread.visibility).tone}>
+                  {visibilityLabel(thread.visibility).short}
+                </Badge>
+              </li>
+            ))}
+            {detail.threads.length === 0 ? (
+              <li className="px-5 py-4 text-sm text-muted">Nog geen berichten.</li>
             ) : null}
           </ul>
         </Card>

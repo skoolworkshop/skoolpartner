@@ -5,7 +5,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
-import { formatPhone, isProfileComplete } from "@/lib/phone";
+import { checkProfile, missingLabel } from "@/lib/account";
+import { formatPhone } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import { LeaveOrganizationForm, ProfileForm } from "./account-forms";
 
@@ -14,6 +15,13 @@ export const metadata: Metadata = { title: "Account" };
 export default async function AccountPage() {
   const session = await requireMember();
   const settings = await getSettings();
+
+  // Het inlogadres uit Supabase Auth is leidend, niet het veld in profiles.
+  const status = checkProfile({
+    full_name: session.profile?.full_name ?? null,
+    phone: session.profile?.phone ?? null,
+    email: session.email,
+  });
 
   return (
     <>
@@ -25,10 +33,11 @@ export default async function AccountPage() {
         description="Uw gegevens en uw koppeling met de organisatie."
       />
 
-      {!isProfileComplete(session.profile) ? (
+      {!status.complete ? (
         <Alert tone="warning" title="Maak uw account compleet" className="mb-5">
-          Vul hieronder uw naam en telefoonnummer in. Wij hebben een telefoonnummer nodig om u op
-          de dag van de workshop te kunnen bereiken.
+          Wij missen nog {missingLabel(status.missing)}. Uw naam en telefoonnummer vult u hieronder
+          zelf aan. Klopt uw e-mailadres niet? Mail ons op {settings.support_email}, want dat adres
+          is ook uw inlogadres.
         </Alert>
       ) : null}
 

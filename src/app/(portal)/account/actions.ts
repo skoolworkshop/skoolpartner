@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isValidEmail } from "@/lib/account";
 import { requireMember, requireUser } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/phone";
 import { recordAudit } from "@/lib/audit";
@@ -29,10 +30,28 @@ export async function updateProfile(
     return { status: "error", message: phoneResult.message ?? "Vul uw telefoonnummer in." };
   }
 
+  // Het e-mailadres is verplicht, maar niet iets wat de klant hier invult: het
+  // is zijn inlogadres. Wij controleren of het klopt en zetten het meteen goed
+  // in het profiel als daar iets is scheefgelopen. Wisselen van inlogadres
+  // loopt via ons, zodat niemand met een zelfgekozen adres bij de gegevens van
+  // een andere school kan komen.
+  if (!isValidEmail(session.email)) {
+    return {
+      status: "error",
+      message:
+        "Er is iets mis met het e-mailadres van uw account. Neem contact met ons op, dan zetten wij het goed.",
+    };
+  }
+
   const supabase = await createServerSupabase();
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: fullName, phone: phoneResult.value, job_title: jobTitle })
+    .update({
+      full_name: fullName,
+      phone: phoneResult.value,
+      job_title: jobTitle,
+      email: session.email,
+    })
     .eq("id", session.userId);
 
   if (error) return { status: "error", message: "Opslaan is niet gelukt." };

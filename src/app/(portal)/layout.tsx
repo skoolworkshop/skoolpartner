@@ -10,7 +10,7 @@ import { ExternalButtonLink } from "@/components/ui/button";
 import { requireMember } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { firstName } from "@/lib/format";
-import { isProfileComplete } from "@/lib/phone";
+import { checkProfile } from "@/lib/account";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await requireMember();
@@ -109,7 +109,14 @@ export default async function PortalLayout({ children }: { children: React.React
             Ingelogd als {firstName(session.profile?.full_name, session.email)}
           </span>
 
-          <ProfileReminder complete={isProfileComplete(session.profile)} />
+          <ProfileReminder
+            status={checkProfile({
+              full_name: session.profile?.full_name ?? null,
+              phone: session.profile?.phone ?? null,
+              email: session.email,
+            })}
+            supportEmail={settings.support_email}
+          />
 
           {children}
         </main>

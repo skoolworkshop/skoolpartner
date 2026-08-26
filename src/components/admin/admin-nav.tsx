@@ -11,6 +11,8 @@ const items = [
   { href: "/admin/organisaties", label: "Organisaties" },
   { href: "/admin/gebruikers", label: "Gebruikers" },
   { href: "/admin/boekingen", label: "Boekingen" },
+  { href: "/admin/facturen", label: "Facturen" },
+  { href: "/admin/berichten", label: "Berichten" },
   { href: "/admin/resultaten", label: "Resultaten" },
   { href: "/admin/skoolpoints", label: "SkoolPoints" },
   { href: "/admin/inwisselen", label: "Inwisselen" },

@@ -44,9 +44,10 @@ export function ProfileForm({
       <Field
         label="E-mailadres"
         htmlFor="email"
-        hint="Hiermee logt u in. Wilt u een ander adres gebruiken? Mail ons, dan regelen wij dat veilig."
+        required
+        hint="Hiermee logt u in en hierop sturen wij bevestigingen, facturen en resultaten. Wilt u een ander adres gebruiken? Mail ons, dan regelen wij dat veilig."
       >
-        <Input id="email" name="email" defaultValue={email} disabled />
+        <Input id="email" name="email" type="email" defaultValue={email} disabled />
       </Field>
 
       <Field

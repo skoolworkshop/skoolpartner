@@ -9,11 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
 import { formatDate, formatDuration, formatTime, relativeDay } from "@/lib/format";
-import {
-  getBookingsInPreparation,
-  getPastBookings,
-  getUpcomingBookings,
-} from "@/lib/portal/queries";
+import { getPastBookings, getUpcomingBookings } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
 import { parseWorkshopImages, type WorkshopImageMap } from "@/lib/workshop-images";
 import type { BookingRow } from "@/lib/types/database";
@@ -75,9 +71,8 @@ export default async function BookingsPage() {
   const session = await requireMember();
   const settings = await getSettings();
   const workshopImages = parseWorkshopImages(settings.workshop_images);
-  const [upcoming, inPreparation, past] = await Promise.all([
+  const [upcoming, past] = await Promise.all([
     getUpcomingBookings(session.activeOrganizationId, 25),
-    getBookingsInPreparation(session.activeOrganizationId),
     getPastBookings(session.activeOrganizationId, 50),
   ]);
 
@@ -126,25 +121,6 @@ export default async function BookingsPage() {
             />
           )}
         </Card>
-
-        {inPreparation.length > 0 ? (
-          <Card>
-            <CardHeader
-              title="In voorbereiding"
-              description="Deze aanvragen zijn nog niet definitief. Zodra wij de datum bevestigen, verhuizen ze naar Aankomende workshops."
-            />
-            <ul className="divide-y divide-line-soft">
-              {inPreparation.map((booking) => (
-                <BookingRowItem
-                  key={booking.id}
-                  booking={booking}
-                  ctaUrl={settings.new_booking_cta_url}
-                  images={workshopImages}
-                />
-              ))}
-            </ul>
-          </Card>
-        ) : null}
 
         <Card>
           <CardHeader title="Eerdere boekingen" />
