@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { isValidEmail } from "@/lib/account";
+import { normalizeCjpNumber } from "@/lib/cjp";
 import { requireMember, requireUser } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/phone";
 import { recordAudit } from "@/lib/audit";
@@ -59,6 +60,72 @@ export async function updateProfile(
   revalidatePath("/account");
   revalidatePath("/", "layout");
   return { status: "ok", message: "Uw gegevens zijn opgeslagen." };
+}
+
+/**
+ * Het CJP-schoolnummer van de organisatie bijwerken.
+ *
+ * Alleen een beheerder binnen die organisatie mag dit. Het nummer hoort bij de
+ * school, dus een collega ziet dezelfde wijziging. Het invullen van een nummer
+ * verandert nooit iets aan een prijs, korting of factuur; het wordt alleen
+ * vastgelegd.
+ */
+export async function updateCjpNumber(
+  _prev: AccountState,
+  formData: FormData
+): Promise<AccountState> {
+  const session = await requireMember();
+
+  if (session.activeMembership.role !== "beheerder") {
+    return {
+      status: "error",
+      message: "Alleen een beheerder van uw organisatie kan dit aanpassen.",
+    };
+  }
+
+  const resultaat = normalizeCjpNumber(String(formData.get("cjp_school_number") ?? ""));
+  if (!resultaat.ok) {
+    return { status: "error", message: resultaat.message ?? "Controleer het nummer." };
+  }
+
+  const supabase = createServiceSupabase();
+  const { data: vorige } = await supabase
+    .from("organizations")
+    .select("cjp_school_number, has_cjp")
+    .eq("id", session.activeOrganizationId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      cjp_school_number: resultaat.value,
+      // Een ingevuld nummer betekent dat de school er een heeft. Wordt het
+      // leeggemaakt, dan weten wij het weer niet zeker.
+      has_cjp: resultaat.value ? true : (vorige?.has_cjp ?? null),
+    })
+    .eq("id", session.activeOrganizationId);
+
+  if (error) return { status: "error", message: "Opslaan is niet gelukt." };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    actorRole: "klant",
+    action: "organization.cjp_updated",
+    entityType: "organization",
+    entityId: session.activeOrganizationId,
+    organizationId: session.activeOrganizationId,
+    before: { cjp_school_number: vorige?.cjp_school_number ?? null },
+    after: { cjp_school_number: resultaat.value ?? null },
+  });
+
+  revalidatePath("/account");
+  return {
+    status: "ok",
+    message: resultaat.value
+      ? "Het CJP-schoolnummer is opgeslagen."
+      : "Het CJP-schoolnummer is verwijderd.",
+  };
 }
 
 /**

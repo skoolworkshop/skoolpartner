@@ -64,6 +64,8 @@ export async function completeRegistrationAction(
     houseNumberAddition: String(formData.get("house_number_addition") ?? ""),
     postalCode: String(formData.get("postal_code") ?? ""),
     city: String(formData.get("city") ?? ""),
+    hasCjp: String(formData.get("has_cjp") ?? "onbekend"),
+    cjpSchoolNumber: String(formData.get("cjp_school_number") ?? ""),
   };
 
   const check = validateRegistration(input);

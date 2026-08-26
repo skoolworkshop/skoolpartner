@@ -13,6 +13,8 @@ import {
   setMembershipStatus,
 } from "@/lib/organizations/service";
 import { generateToken, hashToken } from "@/lib/crypto";
+import { cjpAnswerToBoolean, normalizeCjpNumber } from "@/lib/cjp";
+import { clearOrganizationLogo, fetchOrganizationLogo } from "@/lib/organizations/logo";
 import {
   deleteOrganizationPermanently,
   deleteUserPermanently,
@@ -216,6 +218,112 @@ export async function inviteMemberAction(
     message: `Uitnodiging aangemaakt voor ${email}. Stuur onderstaande link naar deze persoon.`,
     inviteUrl: `${publicEnv.siteUrl}/uitnodiging/${token}`,
   };
+}
+
+/**
+ * Het logo van een organisatie ophalen van haar eigen domein.
+ *
+ * Force staat aan: vraagt een beheerder er bewust om, dan mag een eerder
+ * handmatig ingesteld logo wél worden vervangen.
+ */
+export async function fetchOrganizationLogoAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  if (!organizationId) return { status: "error", message: "Onbekende organisatie." };
+
+  const result = await fetchOrganizationLogo({
+    organizationId,
+    actorId: session.userId,
+    actorEmail: session.email,
+    force: true,
+  });
+
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  revalidatePath("/", "layout");
+
+  return result.ok
+    ? { status: "ok", message: `Logo gevonden via ${result.bron}.` }
+    : { status: "error", message: result.message ?? "Er is geen logo gevonden." };
+}
+
+export async function clearOrganizationLogoAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  if (!organizationId) return { status: "error", message: "Onbekende organisatie." };
+
+  await clearOrganizationLogo({
+    organizationId,
+    actorId: session.userId,
+    actorEmail: session.email,
+  });
+
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  revalidatePath("/", "layout");
+  return { status: "ok", message: "Logo verwijderd. Het standaardicoon is weer zichtbaar." };
+}
+
+/**
+ * Het CJP-schoolnummer vastleggen.
+ *
+ * Puur registratie. Dit veroorzaakt uit zichzelf nooit een korting, een
+ * factuurwijziging of welke financiële actie dan ook.
+ */
+export async function setCjpNumberAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  if (!organizationId) return { status: "error", message: "Onbekende organisatie." };
+
+  const nummer = normalizeCjpNumber(String(formData.get("cjp_school_number") ?? ""));
+  if (!nummer.ok) return { status: "error", message: nummer.message ?? "Controleer het nummer." };
+
+  const antwoord = String(formData.get("has_cjp") ?? "onbekend");
+  const heeftCjp = cjpAnswerToBoolean(antwoord);
+
+  const supabase = createServiceSupabase();
+  const { data: vorige } = await supabase
+    .from("organizations")
+    .select("cjp_school_number, has_cjp")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      cjp_school_number: heeftCjp === false ? null : nummer.value,
+      has_cjp: nummer.value ? true : heeftCjp,
+    })
+    .eq("id", organizationId);
+
+  if (error) return { status: "error", message: "Opslaan is niet gelukt." };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "organization.cjp_updated",
+    entityType: "organization",
+    entityId: organizationId,
+    organizationId,
+    before: {
+      cjp_school_number: vorige?.cjp_school_number ?? null,
+      has_cjp: vorige?.has_cjp ?? null,
+    },
+    after: {
+      cjp_school_number: heeftCjp === false ? null : (nummer.value ?? null),
+      has_cjp: nummer.value ? true : heeftCjp,
+    },
+  });
+
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  return { status: "ok", message: "CJP-gegevens opgeslagen." };
 }
 
 /* -------------------------------------------------------------------------- */

@@ -15,8 +15,12 @@ import { visibilityLabel } from "@/lib/messaging/visibility";
 import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
+import { OrgLogo } from "@/components/portal/org-logo";
 import {
   addMemberByEmailAction,
+  clearOrganizationLogoAction,
+  fetchOrganizationLogoAction,
+  setCjpNumberAction,
   addOrganizationDomainAction,
   deleteOrganizationAction,
   inviteMemberAction,
@@ -56,7 +60,15 @@ export default async function OrganizationDetailPage({
         Terug naar organisaties
       </Link>
 
-      <h1 className="mb-1 text-[30px]">{detail.organization.name}</h1>
+      <div className="mb-1 flex items-center gap-3">
+        <OrgLogo
+          name={detail.organization.name}
+          logoUrl={detail.organization.logo_url}
+          size={40}
+          className="border border-line-soft"
+        />
+        <h1 className="text-[30px]">{detail.organization.name}</h1>
+      </div>
       <p className="mb-6 text-[15px] text-muted">
         {detail.organization.city ?? "—"} · {detail.organization.kind} ·{" "}
         {detail.organization.skoolpartner_enrolled_at
@@ -65,6 +77,96 @@ export default async function OrganizationDetailPage({
       </p>
 
       <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHeader
+            title="Organisatiegegevens"
+            description="Het logo en het CJP-schoolnummer horen bij de organisatie. Alle medewerkers zien hetzelfde."
+          />
+          <CardBody className="space-y-5">
+            <div className="flex flex-wrap items-center gap-4">
+              <OrgLogo
+                name={detail.organization.name}
+                logoUrl={detail.organization.logo_url}
+                size={56}
+                className="border border-line-soft"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Logo</p>
+                <p className="text-sm text-muted">
+                  {detail.organization.logo_url
+                    ? detail.organization.logo_source === "handmatig"
+                      ? "Handmatig ingesteld. Wordt nooit automatisch overschreven."
+                      : "Automatisch gevonden op de website van deze organisatie."
+                    : "Nog geen logo. In de zijbalk staat het standaardicoon."}
+                  {detail.organization.logo_checked_at
+                    ? ` Laatst gezocht op ${formatShortDate(detail.organization.logo_checked_at)}.`
+                    : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <ActionForm action={fetchOrganizationLogoAction} submitLabel="Logo ophalen" inline>
+                <input type="hidden" name="organization_id" value={detail.organization.id} />
+              </ActionForm>
+
+              {detail.organization.logo_url ? (
+                <ActionForm
+                  action={clearOrganizationLogoAction}
+                  submitLabel="Logo verwijderen"
+                  variant="secondary"
+                  inline
+                >
+                  <input type="hidden" name="organization_id" value={detail.organization.id} />
+                </ActionForm>
+              ) : null}
+            </div>
+
+            <div className="border-t border-line-soft pt-5">
+              <ActionForm action={setCjpNumberAction} submitLabel="CJP opslaan">
+                <input type="hidden" name="organization_id" value={detail.organization.id} />
+                <p className="mb-2 text-sm">
+                  Heeft CJP-schoolnummer:{" "}
+                  <strong>
+                    {detail.organization.has_cjp === true
+                      ? "Ja"
+                      : detail.organization.has_cjp === false
+                        ? "Nee"
+                        : "Onbekend"}
+                  </strong>
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="CJP-schoolnummer" htmlFor="cjp">
+                    <Input
+                      id="cjp"
+                      name="cjp_school_number"
+                      defaultValue={detail.organization.cjp_school_number ?? ""}
+                      placeholder="Niet ingevuld"
+                    />
+                  </Field>
+                  <Field label="Heeft de school een nummer?" htmlFor="has-cjp">
+                    <Select
+                      id="has-cjp"
+                      name="has_cjp"
+                      defaultValue={
+                        detail.organization.has_cjp === true
+                          ? "ja"
+                          : detail.organization.has_cjp === false
+                            ? "nee"
+                            : "onbekend"
+                      }
+                    >
+                      <option value="ja">Ja</option>
+                      <option value="nee">Nee</option>
+                      <option value="onbekend">Onbekend</option>
+                    </Select>
+                  </Field>
+                </div>
+              </ActionForm>
+            </div>
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader title="SkoolPoints" />
           <CardBody>

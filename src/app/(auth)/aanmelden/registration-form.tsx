@@ -80,6 +80,7 @@ export function RegistrationForm({
   const [searchState, searchAction] = useActionState(searchOrganizationsAction, initialJoin);
   const [state, formAction] = useActionState(completeRegistrationAction, initialRegistration);
   const [gekozen, setGekozen] = useState<OrganizationOption | null>(null);
+  const [cjp, setCjp] = useState<"ja" | "nee" | "onbekend">("onbekend");
 
   const fout = (veld: keyof RegistrationState["errors"]) => state.errors?.[veld] ?? null;
 
@@ -302,6 +303,66 @@ export function RegistrationForm({
             />
           </Field>
         </div>
+
+        {/* CJP: niet iedere school heeft een nummer, dus nergens verplicht.
+            Alleen wie zegt er een te hebben, vult hem ook in. */}
+        <fieldset className="space-y-2">
+          <legend className="block text-sm font-semibold text-ink">
+            Heeft uw school een CJP-schoolnummer?
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["ja", "Ja"],
+                ["nee", "Nee"],
+                ["onbekend", "Weet ik niet"],
+              ] as const
+            ).map(([waarde, label]) => (
+              <label
+                key={waarde}
+                className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-pill border px-4 py-2 text-sm font-semibold transition-colors ${
+                  cjp === waarde
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-white text-ink hover:border-ink"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="has_cjp"
+                  value={waarde}
+                  checked={cjp === waarde}
+                  onChange={() => setCjp(waarde)}
+                  className="sr-only"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          {cjp === "ja" ? (
+            <Field
+              label="CJP-schoolnummer"
+              htmlFor="cjp_school_number"
+              required
+              error={fout("cjpSchoolNumber")}
+              className="pt-2"
+            >
+              <Input
+                id="cjp_school_number"
+                name="cjp_school_number"
+                defaultValue={state.input?.cjpSchoolNumber ?? ""}
+                required
+              />
+            </Field>
+          ) : null}
+
+          {cjp === "onbekend" ? (
+            <p className="text-sm text-muted">
+              Geen probleem. U kunt het nummer later toevoegen bij Account, en het is nergens voor
+              nodig om SkoolPartner te gebruiken.
+            </p>
+          ) : null}
+        </fieldset>
 
         <Submit>Registratie afronden</Submit>
 

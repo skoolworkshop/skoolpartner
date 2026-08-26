@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ActionForm } from "@/components/admin/action-form";
-import { LoyaltyStatusBadge } from "@/components/portal/status-badges";
+import { LoyaltyStatusBadge, loyaltyTypeLabel } from "@/components/portal/status-badges";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/form";
 import { requireAdmin } from "@/lib/auth/session";
@@ -89,7 +89,9 @@ export default async function AdminLoyaltyPage() {
                       <span className="block text-xs text-muted">Reden: {transaction.reason}</span>
                     ) : null}
                   </td>
-                  <td className="px-5 py-2.5 text-muted">{transaction.type}</td>
+                  <td className="px-5 py-2.5 text-muted">
+                    {loyaltyTypeLabel(transaction.type)}
+                  </td>
                   <td className="px-5 py-2.5 text-right font-medium">
                     {transaction.points > 0 ? "+" : "−"}
                     {formatPoints(Math.abs(transaction.points))}

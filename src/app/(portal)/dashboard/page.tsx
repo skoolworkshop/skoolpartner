@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/portal/page-header";
 import { WorkshopPhoto } from "@/components/portal/workshop-photo";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { PartnerCard } from "@/components/skoolpartner/partner-card";
+import { WelcomeBonusCard } from "@/components/skoolpartner/welcome-bonus-card";
 import { ExternalButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
@@ -23,7 +24,7 @@ import {
 } from "@/lib/format";
 import { buildHighlight, greetingForTime } from "@/lib/greeting";
 import { nextMilestone } from "@/lib/loyalty/calc";
-import { getDashboardData } from "@/lib/portal/queries";
+import { getDashboardData, getWelcomeBonus } from "@/lib/portal/queries";
 import { getResultsForOrganization } from "@/lib/results/service";
 import { getSettings } from "@/lib/settings";
 import { parseWorkshopImages } from "@/lib/workshop-images";
@@ -52,6 +53,13 @@ export default async function DashboardPage() {
     ? await getResultsForOrganization(session.activeOrganizationId)
     : [];
   const openResult = results.find((r) => r.status === "published");
+
+  // Net geregistreerd? Dan laten wij twee weken lang zien dat de eerste punten
+  // klaarstaan. Daarna staat het gewoon in de puntenhistorie.
+  const welkomstbonus = settings.loyalty_enabled
+    ? await getWelcomeBonus(session.activeOrganizationId)
+    : null;
+  const bonusIsRecent = welkomstbonus?.isRecent ?? false;
 
   const highlight = buildHighlight({
     newResultTitle: openResult?.title,
@@ -86,6 +94,15 @@ export default async function DashboardPage() {
           {organizationName} hebben gekoppeld aan uw dossier. Meestal is dat binnen één werkdag
           geregeld. U kunt ondertussen gerust rondkijken.
         </Alert>
+      ) : null}
+
+      {bonusIsRecent && welkomstbonus ? (
+        <WelcomeBonusCard
+          points={welkomstbonus.points}
+          pointValueCentsPer100={welkomstbonus.point_value_cents_per_100}
+          pointsName={settings.points_name}
+          programName={settings.program_name}
+        />
       ) : null}
 
       <DashboardHighlight highlight={highlight} />

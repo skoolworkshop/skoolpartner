@@ -19,6 +19,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const organizations = session.memberships.map((m) => ({
     id: m.organization.id,
     name: m.organization.name,
+    logoUrl: m.organization.logo_url,
   }));
 
   return (
@@ -95,11 +96,12 @@ export default async function PortalLayout({ children }: { children: React.React
           </div>
         </header>
 
-        {organizations.length > 1 ? (
-          <div className="border-b border-line-soft bg-white px-4 py-2 lg:hidden">
-            <OrgSwitcher organizations={organizations} activeId={session.activeOrganizationId} />
-          </div>
-        ) : null}
+        {/* Op mobiel staat de organisatie onder de bovenbalk, met hetzelfde
+            logo als in de zijbalk op desktop. Bij meerdere organisaties is het
+            meteen de wisselaar. */}
+        <div className="border-b border-line-soft bg-white px-4 py-2 lg:hidden">
+          <OrgSwitcher organizations={organizations} activeId={session.activeOrganizationId} />
+        </div>
 
         <main
           id="hoofdinhoud"

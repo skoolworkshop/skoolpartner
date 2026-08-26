@@ -8,9 +8,10 @@ import { requireMember } from "@/lib/auth/session";
 import { checkProfile, missingLabel } from "@/lib/account";
 import { formatPhone } from "@/lib/phone";
 import { formatDate } from "@/lib/format";
-import { getEnrolledAt } from "@/lib/portal/queries";
+import { getEnrolledAt, getOrganizationDetails } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
 import { LeaveOrganizationForm, ProfileForm } from "./account-forms";
+import { OrganisatieGegevens } from "./organisatie-form";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -18,7 +19,10 @@ export default async function AccountPage() {
   const session = await requireMember();
   const settings = await getSettings();
 
-  const enrolledAt = await getEnrolledAt(session.activeOrganizationId);
+  const [enrolledAt, organisatie] = await Promise.all([
+    getEnrolledAt(session.activeOrganizationId),
+    getOrganizationDetails(session.activeOrganizationId),
+  ]);
 
   // Het inlogadres uit Supabase Auth is leidend, niet het veld in profiles.
   const status = checkProfile({
@@ -75,6 +79,23 @@ export default async function AccountPage() {
         </Card>
 
         <div className="space-y-5">
+          <Card>
+            <CardHeader
+              title="Organisatiegegevens"
+              description="Deze gegevens horen bij uw school en zijn voor al uw collega's hetzelfde."
+            />
+            <CardBody>
+              <OrganisatieGegevens
+                organizationName={organisatie.name}
+                logoUrl={organisatie.logo_url}
+                cjpNumber={organisatie.cjp_school_number}
+                hasCjp={organisatie.has_cjp}
+                canEdit={session.activeMembership.role === "beheerder"}
+                supportEmail={settings.support_email}
+              />
+            </CardBody>
+          </Card>
+
           <Card>
             <CardHeader title="Uw organisaties" />
             <ul className="divide-y divide-line-soft">

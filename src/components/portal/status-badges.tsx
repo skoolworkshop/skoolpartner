@@ -3,6 +3,7 @@ import type {
   BookingStatus,
   InvoiceState,
   LoyaltyTransactionStatus,
+  LoyaltyTransactionType,
   RedemptionStatus,
 } from "@/lib/types/database";
 
@@ -48,6 +49,26 @@ const loyaltyLabels: Record<LoyaltyTransactionStatus, { label: string; tone: Bad
 export function LoyaltyStatusBadge({ status }: { status: LoyaltyTransactionStatus }) {
   const item = loyaltyLabels[status] ?? loyaltyLabels.pending;
   return <Badge tone={item.tone}>{item.label}</Badge>;
+}
+
+/**
+ * Waar komen deze punten vandaan? De beheerder zag hier tot nu toe de
+ * technische naam uit de database staan, bijvoorbeeld earn_workshop. Dat leest
+ * niemand prettig en het maakt het lastig om in één oogopslag onderscheid te
+ * zien tussen verdiende punten, een correctie en een reservering.
+ */
+const loyaltyTypeLabels: Record<LoyaltyTransactionType, string> = {
+  earn_workshop: "Verdiend met workshops",
+  earn_review: "Bonus voor een review",
+  welcome_bonus: "Welkomstbonus",
+  manual_adjustment: "Handmatige correctie",
+  redemption_reserve: "Ingewisseld",
+  expiry: "Verlopen",
+  reversal: "Teruggedraaid",
+};
+
+export function loyaltyTypeLabel(type: LoyaltyTransactionType): string {
+  return loyaltyTypeLabels[type] ?? type;
 }
 
 const redemptionLabels: Record<RedemptionStatus, { label: string; tone: BadgeTone }> = {
