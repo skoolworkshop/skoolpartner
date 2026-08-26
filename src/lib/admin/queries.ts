@@ -37,6 +37,19 @@ export async function getAdminOverview() {
     supabase.from("profiles").select("id", { count: "exact", head: true }),
   ]);
 
+  // Tweede ronde: de totalen die de beheerder in één oogopslag wil zien.
+  const [bookings, invoices, threadsNeedingReview, unpaid] = await Promise.all([
+    supabase.from("bookings").select("id", { count: "exact", head: true }),
+    supabase.from("invoices").select("id", { count: "exact", head: true }),
+    supabase
+      .from("message_threads")
+      .select("id", { count: "exact", head: true })
+      .eq("visibility", "needs_review"),
+    supabase.from("invoices").select("total_unpaid_cents").eq("fully_paid", false).limit(1000),
+  ]);
+
+  const unpaidRows = (unpaid.data ?? []) as { total_unpaid_cents: number }[];
+
   return {
     reviewQueue: reviewQueue.count ?? 0,
     pendingMembers: pendingMembers.count ?? 0,
@@ -45,6 +58,10 @@ export async function getAdminOverview() {
     bookingsNeedingReview: bookingsNeedingReview.count ?? 0,
     organizations: organizations.count ?? 0,
     users: users.count ?? 0,
+    bookings: bookings.count ?? 0,
+    invoices: invoices.count ?? 0,
+    threadsNeedingReview: threadsNeedingReview.count ?? 0,
+    unpaidCents: unpaidRows.reduce((sum, row) => sum + (row.total_unpaid_cents ?? 0), 0),
   };
 }
 
@@ -94,7 +111,8 @@ export async function listOrganizations(query?: string) {
 export async function getOrganizationDetail(id: string) {
   const supabase = createServiceSupabase();
 
-  const [organization, members, domains, contacts, balance, bookings, invoices] = await Promise.all([
+  const [organization, members, domains, contacts, balance, bookings, invoices, threads] =
+    await Promise.all([
     supabase.from("organizations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("organization_members")
@@ -109,12 +127,18 @@ export async function getOrganizationDetail(id: string) {
       .select("*")
       .eq("organization_id", id)
       .order("scheduled_date", { ascending: false })
-      .limit(25),
+      .limit(100),
     supabase
       .from("invoices")
       .select("*")
       .eq("organization_id", id)
       .order("invoice_date", { ascending: false })
+      .limit(100),
+    supabase
+      .from("message_threads")
+      .select("id, subject, visibility, message_count, last_message_at")
+      .eq("organization_id", id)
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(25),
   ]);
 
@@ -128,6 +152,7 @@ export async function getOrganizationDetail(id: string) {
     balance: balance.data,
     bookings: bookings.data ?? [],
     invoices: invoices.data ?? [],
+    threads: threads.data ?? [],
   };
 }
 
@@ -161,6 +186,62 @@ export async function listBookings(filter?: "review" | "all") {
   if (filter === "review") request = request.eq("needs_review", true);
   const { data } = await request;
   return data ?? [];
+}
+
+/**
+ * Alle facturen van alle organisaties. De beheerder moet hier hetzelfde zien
+ * als de klant in zijn eigen portaal, plus de facturen die nog aan geen enkele
+ * organisatie gekoppeld zijn.
+ */
+export async function listInvoices(options?: { filter?: "review" | "unpaid" | "all"; query?: string }) {
+  const supabase = createServiceSupabase();
+  let request = supabase
+    .from("invoices")
+    .select("*, organizations(name)")
+    .order("invoice_date", { ascending: false, nullsFirst: false })
+    .limit(200);
+
+  if (options?.filter === "review") request = request.eq("needs_review", true);
+  if (options?.filter === "unpaid") request = request.eq("fully_paid", false);
+
+  const term = options?.query?.trim();
+  if (term && term.length >= 2) request = request.ilike("invoice_number", `%${term}%`);
+
+  const { data } = await request;
+  return data ?? [];
+}
+
+/** Alle e-mailgesprekken, ook die nog geen organisatie hebben. */
+export async function listMessageThreads(options?: { filter?: "review" | "all" }) {
+  const supabase = createServiceSupabase();
+  let request = supabase
+    .from("message_threads")
+    .select("*, organizations(name)")
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(150);
+
+  if (options?.filter === "review") request = request.eq("visibility", "needs_review");
+
+  const { data } = await request;
+  return data ?? [];
+}
+
+export async function getMessageThreadForAdmin(id: string) {
+  const supabase = createServiceSupabase();
+  const { data: thread } = await supabase
+    .from("message_threads")
+    .select("*, organizations(id, name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (!thread) return null;
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("thread_id", id)
+    .order("sent_at", { ascending: true });
+
+  return { thread, messages: messages ?? [] };
 }
 
 export async function listLoyaltyTransactions(organizationId?: string) {

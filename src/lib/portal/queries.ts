@@ -48,6 +48,11 @@ export async function getLoyaltyBalance(organizationId: string): Promise<Loyalty
  * thuis, want die kan een klant niet als zekerheid inplannen. In de database
  * is dat precies status 'confirmed'; 'concept' dekt alles wat nog in
  * voorbereiding is en 'cancelled' spreekt voor zich.
+ *
+ * Conceptboekingen tonen wij bewust nergens in het klantportaal. Een aanvraag
+ * die nog loopt hoort thuis in het contact met Skool Workshop, niet als regel
+ * in het overzicht van de klant. In de beheeromgeving zijn ze wel gewoon
+ * zichtbaar.
  */
 export async function getUpcomingBookings(organizationId: string, limit = 5) {
   const supabase = await createServerSupabase();
@@ -57,25 +62,6 @@ export async function getUpcomingBookings(organizationId: string, limit = 5) {
     .select("*")
     .eq("organization_id", organizationId)
     .eq("status", "confirmed")
-    .gte("scheduled_date", today)
-    .order("scheduled_date", { ascending: true })
-    .limit(limit);
-  return (data ?? []) as BookingRow[];
-}
-
-/**
- * Wat er nog in voorbereiding is: aanvragen en concepten met een datum in de
- * toekomst. Bewust apart, zodat het niet als zekerheid overkomt maar ook niet
- * ongemerkt verdwijnt.
- */
-export async function getBookingsInPreparation(organizationId: string, limit = 25) {
-  const supabase = await createServerSupabase();
-  const today = new Date().toISOString().slice(0, 10);
-  const { data } = await supabase
-    .from("bookings")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("status", "concept")
     .gte("scheduled_date", today)
     .order("scheduled_date", { ascending: true })
     .limit(limit);

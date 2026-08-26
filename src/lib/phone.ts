@@ -87,14 +87,3 @@ export function formatPhone(value: string | null | undefined): string {
 
   return trimmed;
 }
-
-/** Is dit profiel compleet genoeg om mee te werken? */
-export function isProfileComplete(profile: {
-  full_name: string | null;
-  phone: string | null;
-} | null): boolean {
-  if (!profile) return false;
-  if (!profile.full_name || profile.full_name.trim().length < 2) return false;
-  if (!profile.phone || profile.phone.trim() === "") return false;
-  return true;
-}
