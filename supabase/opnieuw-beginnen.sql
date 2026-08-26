@@ -16,6 +16,10 @@
 --   in de beheeromgeving ook klanten ziet die zelf nog niet inloggen.
 --   Boekingen in elke status, facturen, SkoolPoints, berichten en resultaten.
 --
+--   De Goudse Waarden heeft het welkomsttegoed van 100 SkoolPoints al ontvangen
+--   en een CJP-schoolnummer. Het Vrije College heeft er expres geen, en van het
+--   buurtcentrum is het onbekend.
+--
 --   Het SkoolPartner-startmoment van De Goudse Waarden ligt twintig dagen terug.
 --   Daardoor staan er twee vergelijkbare boekingen klaar: SW-2026-0401 kwam tot
 --   stand vóór de deelname en levert geen punten op, SW-2026-0402 kwam erna tot
@@ -233,10 +237,15 @@ begin
   end if;
 
   -- Adressen in de losse velden. address_line wordt daaruit samengesteld.
+  -- De Goudse Waarden heeft een CJP-schoolnummer, Het Vrije College niet, en
+  -- van het buurtcentrum weten wij het niet. Zo zie je alle drie de situaties.
   update public.organizations
   set street = 'Kanaalstraat', house_number = '5', postal_code = '2801 AB', city = 'Gouda',
-      phone = '+31182123456'
+      phone = '+31182123456', website = 'https://www.goudsewaarden.nl',
+      has_cjp = true, cjp_school_number = '123456'
   where id = v_org1 and street is null;
+
+  update public.organizations set has_cjp = false where id = v_org2 and has_cjp is null;
 
   update public.organizations
   set street = 'Zonstraat', house_number = '12', house_number_addition = 'B',
@@ -308,6 +317,20 @@ begin
   update public.organizations
   set skoolpartner_enrolled_at = now() - interval '20 days'
   where id in (v_org1, v_org2, v_org3);
+
+  -- Welkomsttegoed voor De Goudse Waarden, zoals een echte nieuwe klant het
+  -- zou krijgen. Twee keer draaien levert er nooit een tweede op: de unieke
+  -- index op (organisatie, soort, bronverwijzing) staat dat niet toe.
+  insert into public.loyalty_transactions (
+    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    description, source, external_reference, occurred_at, available_at
+  ) values (
+    v_org1, v_acc1, 'welcome_bonus', 'available', 100, 250,
+    'Welkomstbonus SkoolPartner', 'portal', 'welcome',
+    now() - interval '20 days', now() - interval '20 days'
+  )
+  on conflict (organization_id, type, external_reference) where external_reference is not null
+  do nothing;
 
   ---------------------------------------------------------------------------
   -- 4. Boekingen

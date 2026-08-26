@@ -74,6 +74,8 @@ describe("registratieformulier", () => {
     houseNumberAddition: "B",
     postalCode: "2801ab",
     city: "Gouda",
+    hasCjp: "nee",
+    cjpSchoolNumber: "",
   };
 
   it("accepteert een volledig ingevuld formulier en normaliseert", () => {

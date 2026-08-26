@@ -2480,3 +2480,123 @@ alter table public.organization_members
 comment on column public.organization_members.requested_details is
   'Wat de aanvrager bij registratie invulde over de organisatie. Wordt pas naar organizations geschreven nadat een beheerder de aanvraag goedkeurt.';
 
+-- >>> 20260826120300_organisatie_logo.sql
+
+-- =============================================================================
+-- SkoolPartner - 019 - Het logo van de organisatie
+-- =============================================================================
+-- Het logo hoort bij de organisatie, niet bij een medewerker. Alle mensen van
+-- dezelfde school zien dus hetzelfde logo.
+--
+-- logo_source houdt bij waar het vandaan komt. Een automatisch gevonden logo
+-- overschrijft nooit een logo dat door beheer of door de school zelf is
+-- ingesteld.
+--
+-- Het domein staat al in organization_domains. Daar komt bewust geen tweede
+-- veld voor.
+--
+-- LET OP: een logo is uitsluitend visuele informatie. Het zegt niets over wie
+-- toegang heeft tot welke gegevens. Dat blijft volledig bij de bestaande
+-- lidmaatschappen en RLS liggen.
+-- =============================================================================
+
+alter table public.organizations
+  add column if not exists logo_url        text,
+  add column if not exists logo_source     text,
+  add column if not exists logo_checked_at timestamptz;
+
+comment on column public.organizations.logo_url is
+  'Adres van het logo van deze organisatie. Alleen visueel; nooit gebruiken als bewijs van toegang.';
+comment on column public.organizations.logo_source is
+  'handmatig = door beheer of de school zelf ingesteld en dus leidend. automatisch = door ons gevonden op het eigen domein van de school.';
+
+do $$ begin
+  alter table public.organizations
+    add constraint organizations_logo_source_check
+    check (logo_source is null or logo_source in ('handmatig', 'automatisch'));
+exception when duplicate_object then null; end $$;
+
+-- Opslagbucket voor logo's.
+--
+-- Bewust wél openbaar, in tegenstelling tot workshop-resultaten. Een schoollogo
+-- is publiek merkmateriaal dat op de eigen website van die school staat, en de
+-- zijbalk wordt op elke pagina getoond. Met een afgeschermde bucket zou er bij
+-- elke paginaweergave een ondertekende link aangemaakt moeten worden. Het pad
+-- bevat alleen het interne organisatie-ID, dus er valt niets uit af te leiden.
+do $$ begin
+  if to_regclass('storage.buckets') is not null then
+    insert into storage.buckets (id, name, public)
+    values ('organisatie-logos', 'organisatie-logos', true)
+    on conflict (id) do nothing;
+  end if;
+end $$;
+
+-- >>> 20260826120400_welkomstbonus.sql
+
+-- =============================================================================
+-- SkoolPartner - 020 - Welkomsttegoed
+-- =============================================================================
+-- Een organisatie die voor het eerst SkoolPartner activeert krijgt eenmalig een
+-- welkomsttegoed. Dit is de enige puntenboeking die bij de start mag ontstaan;
+-- voor gewone boekingen blijft gelden dat alleen kwalificerende nieuwe
+-- boekingen na het startmoment punten opleveren.
+--
+-- Er komt geen tweede puntensysteem bij. De bonus is een gewone transactie in
+-- het bestaande grootboek. Dubbel toekennen wordt voorkomen door de unieke
+-- index op (organization_id, type, external_reference), die er al staat: met
+-- external_reference 'welcome' kan er per organisatie maar één bestaan, ook bij
+-- twee gelijktijdige registraties.
+--
+-- LET OP: een waarde die je aan een enum toevoegt, kun je niet gebruiken in
+-- dezelfde transactie waarin je hem toevoegt. Het toekennen gebeurt daarom
+-- vanuit de applicatie, in een latere transactie. Hier wordt de nieuwe waarde
+-- nergens gebruikt.
+-- =============================================================================
+
+alter type public.loyalty_transaction_type add value if not exists 'welcome_bonus';
+
+-- Hoeveel punten, en staat het aan? Centraal instelbaar, net als de rest.
+insert into public.app_settings (key, value, label, description, group_name, value_type, is_public, sort_order)
+values
+  ('welcome_bonus_enabled', 'true'::jsonb, 'Welkomstbonus toekennen',
+   'Nieuwe organisaties krijgen bij een afgeronde registratie eenmalig een welkomsttegoed.',
+   'skoolpartner', 'boolean', true, 145),
+  ('welcome_bonus_points', '100'::jsonb, 'Welkomstbonus in punten',
+   'Aantal SkoolPoints dat een organisatie eenmalig krijgt bij de eerste activatie.',
+   'skoolpartner', 'number', true, 146)
+on conflict (key) do nothing;
+
+-- >>> 20260826120500_cjp_schoolnummer.sql
+
+-- =============================================================================
+-- SkoolPartner - 021 - CJP-schoolnummer
+-- =============================================================================
+-- Hoort bij de organisatie, zodat alle medewerkers van dezelfde school hetzelfde
+-- nummer zien. Niet iedere school heeft er een, dus het is nergens verplicht.
+--
+-- has_cjp: true = de school heeft een nummer, false = heeft er geen,
+-- leeg = weet ik niet of nog niet gevraagd. Zo blijft "nee" te onderscheiden
+-- van "onbekend" zonder aparte tabel of enum.
+--
+-- Bewust geen streng formaat. Wij hebben geen betrouwbare bron voor de opbouw
+-- van een CJP-schoolnummer, en een verkeerde aanname houdt scholen tegen.
+--
+-- Het invullen van een nummer veroorzaakt uit zichzelf nooit korting of een
+-- factuurwijziging. Dat is een aparte beslissing.
+-- =============================================================================
+
+alter table public.organizations
+  add column if not exists cjp_school_number text,
+  add column if not exists has_cjp           boolean;
+
+comment on column public.organizations.cjp_school_number is
+  'Het CJP-schoolnummer van deze organisatie. Puur registratie; veroorzaakt uit zichzelf nooit korting of een factuurwijziging.';
+comment on column public.organizations.has_cjp is
+  'true = school heeft een CJP-schoolnummer, false = heeft er geen, leeg = onbekend.';
+
+do $$ begin
+  alter table public.organizations
+    add constraint organizations_cjp_length_check
+    check (cjp_school_number is null or length(trim(cjp_school_number)) between 3 and 40);
+exception when duplicate_object then null; end $$;
+

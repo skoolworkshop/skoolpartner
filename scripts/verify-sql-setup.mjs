@@ -117,6 +117,23 @@ async function main() {
     `)
   )[0];
 
+  const bonus = (
+    await q(`
+      select count(*)::int as aantal, coalesce(sum(points), 0)::int as punten
+      from public.loyalty_transactions where type = 'welcome_bonus'
+    `)
+  )[0];
+
+  const cjp = (
+    await q(`
+      select
+        count(*) filter (where has_cjp is true and cjp_school_number is not null)::int as met_nummer,
+        count(*) filter (where has_cjp is false)::int as zonder_nummer,
+        count(*) filter (where has_cjp is null)::int as onbekend
+      from public.organizations
+    `)
+  )[0];
+
   const counts = (
     await q(`
       select
@@ -144,6 +161,12 @@ async function main() {
   console.log(
     `  startmoment   ${periode.voor_deelname} boeking van vóór de deelname, ${periode.na_deelname} van erna`
   );
+  console.log(
+    `  welkomstbonus ${bonus.aantal} transactie van ${bonus.punten} punten`
+  );
+  console.log(
+    `  cjp           ${cjp.met_nummer} met nummer, ${cjp.zonder_nummer} zonder, ${cjp.onbekend} onbekend`
+  );
 
   const ok =
     accounts.length === 2 &&
@@ -159,9 +182,15 @@ async function main() {
     klant.phone !== null &&
     klant.leden === 1 &&
     counts.organisaties === 3 &&
-    balance.available_points === 350 &&
+    // 350 gespaard met workshops plus 100 welkomsttegoed.
+    balance.available_points === 450 &&
     balance.pending_points === 300 &&
-    balance.lifetime_earned_points === 1200 &&
+    balance.lifetime_earned_points === 1300 &&
+    bonus.aantal === 1 &&
+    bonus.punten === 100 &&
+    cjp.met_nummer === 1 &&
+    cjp.zonder_nummer === 1 &&
+    cjp.onbekend === 1 &&
     counts.boekingen === 10 &&
     counts.bevestigd === 4 &&
     // De demonstratie van de belangrijkste regel: één boeking van vóór de

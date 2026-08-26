@@ -167,6 +167,42 @@ async function main() {
     return;
   }
 
+  // De welkomstbonus: precies één per organisatie, hoe vaak je het ook probeert.
+  const bonus = `
+    insert into public.loyalty_transactions
+      (organization_id, account_id, type, status, points, point_value_cents_per_100,
+       description, source, external_reference, available_at)
+    values ('22222222-2222-2222-2222-222222222222', '${accountId}', 'welcome_bonus', 'available',
+            100, 250, 'Welkomstbonus SkoolPartner', 'portal', 'welcome', now())
+    on conflict (organization_id, type, external_reference) where external_reference is not null
+    do nothing;
+  `;
+  // Vier pogingen: opnieuw registreren, opnieuw verifiëren, opnieuw inloggen,
+  // en een tweede medewerker die erbij komt.
+  await db.exec(bonus);
+  await db.exec(bonus);
+  await db.exec(bonus);
+  await db.exec(bonus);
+
+  const bonusRows = (
+    await db.query(`
+      select count(*)::int as aantal, coalesce(sum(points), 0)::int as punten
+      from public.loyalty_transactions
+      where organization_id = '22222222-2222-2222-2222-222222222222' and type = 'welcome_bonus'
+    `)
+  ).rows[0];
+
+  const bonusOk = bonusRows.aantal === 1 && bonusRows.punten === 100;
+  console.log(
+    bonusOk
+      ? "  Welkomstbonus: vier pogingen leveren precies één bonus van 100 punten op"
+      : `  FOUT: welkomstbonus gaf ${bonusRows.aantal} transacties met ${bonusRows.punten} punten`
+  );
+  if (!bonusOk) {
+    process.exitCode = 1;
+    return;
+  }
+
   // Een correctie zonder reden mag niet.
   let reasonRequired = false;
   try {
