@@ -1,4 +1,5 @@
 import { isValidEmail } from "@/lib/account";
+import { cjpAnswerToBoolean, normalizeCjpNumber } from "@/lib/cjp";
 import { normalizePhone } from "@/lib/phone";
 
 /**
@@ -21,6 +22,9 @@ export interface RegistrationInput {
   houseNumberAddition: string;
   postalCode: string;
   city: string;
+  /** "ja", "nee" of "onbekend". Niet iedere school heeft een CJP-schoolnummer. */
+  hasCjp: string;
+  cjpSchoolNumber: string;
 }
 
 export interface RegistrationValues {
@@ -37,6 +41,9 @@ export interface RegistrationValues {
   /** Genormaliseerd naar 1234 AB. */
   postalCode: string;
   city: string;
+  /** true = ja, false = nee, null = weet ik niet. */
+  hasCjp: boolean | null;
+  cjpSchoolNumber: string | null;
 }
 
 export type FieldName = keyof RegistrationInput;
@@ -97,6 +104,17 @@ export function validateRegistration(input: RegistrationInput): RegistrationResu
 
   if (city.length < 2) errors.city = "Vul de plaats in.";
 
+  // CJP is voor niemand verplicht. Alleen wie zelf zegt een nummer te hebben,
+  // moet het ook invullen; anders slaan wij een half gegeven op.
+  const hasCjp = cjpAnswerToBoolean(input.hasCjp);
+  const cjp = normalizeCjpNumber(input.cjpSchoolNumber);
+
+  if (!cjp.ok) {
+    errors.cjpSchoolNumber = cjp.message ?? "Controleer het CJP-schoolnummer.";
+  } else if (hasCjp === true && !cjp.value) {
+    errors.cjpSchoolNumber = "Vul het CJP-schoolnummer in, of kies Nee of Weet ik niet.";
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -114,6 +132,9 @@ export function validateRegistration(input: RegistrationInput): RegistrationResu
       houseNumberAddition: addition === "" ? null : addition,
       postalCode: postalCode!,
       city,
+      hasCjp,
+      // Zegt iemand geen nummer te hebben, dan bewaren wij ook geen nummer.
+      cjpSchoolNumber: hasCjp === false ? null : (cjp.value ?? null),
     },
   };
 }

@@ -20,7 +20,7 @@ export type InvoiceState =
   | "draft" | "open" | "pending_payment" | "late" | "paid"
   | "partially_paid" | "uncollectible" | "reminded" | "unknown";
 export type LoyaltyTransactionType =
-  | "earn_workshop" | "earn_review" | "manual_adjustment"
+  | "earn_workshop" | "earn_review" | "welcome_bonus" | "manual_adjustment"
   | "redemption_reserve" | "expiry" | "reversal";
 export type LoyaltyTransactionStatus =
   | "pending" | "available" | "reserved" | "redeemed" | "expired" | "reversed" | "cancelled";
@@ -68,6 +68,13 @@ export type OrganizationRow = {
   city: string | null;
   country: string;
   internal_notes: string | null;
+  /** Alleen visueel. Zegt niets over toegang. */
+  logo_url: string | null;
+  logo_source: "handmatig" | "automatisch" | null;
+  logo_checked_at: string | null;
+  cjp_school_number: string | null;
+  /** true = heeft een CJP-schoolnummer, false = heeft er geen, null = onbekend. */
+  has_cjp: boolean | null;
   skoolpartner_enrolled_at: string | null;
   verified_at: string | null;
   verified_by: string | null;
@@ -112,6 +119,8 @@ export type RegistrationDetails = {
   city?: string;
   phone?: string;
   job_title?: string;
+  has_cjp?: boolean | null;
+  cjp_school_number?: string;
 };
 
 export type OrganizationInviteRow = {

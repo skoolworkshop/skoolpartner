@@ -1,6 +1,8 @@
 import "server-only";
 
 import { recordAudit } from "@/lib/audit";
+import { awardWelcomeBonus } from "@/lib/loyalty/ledger";
+import { fetchOrganizationLogo } from "@/lib/organizations/logo";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { emailDomain, slugify } from "@/lib/utils";
 import type { RegistrationValues } from "@/lib/registration";
@@ -44,6 +46,8 @@ function detailsFrom(values: RegistrationValues): RegistrationDetails {
     city: values.city,
     phone: values.phone,
     job_title: values.jobTitle,
+    has_cjp: values.hasCjp,
+    cjp_school_number: values.cjpSchoolNumber ?? undefined,
   };
 }
 
@@ -106,6 +110,8 @@ export async function completeRegistration(params: {
           house_number_addition: values.houseNumberAddition,
           postal_code: values.postalCode,
           city: values.city,
+          has_cjp: values.hasCjp,
+          cjp_school_number: values.cjpSchoolNumber,
         })
         .select("id")
         .single();
@@ -168,6 +174,14 @@ export async function completeRegistration(params: {
       p_actor: params.userId,
     });
 
+    // Het welkomsttegoed. Eenmalig per organisatie; de unieke index in de
+    // database zorgt ervoor dat het bij een tweede poging gewoon niets doet.
+    await awardWelcomeBonus({
+      organizationId,
+      actorId: params.userId,
+      actorEmail: params.userEmail,
+    });
+
     await supabase.from("organization_contacts").upsert(
       {
         organization_id: organizationId,
@@ -218,6 +232,18 @@ export async function completeRegistration(params: {
       organizationId,
       after: { status: "active", organisatie: values.organizationName, nieuw: true },
     });
+
+    // Het logo zoeken op het eigen domein van de school. Lukt dat niet, dan
+    // blijft het gebouwicoon staan; de registratie mag hier nooit op stuklopen.
+    try {
+      await fetchOrganizationLogo({
+        organizationId,
+        actorId: params.userId,
+        actorEmail: params.userEmail,
+      });
+    } catch (error) {
+      console.error("[registratie] logo ophalen mislukt", error);
+    }
 
     return { ok: true, state: "active", organizationId };
   }

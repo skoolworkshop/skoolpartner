@@ -12,6 +12,8 @@ export const SETTING_DEFAULTS = {
   points_per_workshop_hour: 100,
   minimum_booking_minutes: 90,
   review_bonus_points: 50,
+  welcome_bonus_enabled: true,
+  welcome_bonus_points: 100,
   point_value_cents_per_100: 250,
   redemption_minimum_points: 500,
   redemption_maximum_points_per_booking: 0,

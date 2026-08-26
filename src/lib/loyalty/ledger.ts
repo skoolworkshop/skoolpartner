@@ -127,6 +127,99 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
   return { ok: true, points: result.points, transactionId: transaction?.id };
 }
 
+/**
+ * Welkomsttegoed bij de eerste activatie van een organisatie.
+ *
+ * Dit is de enige puntenboeking die meteen bij de start mag ontstaan. Voor
+ * gewone boekingen blijft gelden dat alleen kwalificerende nieuwe boekingen na
+ * het startmoment punten opleveren.
+ *
+ * Eenmalig per ORGANISATIE, niet per persoon. Een tweede medewerker van
+ * dezelfde school levert dus geen tweede bonus op.
+ *
+ * Hoe dat waterdicht is: er staat al een unieke index op
+ * (organization_id, type, external_reference). Met external_reference 'welcome'
+ * kan er per organisatie maar één welkomstbonus bestaan. Ook twee registraties
+ * die elkaar op dezelfde seconde kruisen leveren er samen precies één op; de
+ * tweede botst op de index en wordt genegeerd. Wij hoeven dus niet eerst te
+ * kijken of hij al bestaat, wat juist een gaatje zou openzetten.
+ */
+export async function awardWelcomeBonus(params: {
+  organizationId: string;
+  actorId?: string | null;
+  actorEmail?: string | null;
+}): Promise<AwardResult> {
+  const supabase = createServiceSupabase();
+  const settings = await getSettingsWithServiceRole();
+
+  if (!settings.loyalty_enabled) return { ok: false, skipped: "SkoolPartner staat uit" };
+  if (!settings.welcome_bonus_enabled) return { ok: false, skipped: "Welkomstbonus staat uit" };
+  if (settings.welcome_bonus_points <= 0) {
+    return { ok: false, skipped: "Welkomstbonus staat op 0 punten" };
+  }
+
+  const { data: account } = await supabase
+    .from("loyalty_accounts")
+    .select("id, is_active")
+    .eq("organization_id", params.organizationId)
+    .maybeSingle();
+
+  // Geen account betekent: nog niet echt geactiveerd. Dan ook geen bonus.
+  if (!account?.is_active) {
+    return { ok: false, skipped: "Organisatie neemt nog niet deel aan SkoolPartner" };
+  }
+
+  const { data: transaction, error } = await supabase
+    .from("loyalty_transactions")
+    .upsert(
+      {
+        organization_id: params.organizationId,
+        account_id: account.id,
+        type: "welcome_bonus",
+        status: "available",
+        points: settings.welcome_bonus_points,
+        point_value_cents_per_100: settings.point_value_cents_per_100,
+        description: "Welkomstbonus SkoolPartner",
+        source: "portal",
+        external_reference: "welcome",
+        available_at: new Date().toISOString(),
+        expires_at: settings.points_expiry_enabled
+          ? new Date(
+              Date.now() + settings.points_validity_months * 30 * 24 * 60 * 60 * 1000
+            ).toISOString()
+          : null,
+        created_by: params.actorId ?? null,
+      },
+      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
+    )
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { ok: false, message: error.message };
+
+  // Geen rij terug betekent: er was er al een. Dat is geen fout, dat is de
+  // bedoeling.
+  if (!transaction) return { ok: false, skipped: "Deze organisatie had de welkomstbonus al" };
+
+  await recordAudit({
+    actorId: params.actorId ?? null,
+    actorEmail: params.actorEmail ?? null,
+    actorRole: "systeem",
+    action: "loyalty.welcome_bonus_awarded",
+    entityType: "loyalty_transaction",
+    entityId: transaction.id,
+    organizationId: params.organizationId,
+    after: {
+      punten: settings.welcome_bonus_points,
+      waarde_centen: Math.floor(
+        (settings.welcome_bonus_points * settings.point_value_cents_per_100) / 100
+      ),
+    },
+  });
+
+  return { ok: true, points: settings.welcome_bonus_points, transactionId: transaction.id };
+}
+
 /** Bonuspunten voor een geverifieerde review. Maximaal één keer per boeking. */
 export async function awardReviewBonus(params: {
   reviewId: string;

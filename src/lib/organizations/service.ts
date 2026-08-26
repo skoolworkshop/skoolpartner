@@ -2,6 +2,7 @@ import "server-only";
 
 import { recordAudit } from "@/lib/audit";
 import { hashToken } from "@/lib/crypto";
+import { awardWelcomeBonus } from "@/lib/loyalty/ledger";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { emailDomain, slugify } from "@/lib/utils";
 import type { MembershipSource, OrganizationRow } from "@/lib/types/database";
@@ -199,6 +200,16 @@ export async function approveMembership(params: {
     p_actor: params.adminId,
   });
 
+  // Activeert deze organisatie hiermee voor het eerst, dan hoort daar het
+  // welkomsttegoed bij. Bestond het al, dan doet dit niets: de unieke index in
+  // de database laat maar één welkomstbonus per organisatie toe. Een tweede
+  // contactpersoon levert dus nooit een tweede bonus op.
+  await awardWelcomeBonus({
+    organizationId: member.organization_id,
+    actorId: params.adminId,
+    actorEmail: params.adminEmail,
+  });
+
   // Wat de aanvrager invulde over deze organisatie stond geparkeerd. Nu een
   // beheerder de aanvraag goedkeurt, mogen die gegevens erin. Alleen lege
   // velden worden aangevuld: wat de organisatie al had, blijft staan.
@@ -206,7 +217,9 @@ export async function approveMembership(params: {
   if (gevraagd) {
     const { data: organisatie } = await supabase
       .from("organizations")
-      .select("street, house_number, house_number_addition, postal_code, city, phone")
+      .select(
+        "street, house_number, house_number_addition, postal_code, city, phone, cjp_school_number"
+      )
       .eq("id", member.organization_id)
       .maybeSingle();
 
@@ -221,6 +234,7 @@ export async function approveMembership(params: {
       vul("postal_code", gevraagd.postal_code);
       vul("city", gevraagd.city);
       vul("phone", gevraagd.phone);
+      vul("cjp_school_number", gevraagd.cjp_school_number);
 
       if (Object.keys(aanvulling).length > 0) {
         await supabase.from("organizations").update(aanvulling).eq("id", member.organization_id);

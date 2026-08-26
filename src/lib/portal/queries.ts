@@ -41,6 +41,31 @@ const EMPTY_BALANCE: LoyaltyBalanceRow = {
  * loyalty_accounts.enrolled_at en wordt hier opgehaald via enrolledAt().
  */
 
+/**
+ * De gegevens van de organisatie zelf: naam, logo en CJP-schoolnummer.
+ *
+ * Draait onder de sessie van de gebruiker, dus RLS bepaalt wat er terugkomt.
+ * Een organisatie waar iemand geen lid van is, levert altijd niets op.
+ */
+export async function getOrganizationDetails(organizationId: string) {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("organizations")
+    .select("id, name, logo_url, cjp_school_number, has_cjp")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  return (
+    data ?? {
+      id: organizationId,
+      name: "Onbekende organisatie",
+      logo_url: null,
+      cjp_school_number: null,
+      has_cjp: null,
+    }
+  );
+}
+
 /** Het startmoment van deze organisatie, of null als zij niet deelneemt. */
 export async function getEnrolledAt(organizationId: string): Promise<string | null> {
   const supabase = await createServerSupabase();
@@ -235,6 +260,33 @@ export async function getThreadWithMessages(organizationId: string, threadId: st
 }
 
 /** Alles wat het dashboard nodig heeft, in één keer opgehaald. */
+/**
+ * Het welkomsttegoed van deze organisatie, als het er is.
+ *
+ * Gebruikt om net na de registratie te laten zien dat de eerste punten
+ * klaarstaan. Er is er per organisatie maar één, want de database staat er ook
+ * maar één toe.
+ */
+export async function getWelcomeBonus(organizationId: string) {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("loyalty_transactions")
+    .select("id, points, point_value_cents_per_100, created_at")
+    .eq("organization_id", organizationId)
+    .eq("type", "welcome_bonus")
+    .maybeSingle();
+
+  if (!data) return null;
+
+  // "Net geregistreerd" bepalen wij hier en niet in de pagina, zodat de
+  // dashboardcomponent geen klok hoeft te raadplegen tijdens het renderen.
+  const VEERTIEN_DAGEN = 14 * 24 * 60 * 60 * 1000;
+  return {
+    ...data,
+    isRecent: Date.now() - new Date(data.created_at).getTime() < VEERTIEN_DAGEN,
+  };
+}
+
 export async function getDashboardData(organizationId: string) {
   const [balance, upcoming, invoices, threads] = await Promise.all([
     getLoyaltyBalance(organizationId),
