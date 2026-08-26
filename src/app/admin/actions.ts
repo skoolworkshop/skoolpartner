@@ -14,7 +14,11 @@ import {
 } from "@/lib/organizations/service";
 import { generateToken, hashToken } from "@/lib/crypto";
 import { cjpAnswerToBoolean, normalizeCjpNumber } from "@/lib/cjp";
-import { clearOrganizationLogo, fetchOrganizationLogo } from "@/lib/organizations/logo";
+import {
+  clearOrganizationLogo,
+  fetchOrganizationLogo,
+  setOrganizationLogo,
+} from "@/lib/organizations/logo";
 import {
   deleteOrganizationPermanently,
   deleteUserPermanently,
@@ -45,13 +49,14 @@ export async function approveMembershipAction(
 ): Promise<AdminState> {
   const session = await requireAdmin();
   const memberId = String(formData.get("member_id") ?? "");
-  const role = String(formData.get("role") ?? "lid") === "beheerder" ? "beheerder" : "lid";
 
   const result = await approveMembership({
     memberId,
     adminId: session.userId,
     adminEmail: session.email,
-    role,
+    // Binnen een school is iedereen gelijk. Wie erbij hoort mag de gegevens
+    // van die school aanpassen; daar is geen apart rolletje voor nodig.
+    role: "beheerder",
   });
 
   revalidatePath("/admin/gebruikers");
@@ -186,7 +191,7 @@ export async function inviteMemberAction(
   const session = await requireAdmin();
   const organizationId = String(formData.get("organization_id") ?? "");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const role = String(formData.get("role") ?? "lid") === "beheerder" ? "beheerder" : "lid";
+  const role = "beheerder" as const;
 
   if (!email.includes("@")) return { status: "error", message: "Vul een geldig e-mailadres in." };
 
@@ -247,6 +252,37 @@ export async function fetchOrganizationLogoAction(
   return result.ok
     ? { status: "ok", message: `Logo gevonden via ${result.bron}.` }
     : { status: "error", message: result.message ?? "Er is geen logo gevonden." };
+}
+
+export async function uploadOrganizationLogoAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  if (!organizationId) return { status: "error", message: "Onbekende organisatie." };
+
+  const bestand = formData.get("logo");
+  if (!(bestand instanceof File) || bestand.size === 0) {
+    return { status: "error", message: "Kies eerst een bestand." };
+  }
+  if (bestand.size > 2 * 1024 * 1024) {
+    return { status: "error", message: "Dit bestand is groter dan 2 MB." };
+  }
+
+  const result = await setOrganizationLogo({
+    organizationId,
+    file: await bestand.arrayBuffer(),
+    actorId: session.userId,
+    actorEmail: session.email,
+  });
+
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  revalidatePath("/", "layout");
+
+  return result.ok
+    ? { status: "ok", message: "Logo opgeslagen." }
+    : { status: "error", message: result.message ?? "Het logo kon niet worden opgeslagen." };
 }
 
 export async function clearOrganizationLogoAction(
@@ -1004,7 +1040,7 @@ export async function addMemberByEmailAction(
 
   const organizationId = String(formData.get("organization_id") ?? "");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const role = String(formData.get("role") ?? "lid") === "beheerder" ? "beheerder" : "lid";
+  const role = "beheerder" as const;
 
   if (!email) return { status: "error", message: "Vul een e-mailadres in." };
 

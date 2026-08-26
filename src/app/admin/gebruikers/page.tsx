@@ -116,12 +116,6 @@ export default async function AdminUsersPage({
                   <div className="flex flex-wrap gap-4">
                     <ActionForm action={approveMembershipAction} submitLabel="Goedkeuren" inline>
                       <input type="hidden" name="member_id" value={row.id} />
-                      <Field label="Rol" htmlFor={`role-${row.id}`} className="w-40">
-                        <Select id={`role-${row.id}`} name="role" defaultValue="lid">
-                          <option value="lid">Lid</option>
-                          <option value="beheerder">Beheerder</option>
-                        </Select>
-                      </Field>
                     </ActionForm>
 
                     <ActionForm

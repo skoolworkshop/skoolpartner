@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { OrgLogo } from "@/components/portal/org-logo";
 import { PageHeader } from "@/components/portal/page-header";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,16 +83,16 @@ export default async function AccountPage() {
           <Card>
             <CardHeader
               title="Organisatiegegevens"
-              description="Deze gegevens horen bij uw school en zijn voor al uw collega's hetzelfde."
+              description="Deze gegevens horen bij uw school. Iedereen van uw school kan ze aanpassen, en uw collega's zien dezelfde wijziging."
             />
             <CardBody>
               <OrganisatieGegevens
                 organizationName={organisatie.name}
                 logoUrl={organisatie.logo_url}
+                logoSource={organisatie.logo_source}
+                website={organisatie.website}
                 cjpNumber={organisatie.cjp_school_number}
                 hasCjp={organisatie.has_cjp}
-                canEdit={session.activeMembership.role === "beheerder"}
-                supportEmail={settings.support_email}
               />
             </CardBody>
           </Card>
@@ -104,13 +105,13 @@ export default async function AccountPage() {
                   key={membership.organization.id}
                   className="flex items-center justify-between gap-3 px-5 py-3.5"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">
-                      {membership.organization.name}
-                    </span>
-                    <span className="text-sm text-muted">
-                      {membership.role === "beheerder" ? "Beheerder" : "Lid"}
-                    </span>
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <OrgLogo
+                      name={membership.organization.name}
+                      logoUrl={membership.organization.logo_url}
+                      size={22}
+                    />
+                    <span className="truncate font-semibold">{membership.organization.name}</span>
                   </span>
                   {membership.organization.id === session.activeOrganizationId ? (
                     <Badge tone="accent">Actief</Badge>

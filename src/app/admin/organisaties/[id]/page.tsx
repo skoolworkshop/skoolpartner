@@ -21,6 +21,7 @@ import {
   clearOrganizationLogoAction,
   fetchOrganizationLogoAction,
   setCjpNumberAction,
+  uploadOrganizationLogoAction,
   addOrganizationDomainAction,
   deleteOrganizationAction,
   inviteMemberAction,
@@ -104,6 +105,23 @@ export default async function OrganizationDetailPage({
                 </p>
               </div>
             </div>
+
+            <ActionForm action={uploadOrganizationLogoAction} submitLabel="Logo uploaden">
+              <input type="hidden" name="organization_id" value={detail.organization.id} />
+              <Field
+                label="Zelf een logo kiezen"
+                htmlFor="admin-logo"
+                hint="PNG, JPG of WEBP, maximaal 2 MB."
+              >
+                <input
+                  id="admin-logo"
+                  name="logo"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-pill file:border-0 file:bg-ink file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                />
+              </Field>
+            </ActionForm>
 
             <div className="flex flex-wrap gap-3">
               <ActionForm action={fetchOrganizationLogoAction} submitLabel="Logo ophalen" inline>
@@ -241,9 +259,6 @@ export default async function OrganizationDetailPage({
                   <span className="block text-sm text-muted">{member.profiles?.email}</span>
                 </span>
                 <span className="flex shrink-0 gap-1">
-                  <Badge tone={member.role === "beheerder" ? "info" : "neutral"}>
-                    {member.role}
-                  </Badge>
                   <Badge
                     tone={
                       member.status === "active"
@@ -266,17 +281,9 @@ export default async function OrganizationDetailPage({
             <p className="mb-3 text-sm font-semibold">Gebruiker uitnodigen</p>
             <ActionForm action={inviteMemberAction} submitLabel="Uitnodiging aanmaken">
               <input type="hidden" name="organization_id" value={detail.organization.id} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="E-mailadres" htmlFor="invite-email" required>
-                  <Input id="invite-email" name="email" type="email" required />
-                </Field>
-                <Field label="Rol" htmlFor="invite-role">
-                  <Select id="invite-role" name="role" defaultValue="lid">
-                    <option value="lid">Lid</option>
-                    <option value="beheerder">Beheerder</option>
-                  </Select>
-                </Field>
-              </div>
+              <Field label="E-mailadres" htmlFor="invite-email" required>
+                <Input id="invite-email" name="email" type="email" required />
+              </Field>
             </ActionForm>
 
             <p className="mb-3 mt-6 text-sm font-semibold">
@@ -288,17 +295,9 @@ export default async function OrganizationDetailPage({
             </p>
             <ActionForm action={addMemberByEmailAction} submitLabel="Direct toevoegen">
               <input type="hidden" name="organization_id" value={detail.organization.id} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="E-mailadres" htmlFor="direct-email" required>
-                  <Input id="direct-email" name="email" type="email" required />
-                </Field>
-                <Field label="Rol" htmlFor="direct-role">
-                  <Select id="direct-role" name="role" defaultValue="lid">
-                    <option value="lid">Lid</option>
-                    <option value="beheerder">Beheerder</option>
-                  </Select>
-                </Field>
-              </div>
+              <Field label="E-mailadres" htmlFor="direct-email" required>
+                <Input id="direct-email" name="email" type="email" required />
+              </Field>
             </ActionForm>
           </CardBody>
         </Card>

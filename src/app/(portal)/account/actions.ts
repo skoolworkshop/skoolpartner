@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { isValidEmail } from "@/lib/account";
 import { normalizeCjpNumber } from "@/lib/cjp";
+import { domeinNaarUrl } from "@/lib/organizations/logo-parse";
+import {
+  clearOrganizationLogo,
+  fetchOrganizationLogo,
+  setOrganizationLogo,
+} from "@/lib/organizations/logo";
 import { requireMember, requireUser } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/phone";
 import { recordAudit } from "@/lib/audit";
@@ -65,23 +71,20 @@ export async function updateProfile(
 /**
  * Het CJP-schoolnummer van de organisatie bijwerken.
  *
- * Alleen een beheerder binnen die organisatie mag dit. Het nummer hoort bij de
- * school, dus een collega ziet dezelfde wijziging. Het invullen van een nummer
- * verandert nooit iets aan een prijs, korting of factuur; het wordt alleen
- * vastgelegd.
+ * Iedereen die bij deze organisatie hoort mag dit. Het nummer hoort bij de
+ * school en niet bij een persoon, dus een collega ziet dezelfde wijziging. Het
+ * invullen van een nummer verandert nooit iets aan een prijs, korting of
+ * factuur; het wordt alleen vastgelegd.
+ *
+ * requireMember() zorgt ervoor dat iemand alleen bij zijn eigen organisatie
+ * kan komen. Een ander organisatie-ID meesturen heeft geen zin: wij gebruiken
+ * uitsluitend de actieve organisatie uit de gecontroleerde sessie.
  */
 export async function updateCjpNumber(
   _prev: AccountState,
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-
-  if (session.activeMembership.role !== "beheerder") {
-    return {
-      status: "error",
-      message: "Alleen een beheerder van uw organisatie kan dit aanpassen.",
-    };
-  }
 
   const resultaat = normalizeCjpNumber(String(formData.get("cjp_school_number") ?? ""));
   if (!resultaat.ok) {
@@ -126,6 +129,134 @@ export async function updateCjpNumber(
       ? "Het CJP-schoolnummer is opgeslagen."
       : "Het CJP-schoolnummer is verwijderd.",
   };
+}
+
+/**
+ * De website van de organisatie bijwerken.
+ *
+ * Daar zoeken wij het logo. Puur visueel: een website zegt nooit iets over wie
+ * toegang heeft tot welke gegevens.
+ */
+export async function updateOrganizationWebsite(
+  _prev: AccountState,
+  formData: FormData
+): Promise<AccountState> {
+  const session = await requireMember();
+  const ingevuld = String(formData.get("website") ?? "").trim();
+
+  if (ingevuld === "") {
+    const supabase = createServiceSupabase();
+    await supabase
+      .from("organizations")
+      .update({ website: null })
+      .eq("id", session.activeOrganizationId);
+    revalidatePath("/account");
+    return { status: "ok", message: "De website is verwijderd." };
+  }
+
+  const url = domeinNaarUrl(ingevuld);
+  if (!url) {
+    return {
+      status: "error",
+      message: "Vul een gewoon webadres in, bijvoorbeeld goudsewaarden.nl.",
+    };
+  }
+
+  const supabase = createServiceSupabase();
+  const { data: vorige } = await supabase
+    .from("organizations")
+    .select("website")
+    .eq("id", session.activeOrganizationId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({ website: url })
+    .eq("id", session.activeOrganizationId);
+
+  if (error) return { status: "error", message: "Opslaan is niet gelukt." };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    actorRole: "klant",
+    action: "organization.website_updated",
+    entityType: "organization",
+    entityId: session.activeOrganizationId,
+    organizationId: session.activeOrganizationId,
+    before: { website: vorige?.website ?? null },
+    after: { website: url },
+  });
+
+  revalidatePath("/account");
+  return { status: "ok", message: "De website is opgeslagen. U kunt nu het logo laten ophalen." };
+}
+
+/** Het logo laten ophalen van de eigen website. */
+export async function fetchOwnLogo(): Promise<AccountState> {
+  const session = await requireMember();
+
+  const result = await fetchOrganizationLogo({
+    organizationId: session.activeOrganizationId,
+    actorId: session.userId,
+    actorEmail: session.email,
+    // De klant vraagt er zelf om, dus een eerder ingesteld logo mag vervangen.
+    force: true,
+  });
+
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+
+  return result.ok
+    ? { status: "ok", message: `Logo gevonden via ${result.bron}.` }
+    : { status: "error", message: result.message ?? "Wij hebben geen logo kunnen vinden." };
+}
+
+/** Zelf een logo uploaden. */
+export async function uploadOwnLogo(
+  _prev: AccountState,
+  formData: FormData
+): Promise<AccountState> {
+  const session = await requireMember();
+  const bestand = formData.get("logo");
+
+  if (!(bestand instanceof File) || bestand.size === 0) {
+    return { status: "error", message: "Kies eerst een bestand." };
+  }
+
+  if (bestand.size > 2 * 1024 * 1024) {
+    return { status: "error", message: "Dit bestand is groter dan 2 MB." };
+  }
+
+  const result = await setOrganizationLogo({
+    organizationId: session.activeOrganizationId,
+    file: await bestand.arrayBuffer(),
+    actorId: session.userId,
+    actorEmail: session.email,
+    actorRole: "klant",
+  });
+
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+
+  return result.ok
+    ? { status: "ok", message: "Uw logo staat erop." }
+    : { status: "error", message: result.message ?? "Het logo kon niet worden opgeslagen." };
+}
+
+/** Terug naar het standaardicoon. */
+export async function removeOwnLogo(): Promise<AccountState> {
+  const session = await requireMember();
+
+  await clearOrganizationLogo({
+    organizationId: session.activeOrganizationId,
+    actorId: session.userId,
+    actorEmail: session.email,
+  });
+
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+  return { status: "ok", message: "Het logo is verwijderd." };
 }
 
 /**
