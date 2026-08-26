@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireMember, requireUser } from "@/lib/auth/session";
+import { normalizePhone } from "@/lib/phone";
 import { recordAudit } from "@/lib/audit";
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
 
@@ -17,20 +18,27 @@ export async function updateProfile(
 ): Promise<AccountState> {
   const session = await requireUser();
   const fullName = String(formData.get("full_name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim() || null;
   const jobTitle = String(formData.get("job_title") ?? "").trim() || null;
 
   if (fullName.length < 2) return { status: "error", message: "Vul uw naam in." };
 
+  // Telefoonnummer is verplicht: wij moeten een school op de dag zelf kunnen
+  // bereiken als er iets misgaat met een workshop.
+  const phoneResult = normalizePhone(String(formData.get("phone") ?? ""));
+  if (!phoneResult.ok || !phoneResult.value) {
+    return { status: "error", message: phoneResult.message ?? "Vul uw telefoonnummer in." };
+  }
+
   const supabase = await createServerSupabase();
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: fullName, phone, job_title: jobTitle })
+    .update({ full_name: fullName, phone: phoneResult.value, job_title: jobTitle })
     .eq("id", session.userId);
 
   if (error) return { status: "error", message: "Opslaan is niet gelukt." };
 
   revalidatePath("/account");
+  revalidatePath("/", "layout");
   return { status: "ok", message: "Uw gegevens zijn opgeslagen." };
 }
 

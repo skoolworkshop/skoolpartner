@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Paperclip } from "lucide-react";
+import { Paperclip } from "lucide-react";
 
+import { BackLink } from "@/components/portal/back-link";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { requireMember } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/format";
@@ -25,13 +25,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <Link
-        href="/berichten"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink"
-      >
-        <ArrowLeft aria-hidden className="size-4" />
-        Terug naar berichten
-      </Link>
+      <BackLink href="/berichten" label="Terug naar berichten" />
 
       <h1 className="mb-6 text-[26px] leading-tight sm:text-[30px]">
         {thread.subject ?? "Zonder onderwerp"}

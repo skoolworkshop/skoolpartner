@@ -21,6 +21,8 @@ export default async function MessagesPage() {
   return (
     <>
       <PageHeader
+        backHref="/dashboard"
+        backLabel="Terug naar dashboard"
         eyebrow="Contact"
         title="Berichten"
         description={`De e-mailwisseling tussen uw organisatie en ${settings.support_email}. U ziet alleen gesprekken waar een geverifieerde contactpersoon van uw organisatie aan deelneemt.`}

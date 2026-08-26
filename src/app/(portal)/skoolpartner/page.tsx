@@ -40,7 +40,7 @@ export default async function SkoolPartnerPage() {
   if (!settings.loyalty_enabled) {
     return (
       <>
-        <PageHeader title={settings.program_name} />
+        <PageHeader backHref="/dashboard" backLabel="Terug naar dashboard" title={settings.program_name} />
         <Alert tone="info" title="Tijdelijk niet beschikbaar">
           {settings.program_name} is op dit moment niet actief. Uw {settings.points_name} blijven
           bewaard.
@@ -52,6 +52,8 @@ export default async function SkoolPartnerPage() {
   return (
     <>
       <PageHeader
+        backHref="/dashboard"
+        backLabel="Terug naar dashboard"
         eyebrow="Loyaliteitsprogramma"
         title={settings.program_name}
         description={settings.how_it_works_text || undefined}

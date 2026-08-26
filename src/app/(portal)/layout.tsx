@@ -4,11 +4,13 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { MobileNav, SidebarNav } from "@/components/portal/portal-nav";
 import { OrgSwitcher } from "@/components/portal/org-switcher";
+import { ProfileReminder } from "@/components/portal/profile-reminder";
 import { ChatFloatingButton } from "@/components/portal/chat-cta";
 import { ExternalButtonLink } from "@/components/ui/button";
 import { requireMember } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { firstName } from "@/lib/format";
+import { isProfileComplete } from "@/lib/phone";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await requireMember();
@@ -106,6 +108,9 @@ export default async function PortalLayout({ children }: { children: React.React
           <span className="sr-only">
             Ingelogd als {firstName(session.profile?.full_name, session.email)}
           </span>
+
+          <ProfileReminder complete={isProfileComplete(session.profile)} />
+
           {children}
         </main>
       </div>

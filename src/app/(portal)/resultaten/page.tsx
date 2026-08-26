@@ -49,6 +49,8 @@ export default async function ResultsPage() {
   return (
     <>
       <PageHeader
+        backHref="/dashboard"
+        backLabel="Terug naar dashboard"
         eyebrow="Na de workshop"
         title="Resultaten"
         description={`Het werk dat tijdens uw workshops is gemaakt. Bestanden staan ${settings.results_available_days} dagen klaar, sla ze daarom meteen op een eigen plek op.`}

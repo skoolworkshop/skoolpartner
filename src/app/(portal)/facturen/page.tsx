@@ -18,6 +18,8 @@ export default async function InvoicesPage() {
   return (
     <>
       <PageHeader
+        backHref="/dashboard"
+        backLabel="Terug naar dashboard"
         eyebrow="Administratie"
         title="Facturen"
         description="Alle facturen van uw organisatie. U ziet uitsluitend facturen van de organisatie waarvoor u geautoriseerd bent."

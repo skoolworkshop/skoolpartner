@@ -44,17 +44,30 @@ export function ProfileForm({
       <Field
         label="E-mailadres"
         htmlFor="email"
-        hint="Uw e-mailadres wijzigen? Neem contact op met Skool Workshop."
+        hint="Hiermee logt u in. Wilt u een ander adres gebruiken? Mail ons, dan regelen wij dat veilig."
       >
         <Input id="email" name="email" defaultValue={email} disabled />
       </Field>
 
-      <Field label="Functie" htmlFor="job_title">
-        <Input id="job_title" name="job_title" defaultValue={jobTitle} placeholder="Cultuurcoördinator" />
+      <Field
+        label="Telefoonnummer"
+        htmlFor="phone"
+        required
+        hint="Zodat wij u op de dag van de workshop kunnen bereiken. Een nummer uit het buitenland? Zet de landcode ervoor, bijvoorbeeld +32."
+      >
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          autoComplete="tel"
+          defaultValue={phone}
+          placeholder="06 12345678"
+          required
+        />
       </Field>
 
-      <Field label="Telefoonnummer" htmlFor="phone">
-        <Input id="phone" name="phone" type="tel" defaultValue={phone} />
+      <Field label="Functie" htmlFor="job_title">
+        <Input id="job_title" name="job_title" defaultValue={jobTitle} placeholder="Cultuurcoördinator" />
       </Field>
 
       <Save />

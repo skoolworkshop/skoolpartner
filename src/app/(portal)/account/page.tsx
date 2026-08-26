@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/portal/page-header";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
+import { formatPhone, isProfileComplete } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import { LeaveOrganizationForm, ProfileForm } from "./account-forms";
 
@@ -16,10 +18,19 @@ export default async function AccountPage() {
   return (
     <>
       <PageHeader
+        backHref="/dashboard"
+        backLabel="Terug naar dashboard"
         eyebrow="Uw gegevens"
         title="Account"
         description="Uw gegevens en uw koppeling met de organisatie."
       />
+
+      {!isProfileComplete(session.profile) ? (
+        <Alert tone="warning" title="Maak uw account compleet" className="mb-5">
+          Vul hieronder uw naam en telefoonnummer in. Wij hebben een telefoonnummer nodig om u op
+          de dag van de workshop te kunnen bereiken.
+        </Alert>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
@@ -27,7 +38,7 @@ export default async function AccountPage() {
           <CardBody>
             <ProfileForm
               fullName={session.profile?.full_name ?? ""}
-              phone={session.profile?.phone ?? ""}
+              phone={formatPhone(session.profile?.phone)}
               jobTitle={session.profile?.job_title ?? ""}
               email={session.email}
             />
