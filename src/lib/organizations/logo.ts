@@ -3,12 +3,14 @@ import "server-only";
 import { recordAudit } from "@/lib/audit";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import {
+  detecteerAfbeeldingstype,
   domeinNaarUrl,
   isBruikbareAfbeelding,
   isVeiligeUrl,
   logoBestandsnaam,
   MAX_BYTES,
   standaardFavicon,
+  UPLOAD_TYPES,
   vindLogoKandidaten,
 } from "./logo-parse";
 
@@ -196,22 +198,38 @@ export async function fetchOrganizationLogo(params: {
   };
 }
 
-/** Een logo dat door beheer of de school zelf is aangeleverd. Gaat altijd voor. */
+/**
+ * Een logo dat door beheer of de school zelf is aangeleverd. Gaat altijd voor.
+ *
+ * Wij geloven niet wat de browser zegt dat het bestand is, maar kijken naar de
+ * eerste bytes van het bestand zelf. Iemand die een script hernoemt naar
+ * logo.png komt er dus niet doorheen.
+ */
 export async function setOrganizationLogo(params: {
   organizationId: string;
   file: ArrayBuffer;
-  contentType: string;
   actorId: string;
   actorEmail: string;
   actorRole?: "admin" | "klant";
 }): Promise<LogoResult> {
-  if (!isBruikbareAfbeelding(params.contentType, params.file.byteLength)) {
+  const echteType = detecteerAfbeeldingstype(new Uint8Array(params.file.slice(0, 16)));
+
+  if (!echteType || !UPLOAD_TYPES.includes(echteType)) {
     return {
       ok: false,
-      message: "Kies een PNG, JPG of WEBP van maximaal 2 MB. SVG kunnen wij niet gebruiken.",
+      message: "Dit lijkt geen PNG, JPG of WEBP. Kies een ander bestand.",
     };
   }
 
+  if (params.file.byteLength < 200) {
+    return { ok: false, message: "Dit bestand is te klein om een logo te zijn." };
+  }
+
+  if (params.file.byteLength > MAX_BYTES) {
+    return { ok: false, message: "Dit bestand is groter dan 2 MB. Kies een kleinere afbeelding." };
+  }
+
+  const contentType = echteType;
   const supabase = createServiceSupabase();
   const { data: vorige } = await supabase
     .from("organizations")
@@ -219,10 +237,10 @@ export async function setOrganizationLogo(params: {
     .eq("id", params.organizationId)
     .maybeSingle();
 
-  const pad = logoBestandsnaam(params.organizationId, params.contentType);
+  const pad = logoBestandsnaam(params.organizationId, contentType);
   const { error } = await supabase.storage
     .from(LOGO_BUCKET)
-    .upload(pad, params.file, { contentType: params.contentType, upsert: true });
+    .upload(pad, params.file, { contentType, upsert: true });
 
   if (error) return { ok: false, message: "Het logo kon niet worden opgeslagen." };
 

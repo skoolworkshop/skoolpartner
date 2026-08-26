@@ -51,7 +51,7 @@ export async function getOrganizationDetails(organizationId: string) {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("organizations")
-    .select("id, name, logo_url, cjp_school_number, has_cjp")
+    .select("id, name, logo_url, logo_source, website, cjp_school_number, has_cjp")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -60,6 +60,8 @@ export async function getOrganizationDetails(organizationId: string) {
       id: organizationId,
       name: "Onbekende organisatie",
       logo_url: null,
+      logo_source: null,
+      website: null,
       cjp_school_number: null,
       has_cjp: null,
     }

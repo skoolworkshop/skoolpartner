@@ -153,6 +153,47 @@ export function isBruikbareAfbeelding(contentType: string | null, bytes: number)
   return true;
 }
 
+/**
+ * Wat is dit bestand écht?
+ *
+ * Een browser stuurt zelf mee wat voor bestand het zou zijn, maar dat kan
+ * iemand gewoon veranderen. Daarom kijken wij naar de eerste bytes van het
+ * bestand zelf. Elk afbeeldingsformaat begint met een vaste reeks, en die kun
+ * je niet vervalsen zonder dat het bestand ook echt dat formaat wordt.
+ *
+ * Zo kan er nooit iets anders dan een echte afbeelding in onze opslag komen,
+ * ook niet als iemand een script hernoemt naar logo.png.
+ */
+export function detecteerAfbeeldingstype(bytes: Uint8Array): string | null {
+  const begintMet = (...waarden: number[]) =>
+    waarden.every((waarde, index) => bytes[index] === waarde);
+
+  // PNG
+  if (begintMet(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
+
+  // JPEG
+  if (begintMet(0xff, 0xd8, 0xff)) return "image/jpeg";
+
+  // WEBP: "RIFF" op positie 0 en "WEBP" op positie 8
+  if (
+    begintMet(0x52, 0x49, 0x46, 0x46) &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+
+  // ICO. Alleen bij automatisch ophalen; niet voor uploads door mensen.
+  if (begintMet(0x00, 0x00, 0x01, 0x00)) return "image/x-icon";
+
+  return null;
+}
+
+/** Wat een mens mag uploaden. Bewust smaller dan wat wij zelf ophalen. */
+export const UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
 /** De bestandsnaam waaronder wij het logo bewaren. */
 export function logoBestandsnaam(organizationId: string, contentType: string): string {
   const type = contentType.split(";")[0].trim().toLowerCase();
