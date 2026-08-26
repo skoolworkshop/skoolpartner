@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 004 - Facturen (Moneybird is de primaire financiële bron)
+-- SkoolPartner - 004 - Facturen (Moneybird is de primaire financiële bron)
 -- =============================================================================
 
 create table if not exists public.invoices (

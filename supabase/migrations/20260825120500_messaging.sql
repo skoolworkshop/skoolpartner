@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 006 - Berichtencentrum (Gmail, boekingen@skoolworkshop.nl)
+-- SkoolPartner - 006 - Berichtencentrum (Gmail, boekingen@skoolworkshop.nl)
 -- =============================================================================
 -- Privacy is hier kritiek. Een klant mag NOOIT vrij in Gmail kunnen zoeken.
 -- Zichtbaarheid werkt via een expliciete allowlist:
@@ -59,7 +59,7 @@ create table if not exists public.messages (
 create unique index if not exists messages_gmail_key on public.messages (gmail_message_id);
 create index if not exists messages_thread_idx on public.messages (thread_id, sent_at);
 
--- Uitgaande berichten die vanuit Mijn Skool zijn geschreven maar nog niet
+-- Uitgaande berichten die vanuit SkoolPartner zijn geschreven maar nog niet
 -- door Gmail bevestigd zijn (retry / offline afhandeling).
 create table if not exists public.outbound_messages (
   id               uuid primary key default gen_random_uuid(),

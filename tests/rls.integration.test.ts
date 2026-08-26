@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  *   SUPABASE_SERVICE_ROLE_KEY=... \
  *   npm run test:rls
  *
- * De test controleert het belangrijkste beveiligingsprincipe van Mijn Skool:
+ * De test controleert het belangrijkste beveiligingsprincipe van SkoolPartner:
  * gebruiker A mag nooit gegevens van organisatie B kunnen ophalen, ook niet
  * door handmatig een ander UUID in te vullen.
  */

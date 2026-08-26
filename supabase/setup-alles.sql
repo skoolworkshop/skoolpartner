@@ -1,19 +1,16 @@
 -- =============================================================================
--- Mijn Skool - volledige database-installatie
+-- SkoolPartner - volledige database-installatie
 -- =============================================================================
--- Plak dit hele bestand in Supabase > SQL Editor en klik op Run.
--- Het bevat alle migraties op volgorde: tabellen, Row Level Security,
--- functies en de startinstellingen van SkoolPartner.
---
--- Opnieuw draaien is veilig: alles gebruikt "if not exists" of "on conflict".
+-- Dit bestand is samengesteld uit supabase/migrations. Niet met de hand
+-- aanpassen: pas de migratie aan en draai `node scripts/build-setup-sql.mjs`.
+-- Plak de volledige inhoud in Supabase > SQL Editor en klik op Run.
+-- Opnieuw draaien is veilig.
 -- =============================================================================
 
-
-
--- ############ 20260825120000_extensions_and_enums.sql ############
+-- >>> 20260825120000_extensions_and_enums.sql
 
 -- =============================================================================
--- Mijn Skool - 001 - Extensies, enums en generieke helpers
+-- SkoolPartner - 001 - Extensies, enums en generieke helpers
 -- =============================================================================
 -- Deze migratie legt het fundament: extensies, alle enum-types en een aantal
 -- kleine helperfuncties die door latere migraties worden gebruikt.
@@ -158,11 +155,10 @@ as $$
   select exists (select 1 from public.public_email_domains d where d.domain = lower(p_domain));
 $$;
 
-
--- ############ 20260825120100_core_identity.sql ############
+-- >>> 20260825120100_core_identity.sql
 
 -- =============================================================================
--- Mijn Skool - 002 - Profielen, organisaties, lidmaatschappen, contacten
+-- SkoolPartner - 002 - Profielen, organisaties, lidmaatschappen, contacten
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -449,11 +445,10 @@ grant execute on function public.user_organization_ids(uuid) to authenticated, s
 grant execute on function public.has_organization_access(uuid, uuid) to authenticated, service_role;
 grant execute on function public.is_organization_beheerder(uuid, uuid) to authenticated, service_role;
 
-
--- ############ 20260825120200_bookings.sql ############
+-- >>> 20260825120200_bookings.sql
 
 -- =============================================================================
--- Mijn Skool - 003 - Boekingen, boekingsbronnen en reviews
+-- SkoolPartner - 003 - Boekingen, boekingsbronnen en reviews
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -584,11 +579,10 @@ drop trigger if exists reviews_set_updated_at on public.reviews;
 create trigger reviews_set_updated_at before update on public.reviews
   for each row execute function public.set_updated_at();
 
-
--- ############ 20260825120300_invoices.sql ############
+-- >>> 20260825120300_invoices.sql
 
 -- =============================================================================
--- Mijn Skool - 004 - Facturen (Moneybird is de primaire financiële bron)
+-- SkoolPartner - 004 - Facturen (Moneybird is de primaire financiële bron)
 -- =============================================================================
 
 create table if not exists public.invoices (
@@ -693,11 +687,10 @@ drop trigger if exists external_record_mappings_set_updated_at on public.externa
 create trigger external_record_mappings_set_updated_at before update on public.external_record_mappings
   for each row execute function public.set_updated_at();
 
-
--- ############ 20260825120400_loyalty.sql ############
+-- >>> 20260825120400_loyalty.sql
 
 -- =============================================================================
--- Mijn Skool - 005 - SkoolPartner: loyalty accounts, ledger en redemptions
+-- SkoolPartner - 005 - SkoolPartner: loyalty accounts, ledger en redemptions
 -- =============================================================================
 -- Uitgangspunt: het saldo wordt NOOIT als los getal bijgehouden maar altijd
 -- berekend vanuit de transactieregels (ledger). Elke regel heeft een teken
@@ -903,11 +896,10 @@ group by a.organization_id, a.id, a.enrolled_at, a.is_active;
 comment on view public.loyalty_balances is
   'Berekent het SkoolPoints-saldo uitsluitend vanuit de ledger. Nooit cachen in een losse kolom.';
 
-
--- ############ 20260825120500_messaging.sql ############
+-- >>> 20260825120500_messaging.sql
 
 -- =============================================================================
--- Mijn Skool - 006 - Berichtencentrum (Gmail, boekingen@skoolworkshop.nl)
+-- SkoolPartner - 006 - Berichtencentrum (Gmail, boekingen@skoolworkshop.nl)
 -- =============================================================================
 -- Privacy is hier kritiek. Een klant mag NOOIT vrij in Gmail kunnen zoeken.
 -- Zichtbaarheid werkt via een expliciete allowlist:
@@ -967,7 +959,7 @@ create table if not exists public.messages (
 create unique index if not exists messages_gmail_key on public.messages (gmail_message_id);
 create index if not exists messages_thread_idx on public.messages (thread_id, sent_at);
 
--- Uitgaande berichten die vanuit Mijn Skool zijn geschreven maar nog niet
+-- Uitgaande berichten die vanuit SkoolPartner zijn geschreven maar nog niet
 -- door Gmail bevestigd zijn (retry / offline afhandeling).
 create table if not exists public.outbound_messages (
   id               uuid primary key default gen_random_uuid(),
@@ -1014,11 +1006,10 @@ create trigger messages_refresh_thread_stats
   after insert or delete on public.messages
   for each row execute function public.refresh_thread_stats();
 
-
--- ############ 20260825120600_integrations_settings_audit.sql ############
+-- >>> 20260825120600_integrations_settings_audit.sql
 
 -- =============================================================================
--- Mijn Skool - 007 - Integratiestatus, credentials, instellingen, audit, webhooks
+-- SkoolPartner - 007 - Integratiestatus, credentials, instellingen, audit, webhooks
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -1135,11 +1126,10 @@ create unique index if not exists webhook_events_external_key
   on public.webhook_events (provider, external_event_id);
 create index if not exists webhook_events_status_idx on public.webhook_events (status, received_at);
 
-
--- ############ 20260825120700_rls_policies.sql ############
+-- >>> 20260825120700_rls_policies.sql
 
 -- =============================================================================
--- Mijn Skool - 008 - Row Level Security
+-- SkoolPartner - 008 - Row Level Security
 -- =============================================================================
 -- Uitgangspunten:
 --  * RLS staat op ALLE tabellen aan. Uitzetten is nooit de oplossing.
@@ -1462,11 +1452,10 @@ grant select on public.webhook_events to authenticated;
 -- integration_credentials krijgt met opzet GEEN policy en GEEN grant:
 -- alleen de service role (die RLS bypast) komt erbij.
 
-
--- ############ 20260825120800_loyalty_functions.sql ############
+-- >>> 20260825120800_loyalty_functions.sql
 
 -- =============================================================================
--- Mijn Skool - 009 - Loyalty-functies (atomair, met vergrendeling)
+-- SkoolPartner - 009 - Loyalty-functies (atomair, met vergrendeling)
 -- =============================================================================
 -- Alle mutaties op punten lopen via deze functies zodat saldo, reservering en
 -- historie altijd consistent blijven, ook bij gelijktijdige verzoeken.
@@ -1797,11 +1786,10 @@ grant execute on function public.get_setting_int(text, integer) to authenticated
 grant execute on function public.get_setting_bool(text, boolean) to authenticated, service_role;
 grant execute on function public.loyalty_available_points(uuid) to authenticated, service_role;
 
-
--- ############ 20260825120900_seed_settings.sql ############
+-- >>> 20260825120900_seed_settings.sql
 
 -- =============================================================================
--- Mijn Skool - 010 - Startinstellingen SkoolPartner
+-- SkoolPartner - 010 - Startinstellingen SkoolPartner
 -- =============================================================================
 -- Deze waarden zijn de startsituatie. Ze zijn allemaal aanpasbaar via
 -- Admin > Instellingen, zonder programmeerwerk.
@@ -1850,7 +1838,7 @@ insert into public.app_settings (key, value, label, description, group_name, val
    'Gebruikt voor de subtiele voortgangsmelding op het dashboard.', 'programma', 'number', true, 120),
 
   ('new_booking_cta_url', '"https://skoolworkshop.nl/offerte-aanvraag/"'::jsonb, 'URL nieuwe workshop aanvragen',
-   'Mijn Skool bouwt geen eigen boekingssysteem. Deze knop verwijst naar de bestaande offerteaanvraag.',
+   'SkoolPartner bouwt geen eigen boekingssysteem. Deze knop verwijst naar de bestaande offerteaanvraag.',
    'programma', 'url', true, 130),
 
   ('new_booking_cta_label', '"Nieuwe workshop aanvragen"'::jsonb, 'Tekst op de knop',
@@ -1859,10 +1847,10 @@ insert into public.app_settings (key, value, label, description, group_name, val
   ('support_email', '"boekingen@skoolworkshop.nl"'::jsonb, 'Centrale mailbox',
    'Alle klantcommunicatie loopt via dit adres.', 'programma', 'text', true, 150),
 
-  ('rules_text', '"SkoolPoints worden toegekend over de daadwerkelijk afgenomen workshopuren van een definitieve boeking. Reiskosten, starttarief, materiaalkosten, extra deelnemers en toeslagen tellen niet mee.\n\nPunten komen beschikbaar zodra de bijbehorende factuur volledig is voldaan. Tot die tijd staan ze als punten in behandeling in uw overzicht.\n\nSkoolPoints horen bij uw organisatie en niet bij een individuele medewerker. Ze zijn niet overdraagbaar naar een andere organisatie, niet uitbetaalbaar en niet inwisselbaar voor contant geld.\n\nPunten zijn te gebruiken als voordeel op een volgende boeking. U dient daarvoor een inwisselverzoek in via Mijn Skool. Zolang een verzoek loopt, zijn die punten gereserveerd.\n\nDeelname begint op het moment van registratie. Boekingen van voor uw registratie leveren geen punten op."'::jsonb,
+  ('rules_text', '"SkoolPoints worden toegekend over de daadwerkelijk afgenomen workshopuren van een definitieve boeking. Reiskosten, starttarief, materiaalkosten, extra deelnemers en toeslagen tellen niet mee.\n\nPunten komen beschikbaar zodra de bijbehorende factuur volledig is voldaan. Tot die tijd staan ze als punten in behandeling in uw overzicht.\n\nSkoolPoints horen bij uw organisatie en niet bij een individuele medewerker. Ze zijn niet overdraagbaar naar een andere organisatie, niet uitbetaalbaar en niet inwisselbaar voor contant geld.\n\nPunten zijn te gebruiken als voordeel op een volgende boeking. U dient daarvoor een inwisselverzoek in via SkoolPartner. Zolang een verzoek loopt, zijn die punten gereserveerd.\n\nDeelname begint op het moment van registratie. Boekingen van voor uw registratie leveren geen punten op."'::jsonb,
    'Spelregels SkoolPartner', 'Getoond op de SkoolPartner-pagina.', 'teksten', 'longtext', true, 160),
 
-  ('how_it_works_text', '"U boekt een workshop via de gebruikelijke offerteaanvraag. Zodra de boeking definitief is bevestigd, rekenen wij de workshopuren om naar SkoolPoints. Na betaling van de factuur komen die punten beschikbaar in Mijn Skool. Bij een volgende aanvraag geeft u aan hoeveel punten u wilt gebruiken."'::jsonb,
+  ('how_it_works_text', '"U boekt een workshop via de gebruikelijke offerteaanvraag. Zodra de boeking definitief is bevestigd, rekenen wij de workshopuren om naar SkoolPoints. Na betaling van de factuur komen die punten beschikbaar in SkoolPartner. Bij een volgende aanvraag geeft u aan hoeveel punten u wilt gebruiken."'::jsonb,
    'Zo werkt SkoolPartner', 'Korte uitleg bovenaan de SkoolPartner-pagina.', 'teksten', 'longtext', true, 170),
 
   ('parser_enabled', 'true'::jsonb, 'Automatisch bevestigingsmails inlezen',
@@ -1883,3 +1871,107 @@ insert into public.app_settings (key, value, label, description, group_name, val
    'Bepaalt welk deel van de mailbox wordt ingelezen. Alleen threads met een geverifieerde contactpersoon worden bewaard.',
    'berichten', 'text', false, 220)
 on conflict (key) do nothing;
+
+-- >>> 20260825121000_chat_and_naming.sql
+
+-- =============================================================================
+-- SkoolPartner - 011 - Chatknop en naamgeving
+-- =============================================================================
+-- 1. Nieuwe instellingen voor de WhatsApp-chatknop. Zolang er geen nummer is
+--    ingevuld blijft de knop verborgen, zodat er nooit een dood adres in het
+--    portaal staat.
+-- 2. De portaalnaam in bestaande teksten bijwerken naar SkoolPartner. Dit raakt
+--    alleen tekst die de klant ziet, niet de Gmail-labels of andere technische
+--    waarden.
+-- =============================================================================
+
+insert into public.app_settings (key, value, label, description, group_name, value_type, is_public, sort_order) values
+  ('chat_enabled', 'true'::jsonb, 'Chatknop tonen',
+   'Zet de knop "Liever even chatten?" in het klantportaal aan of uit.',
+   'contact', 'boolean', true, 230),
+
+  ('chat_whatsapp_url', '"https://wa.me/31850653923"'::jsonb, 'WhatsApp-adres',
+   'Bijvoorbeeld https://wa.me/31612345678. Laat leeg om de knop verborgen te houden. Vul hier het zakelijke nummer in, zonder plusteken en zonder spaties.',
+   'contact', 'url', true, 240),
+
+  ('chat_label', '"Liever even chatten?"'::jsonb, 'Tekst op de chatknop',
+   null, 'contact', 'text', true, 250),
+
+  ('chat_help_text',
+   '"Stel uw vraag via WhatsApp. Op werkdagen reageren wij meestal binnen een paar uur."'::jsonb,
+   'Toelichting bij de chatknop',
+   'Korte zin onder de knop op de berichtenpagina.', 'contact', 'text', true, 260)
+on conflict (key) do nothing;
+
+-- Als het adres nog leeg is, zetten we het nummer van Skool Workshop erin.
+update public.app_settings
+set value = '"https://wa.me/31850653923"'::jsonb
+where key = 'chat_whatsapp_url'
+  and coalesce(nullif(trim(value #>> '{}'), ''), '') = '';
+
+-- Naamgeving bijwerken in teksten die al in de database staan.
+update public.app_settings
+set value = to_jsonb(replace(value #>> '{}', 'Mijn Skool', 'SkoolPartner'))
+where key in ('rules_text', 'how_it_works_text', 'program_name')
+  and value #>> '{}' like '%Mijn Skool%';
+
+update public.app_settings
+set description = replace(description, 'Mijn Skool', 'SkoolPartner')
+where description like '%Mijn Skool%'
+  and key <> 'booking_confirmation_label';
+
+-- >>> 20260825121100_workshop_images.sql
+
+-- =============================================================================
+-- SkoolPartner - 012 - Foto's per workshopsoort
+-- =============================================================================
+-- De foto's staan op skoolworkshop.nl zelf. Hier leggen we alleen vast welke
+-- foto bij welke workshopnaam hoort. Aanpasbaar via Admin > Instellingen,
+-- zonder programmeerwerk: het is gewoon een lijstje sleutel naar adres.
+--
+-- De sleutel wordt gezocht in de workshopnaam van de boeking. De langste
+-- passende sleutel wint, zodat "light graffiti" niet de gewone graffitifoto
+-- pakt. Staat er niets bij, dan toont het portaal een rustig vlak in de
+-- huisstijl in plaats van een verkeerde foto.
+-- =============================================================================
+
+insert into public.app_settings (key, value, label, description, group_name, value_type, is_public, sort_order) values
+  ('workshop_images', '{
+  "3d printerpen": "https://skoolworkshop.nl/wp-content/uploads/2024/07/MDC05556-scaled-e1781612569521-1024x382.jpg",
+  "bodypercussie": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Workshop-Ghetto-Drums-10-1024x683.jpg",
+  "bootcamp": "https://skoolworkshop.nl/wp-content/uploads/2026/06/Workshop-Bootcamp-e1781614313226-1024x416.jpg",
+  "breakdance": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Website-fotos-Hersteld_0008s_0008_6L6A5965-Verbeterd-NR-1024x576.jpg",
+  "caribbean drums": "https://skoolworkshop.nl/wp-content/uploads/2020/10/6-Workshop-Carribean-Drums-1024x576.jpg",
+  "cultuurdag": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Cultuurdag-op-school-1024x683.jpg",
+  "dans": "https://skoolworkshop.nl/wp-content/uploads/2019/12/Dans-Website-1024x683.jpg",
+  "dj": "https://skoolworkshop.nl/wp-content/uploads/2023/02/2-Workshop-Dj-Skills-1024x576.jpg",
+  "dj skills": "https://skoolworkshop.nl/wp-content/uploads/2023/02/2-Workshop-Dj-Skills-1024x576.jpg",
+  "flashmob": "https://skoolworkshop.nl/wp-content/uploads/2026/06/Workshop-Flashmob-1024x576.jpg",
+  "freerunning": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Website-fotos-Hersteld_0006s_0000_Workshop-ISL-30-1024x576.jpg",
+  "ghetto drums": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Workshop-Ghetto-Drums-12-1024x683.jpg",
+  "graffiti": "https://skoolworkshop.nl/wp-content/uploads/2020/06/0006s_0000_8-Montessori-Lyceum-Rotterdam-1024x576.jpg",
+  "hiphop": "https://skoolworkshop.nl/wp-content/uploads/2019/12/Dans-Website-1024x683.jpg",
+  "kickboksen": "https://skoolworkshop.nl/wp-content/uploads/2020/07/6L6A5932-Verbeterd-NR-1024x576.jpg",
+  "korte film": "https://skoolworkshop.nl/wp-content/uploads/2020/07/0004s_0000_15-Workshops-British-School-1024x576.jpg",
+  "liedje maken": "https://skoolworkshop.nl/wp-content/uploads/2025/10/5-Workshop-Rap-Zang-1.jpg",
+  "light graffiti": "https://skoolworkshop.nl/wp-content/uploads/2020/07/1-Wrokshop-Light-Graffiti--1024x576.jpg",
+  "live looping": "https://skoolworkshop.nl/wp-content/uploads/2025/10/1-Workshop-Rap-Zang.jpg",
+  "pannavoetbal": "https://skoolworkshop.nl/wp-content/uploads/2026/06/Workshop-Pannavoetbal-1024x576.jpg",
+  "podcast": "https://skoolworkshop.nl/wp-content/uploads/2023/02/Website-fotos_0000s_0001_14-Introductiedag-Curio-Breda-1024x576.jpg",
+  "popstar": "https://skoolworkshop.nl/wp-content/uploads/2025/10/5-Workshop-Rap-Zang-1.jpg",
+  "rap": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Website-fotos-Hersteld_0010s_0001_17-Comenius-College-Hilversum-1024x576.jpg",
+  "smartphone fotografie": "https://skoolworkshop.nl/wp-content/uploads/2020/11/Foto-6-1024x682.jpg",
+  "soap acteren": "https://skoolworkshop.nl/wp-content/uploads/2026/06/Workshop-Soap-1024x576.jpg",
+  "stage fighting": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Website-fotos-Hersteld_0009s_0001_3-Workshopdag-Curio-Roosendaal-1024x576.jpg",
+  "stop motion": "https://skoolworkshop.nl/wp-content/uploads/2020/07/0008s_0002_MDC05818-1024x576.jpg",
+  "streetdance": "https://skoolworkshop.nl/wp-content/uploads/2020/09/hele-groep-1024x517.jpg",
+  "t shirt ontwerpen": "https://skoolworkshop.nl/wp-content/uploads/2020/07/23-Workshops-British-School-1024x683.jpg",
+  "theatersport": "https://skoolworkshop.nl/wp-content/uploads/2019/12/Theater.jpg",
+  "videoclip": "https://skoolworkshop.nl/wp-content/uploads/2025/07/Videoclip-Maken_0007_Workshop-ISL-16-1024x576.jpg",
+  "vloggen": "https://skoolworkshop.nl/wp-content/uploads/2021/04/Vloggen-workshop-1024x801.jpg",
+  "zelfverdediging": "https://skoolworkshop.nl/wp-content/uploads/2020/07/6L6A6020-Verbeterd-NR-1024x576.jpg"
+}'::jsonb, 'Foto per workshopsoort',
+   'Een lijst met workshopnaam en het adres van de foto. De foto''s staan op skoolworkshop.nl, dus een nieuwe foto op de website betekent automatisch een nieuwe foto in het portaal.',
+   'programma', 'json', true, 270)
+on conflict (key) do nothing;
+

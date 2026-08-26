@@ -1,9 +1,9 @@
-# Mijn Skool
+# SkoolPartner
 
 De klantomgeving van Skool Workshop. Klanten zien hier hun boekingen, facturen en
 e-mailcommunicatie, en sparen SkoolPoints via het loyaliteitsprogramma SkoolPartner.
 
-Mijn Skool is een **losse webapplicatie**. De bestaande WordPress-site op
+SkoolPartner is een **losse webapplicatie**. De bestaande WordPress-site op
 [skoolworkshop.nl](https://skoolworkshop.nl) blijft volledig ongewijzigd. Er wordt hier ook
 **geen boekingssysteem** gebouwd: de knop "Nieuwe workshop aanvragen" verwijst naar de
 bestaande offerteaanvraag.
@@ -142,7 +142,7 @@ npm run test:rls     # Row Level Security tegen een echt Supabase-project
    - Redirect URLs: voeg `https://mijn.skoolworkshop.nl/auth/callback` toe, plus
      `http://localhost:3000/auth/callback` en de Vercel preview-URL's.
 5. Zet in **Authentication > Providers > Email** de optie "Confirm email" aan en schakel
-   wachtwoorden desgewenst uit; Mijn Skool gebruikt uitsluitend magic links en OTP.
+   wachtwoorden desgewenst uit; SkoolPartner gebruikt uitsluitend magic links en OTP.
 
 Wil je de types opnieuw genereren nadat je het schema hebt aangepast:
 
@@ -260,7 +260,7 @@ precies welke variabelen er nog ontbreken.
 
 1. Maak een API-token aan: Moneybird > Instellingen > Developers > API-tokens.
    Benodigde rechten: **lezen van verkoopfacturen en contacten**. Schrijfrechten zijn niet
-   nodig; Mijn Skool wijzigt nooit iets in Moneybird.
+   nodig; SkoolPartner wijzigt nooit iets in Moneybird.
 2. Zet `MONEYBIRD_API_TOKEN` en `MONEYBIRD_ADMINISTRATION_ID` in Vercel.
 3. Registreer een webhook met als URL:
    `https://mijn.skoolworkshop.nl/api/webhooks/moneybird`
@@ -432,7 +432,7 @@ gebruiken. Draai die test op een ontwikkelproject, nooit op productie.
 
 ### Inwisselen
 
-Een klant vraagt in Mijn Skool een aantal punten aan. De databasefunctie
+Een klant vraagt in SkoolPartner een aantal punten aan. De databasefunctie
 `request_redemption` controleert in één transactie, met een lock op het account, het saldo,
 het minimum en het maximum, en zet meteen een reservering klaar. Dezelfde punten kunnen
 daardoor nooit twee keer worden ingezet. Een beheerder keurt het verzoek goed en zet het op

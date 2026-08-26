@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 007 - Integratiestatus, credentials, instellingen, audit, webhooks
+-- SkoolPartner - 007 - Integratiestatus, credentials, instellingen, audit, webhooks
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------

@@ -32,7 +32,7 @@ create or replace function auth.uid() returns uuid
 language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 `;
 
-const TEST_EMAIL = "info@skoolworkshop.nl";
+const TEST_EMAIL = "skoolworkshop@gmail.com";
 
 async function main() {
   const db = await PGlite.create();
@@ -103,13 +103,61 @@ async function main() {
   );
   console.log(`  beheerder     is_admin=${profile.is_admin} is_super_admin=${profile.is_super_admin}`);
 
+  // 6. Tweede account als gewone klant koppelen
+  await db.exec(`insert into auth.users (email) values ('skoolworkshop+klant@gmail.com');`);
+  await db.exec(await readFile("supabase/tweede-account-als-klant.sql", "utf8"));
+  const klant = (
+    await db.query(`
+      select p.is_admin, m.role, m.status
+      from public.profiles p
+      join public.organization_members m on m.user_id = p.id
+      where lower(p.email) = 'skoolworkshop+klant@gmail.com'
+    `)
+  ).rows[0];
+  const klantOk =
+    klant && klant.is_admin === false && klant.role === "lid" && klant.status === "active";
+  console.log(
+    klantOk
+      ? "  ok   tweede-account-als-klant.sql koppelt zonder beheerrechten"
+      : "  FOUT tweede-account-als-klant.sql klopt niet"
+  );
+
+  // 7. Opruimen moet de demodata weghalen en het account laten staan
+  await db.exec(await readFile("supabase/demo-data-verwijderen.sql", "utf8"));
+  const na = (
+    await db.query(`
+      select
+        (select count(*) from public.organizations)::int as orgs,
+        (select count(*) from public.bookings)::int as boekingen,
+        (select count(*) from public.loyalty_transactions)::int as transacties,
+        (select count(*) from public.messages)::int as berichten,
+        (select count(*) from public.booking_sources)::int as bronnen,
+        (select count(*) from public.profiles)::int as profielen
+    `)
+  ).rows[0];
+  const opgeruimd =
+    na.orgs === 0 &&
+    na.boekingen === 0 &&
+    na.transacties === 0 &&
+    na.berichten === 0 &&
+    na.bronnen === 0 &&
+    na.profielen > 0;
+  console.log(
+    opgeruimd
+      ? "  ok   demo-data-verwijderen.sql ruimt alles op en laat je account staan"
+      : "  FOUT demo-data-verwijderen.sql heeft niet alles opgeruimd"
+  );
+
   const ok =
-    balance.available_points === 650 &&
+    opgeruimd &&
+    klantOk &&
+    balance.available_points === 350 &&
     balance.pending_points === 300 &&
-    counts.boekingen === 3 &&
-    counts.facturen === 2 &&
-    counts.berichten === 2 &&
-    counts.leden === 1 &&
+    balance.lifetime_earned_points === 1200 &&
+    counts.boekingen === 8 &&
+    counts.facturen === 5 &&
+    counts.berichten === 6 &&
+    counts.leden === 3 &&
     profile.is_admin === true;
 
   await db.close();

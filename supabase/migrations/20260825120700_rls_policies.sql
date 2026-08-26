@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 008 - Row Level Security
+-- SkoolPartner - 008 - Row Level Security
 -- =============================================================================
 -- Uitgangspunten:
 --  * RLS staat op ALLE tabellen aan. Uitzetten is nooit de oplossing.

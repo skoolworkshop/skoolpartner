@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 009 - Loyalty-functies (atomair, met vergrendeling)
+-- SkoolPartner - 009 - Loyalty-functies (atomair, met vergrendeling)
 -- =============================================================================
 -- Alle mutaties op punten lopen via deze functies zodat saldo, reservering en
 -- historie altijd consistent blijven, ook bij gelijktijdige verzoeken.

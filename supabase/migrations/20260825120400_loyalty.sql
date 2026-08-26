@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 005 - SkoolPartner: loyalty accounts, ledger en redemptions
+-- SkoolPartner - 005 - SkoolPartner: loyalty accounts, ledger en redemptions
 -- =============================================================================
 -- Uitgangspunt: het saldo wordt NOOIT als los getal bijgehouden maar altijd
 -- berekend vanuit de transactieregels (ledger). Elke regel heeft een teken

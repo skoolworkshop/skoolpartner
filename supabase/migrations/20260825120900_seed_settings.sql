@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 010 - Startinstellingen SkoolPartner
+-- SkoolPartner - 010 - Startinstellingen SkoolPartner
 -- =============================================================================
 -- Deze waarden zijn de startsituatie. Ze zijn allemaal aanpasbaar via
 -- Admin > Instellingen, zonder programmeerwerk.
@@ -48,7 +48,7 @@ insert into public.app_settings (key, value, label, description, group_name, val
    'Gebruikt voor de subtiele voortgangsmelding op het dashboard.', 'programma', 'number', true, 120),
 
   ('new_booking_cta_url', '"https://skoolworkshop.nl/offerte-aanvraag/"'::jsonb, 'URL nieuwe workshop aanvragen',
-   'Mijn Skool bouwt geen eigen boekingssysteem. Deze knop verwijst naar de bestaande offerteaanvraag.',
+   'SkoolPartner bouwt geen eigen boekingssysteem. Deze knop verwijst naar de bestaande offerteaanvraag.',
    'programma', 'url', true, 130),
 
   ('new_booking_cta_label', '"Nieuwe workshop aanvragen"'::jsonb, 'Tekst op de knop',
@@ -57,10 +57,10 @@ insert into public.app_settings (key, value, label, description, group_name, val
   ('support_email', '"boekingen@skoolworkshop.nl"'::jsonb, 'Centrale mailbox',
    'Alle klantcommunicatie loopt via dit adres.', 'programma', 'text', true, 150),
 
-  ('rules_text', '"SkoolPoints worden toegekend over de daadwerkelijk afgenomen workshopuren van een definitieve boeking. Reiskosten, starttarief, materiaalkosten, extra deelnemers en toeslagen tellen niet mee.\n\nPunten komen beschikbaar zodra de bijbehorende factuur volledig is voldaan. Tot die tijd staan ze als punten in behandeling in uw overzicht.\n\nSkoolPoints horen bij uw organisatie en niet bij een individuele medewerker. Ze zijn niet overdraagbaar naar een andere organisatie, niet uitbetaalbaar en niet inwisselbaar voor contant geld.\n\nPunten zijn te gebruiken als voordeel op een volgende boeking. U dient daarvoor een inwisselverzoek in via Mijn Skool. Zolang een verzoek loopt, zijn die punten gereserveerd.\n\nDeelname begint op het moment van registratie. Boekingen van voor uw registratie leveren geen punten op."'::jsonb,
+  ('rules_text', '"SkoolPoints worden toegekend over de daadwerkelijk afgenomen workshopuren van een definitieve boeking. Reiskosten, starttarief, materiaalkosten, extra deelnemers en toeslagen tellen niet mee.\n\nPunten komen beschikbaar zodra de bijbehorende factuur volledig is voldaan. Tot die tijd staan ze als punten in behandeling in uw overzicht.\n\nSkoolPoints horen bij uw organisatie en niet bij een individuele medewerker. Ze zijn niet overdraagbaar naar een andere organisatie, niet uitbetaalbaar en niet inwisselbaar voor contant geld.\n\nPunten zijn te gebruiken als voordeel op een volgende boeking. U dient daarvoor een inwisselverzoek in via SkoolPartner. Zolang een verzoek loopt, zijn die punten gereserveerd.\n\nDeelname begint op het moment van registratie. Boekingen van voor uw registratie leveren geen punten op."'::jsonb,
    'Spelregels SkoolPartner', 'Getoond op de SkoolPartner-pagina.', 'teksten', 'longtext', true, 160),
 
-  ('how_it_works_text', '"U boekt een workshop via de gebruikelijke offerteaanvraag. Zodra de boeking definitief is bevestigd, rekenen wij de workshopuren om naar SkoolPoints. Na betaling van de factuur komen die punten beschikbaar in Mijn Skool. Bij een volgende aanvraag geeft u aan hoeveel punten u wilt gebruiken."'::jsonb,
+  ('how_it_works_text', '"U boekt een workshop via de gebruikelijke offerteaanvraag. Zodra de boeking definitief is bevestigd, rekenen wij de workshopuren om naar SkoolPoints. Na betaling van de factuur komen die punten beschikbaar in SkoolPartner. Bij een volgende aanvraag geeft u aan hoeveel punten u wilt gebruiken."'::jsonb,
    'Zo werkt SkoolPartner', 'Korte uitleg bovenaan de SkoolPartner-pagina.', 'teksten', 'longtext', true, 170),
 
   ('parser_enabled', 'true'::jsonb, 'Automatisch bevestigingsmails inlezen',

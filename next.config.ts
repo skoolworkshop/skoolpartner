@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 /**
  * Beveiligingsheaders voor alle routes.
- * Mijn Skool is een afgeschermd klantportaal: het mag niet in een iframe
+ * SkoolPartner is een afgeschermd klantportaal: het mag niet in een iframe
  * worden geladen en hoeft niet door zoekmachines te worden geïndexeerd.
  */
 const securityHeaders = [
@@ -20,6 +20,14 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  images: {
+    // De workshopfoto's staan op de eigen website van Skool Workshop. Zo hoeven
+    // ze niet gekopieerd te worden en blijft één plek de bron.
+    remotePatterns: [
+      { protocol: "https", hostname: "skoolworkshop.nl", pathname: "/wp-content/uploads/**" },
+      { protocol: "https", hostname: "www.skoolworkshop.nl", pathname: "/wp-content/uploads/**" },
+    ],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

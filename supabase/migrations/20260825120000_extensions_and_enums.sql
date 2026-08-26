@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mijn Skool - 001 - Extensies, enums en generieke helpers
+-- SkoolPartner - 001 - Extensies, enums en generieke helpers
 -- =============================================================================
 -- Deze migratie legt het fundament: extensies, alle enum-types en een aantal
 -- kleine helperfuncties die door latere migraties worden gebruikt.
