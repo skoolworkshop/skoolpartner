@@ -38,7 +38,7 @@ export async function getAdminOverview() {
   ]);
 
   // Tweede ronde: de totalen die de beheerder in één oogopslag wil zien.
-  const [bookings, invoices, threadsNeedingReview, unpaid] = await Promise.all([
+  const [bookings, invoices, threadsNeedingReview, unpaid, cjpRequests, cjpBalances] = await Promise.all([
     supabase.from("bookings").select("id", { count: "exact", head: true }),
     supabase.from("invoices").select("id", { count: "exact", head: true }),
     supabase
@@ -46,9 +46,16 @@ export async function getAdminOverview() {
       .select("id", { count: "exact", head: true })
       .eq("visibility", "needs_review"),
     supabase.from("invoices").select("total_unpaid_cents").eq("fully_paid", false).limit(1000),
+    supabase
+      .from("cjp_parking_requests")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["requested", "in_review"]),
+    // Het geparkeerde tegoed dat nog niet is gebruikt. Euro's, geen punten.
+    supabase.from("cjp_credit_balances").select("available_cents").gt("available_cents", 0).limit(1000),
   ]);
 
   const unpaidRows = (unpaid.data ?? []) as { total_unpaid_cents: number }[];
+  const creditRows = (cjpBalances.data ?? []) as { available_cents: number }[];
 
   return {
     reviewQueue: reviewQueue.count ?? 0,
@@ -62,6 +69,8 @@ export async function getAdminOverview() {
     invoices: invoices.count ?? 0,
     threadsNeedingReview: threadsNeedingReview.count ?? 0,
     unpaidCents: unpaidRows.reduce((sum, row) => sum + (row.total_unpaid_cents ?? 0), 0),
+    openCjpRequests: cjpRequests.count ?? 0,
+    cjpCreditCents: creditRows.reduce((sum, row) => sum + (row.available_cents ?? 0), 0),
   };
 }
 

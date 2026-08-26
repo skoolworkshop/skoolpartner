@@ -737,6 +737,85 @@ begin
   end if;
 
   ---------------------------------------------------------------------------
+  -- 8b. CJP-tegoed
+  ---------------------------------------------------------------------------
+  -- Eén bevestigde aanvraag met de bijbehorende bonus, en één aanvraag die nog
+  -- open staat. Zo is in beide schermen te zien hoe het eruitziet. Bedragen in
+  -- eurocenten; deze staan volledig los van de punten hierboven.
+  if not exists (
+    select 1 from public.cjp_parking_requests where organization_id = v_org1
+  ) then
+    insert into public.cjp_parking_requests (
+      id, organization_id, school_name, cjp_school_number, holder_name,
+      holder_email, holder_phone, amount_cents, status, requested_by,
+      requested_by_email, decided_by, decided_at, decision_note,
+      notified_at, created_at
+    ) values (
+      '00000000-0000-4000-8000-0000000c1901',
+      v_org1, 'De Goudse Waarden', '123456', 'Sanne de Vries',
+      v_email, '+31612345678', 75000, 'confirmed', v_user,
+      v_email, v_beheerder, now() - interval '12 days', 'Bedrag ontvangen van CJP.',
+      now() - interval '14 days', now() - interval '14 days'
+    );
+
+    insert into public.cjp_credit_transactions (
+      organization_id, amount_cents, type, description, request_id,
+      external_reference, created_by, occurred_at
+    ) values (
+      v_org1, 75000, 'parking', 'CJP-tegoed toegevoegd',
+      '00000000-0000-4000-8000-0000000c1901',
+      'request:00000000-0000-4000-8000-0000000c1901', v_beheerder,
+      now() - interval '12 days'
+    ) on conflict (organization_id, type, external_reference)
+      where external_reference is not null do nothing;
+
+    insert into public.cjp_credit_transactions (
+      organization_id, amount_cents, type, description, booking_id,
+      invoice_number, created_by, note, occurred_at
+    ) values (
+      v_org1, -25000, 'spend', 'Breakdance', v_b3,
+      'demo-2026-00231', v_beheerder, 'Verrekend op de factuur.',
+      now() - interval '5 days'
+    );
+
+    insert into public.loyalty_transactions (
+      organization_id, account_id, type, status, points,
+      point_value_cents_per_100, description, source, external_reference,
+      available_at, created_by, occurred_at
+    ) values (
+      v_org1, v_acc1, 'cjp_bonus', 'available', 1000, 250,
+      'Bonus bij geparkeerd CJP-tegoed', 'portal',
+      'cjp:00000000-0000-4000-8000-0000000c1901',
+      now() - interval '12 days', v_beheerder, now() - interval '12 days'
+    ) on conflict (organization_id, type, external_reference)
+      where external_reference is not null do nothing;
+
+    update public.cjp_parking_requests
+    set credit_transaction_id = (
+          select id from public.cjp_credit_transactions
+          where external_reference = 'request:00000000-0000-4000-8000-0000000c1901'
+        ),
+        bonus_transaction_id = (
+          select id from public.loyalty_transactions
+          where external_reference = 'cjp:00000000-0000-4000-8000-0000000c1901'
+        )
+    where id = '00000000-0000-4000-8000-0000000c1901';
+  end if;
+
+  if not exists (
+    select 1 from public.cjp_parking_requests where organization_id = v_org2
+  ) then
+    insert into public.cjp_parking_requests (
+      organization_id, school_name, cjp_school_number, holder_name,
+      holder_email, amount_cents, status, requested_by_email, created_at
+    ) values (
+      v_org2, 'Het Erasmus', '987654', 'Mark Jansen',
+      'planning@skoolworkshop.nl', 40000, 'requested', 'planning@skoolworkshop.nl',
+      now() - interval '2 days'
+    );
+  end if;
+
+  ---------------------------------------------------------------------------
   -- 9. Berichtencentrum
   ---------------------------------------------------------------------------
   insert into public.message_threads (

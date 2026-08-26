@@ -16,6 +16,7 @@ const items = [
   { href: "/admin/resultaten", label: "Resultaten" },
   { href: "/admin/skoolpoints", label: "SkoolPoints" },
   { href: "/admin/inwisselen", label: "Inwisselen" },
+  { href: "/admin/cjp-tegoed", label: "CJP-tegoed" },
   { href: "/admin/integraties", label: "Integraties" },
   { href: "/admin/instellingen", label: "Instellingen" },
   { href: "/admin/audit", label: "Audit log" },

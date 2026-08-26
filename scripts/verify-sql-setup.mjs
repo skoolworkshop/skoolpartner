@@ -168,6 +168,24 @@ async function main() {
     `  cjp           ${cjp.met_nummer} met nummer, ${cjp.zonder_nummer} zonder, ${cjp.onbekend} onbekend`
   );
 
+  const tegoed = (
+    await db.query(`
+      select
+        (select coalesce(available_cents, 0) from public.cjp_credit_balances
+          where organization_id = (select id from public.organizations where slug = 'de-goudse-waarden'))::int as beschikbaar,
+        (select coalesce(added_cents, 0) from public.cjp_credit_balances
+          where organization_id = (select id from public.organizations where slug = 'de-goudse-waarden'))::int as bijgeschreven,
+        (select coalesce(spent_cents, 0) from public.cjp_credit_balances
+          where organization_id = (select id from public.organizations where slug = 'de-goudse-waarden'))::int as gebruikt,
+        (select count(*) from public.loyalty_transactions where type = 'cjp_bonus')::int as bonussen,
+        (select count(*) from public.cjp_parking_requests where status in ('requested', 'in_review'))::int as open_aanvragen
+    `)
+  ).rows[0];
+
+  console.log(
+    `  cjp-tegoed    ${(tegoed.beschikbaar / 100).toFixed(2)} beschikbaar van ${(tegoed.bijgeschreven / 100).toFixed(2)} geparkeerd, ${tegoed.bonussen} bonus, ${tegoed.open_aanvragen} open aanvraag`
+  );
+
   const ok =
     accounts.length === 2 &&
     accounts.includes(BEHEERDER) &&
@@ -182,10 +200,11 @@ async function main() {
     klant.phone !== null &&
     klant.leden === 1 &&
     counts.organisaties === 3 &&
-    // 350 gespaard met workshops plus 100 welkomsttegoed.
-    balance.available_points === 450 &&
+    // 350 gespaard met workshops, plus 100 welkomsttegoed, plus 1.000 bonus
+    // bij het geparkeerde CJP-tegoed.
+    balance.available_points === 1450 &&
     balance.pending_points === 300 &&
-    balance.lifetime_earned_points === 1300 &&
+    balance.lifetime_earned_points === 2300 &&
     bonus.aantal === 1 &&
     bonus.punten === 100 &&
     cjp.met_nummer === 1 &&
@@ -199,7 +218,13 @@ async function main() {
     periode.na_deelname === 9 &&
     counts.facturen === 5 &&
     counts.berichten === 6 &&
-    counts.resultaten === 2;
+    counts.resultaten === 2 &&
+    // Euro's, los van de punten hierboven: 750,00 geparkeerd, 250,00 gebruikt.
+    tegoed.beschikbaar === 50000 &&
+    tegoed.bijgeschreven === 75000 &&
+    tegoed.gebruikt === 25000 &&
+    tegoed.bonussen === 1 &&
+    tegoed.open_aanvragen === 1;
 
   await db.close();
 

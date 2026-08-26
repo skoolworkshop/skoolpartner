@@ -20,6 +20,13 @@ import {
   setOrganizationLogo,
 } from "@/lib/organizations/logo";
 import { testIntegration } from "@/lib/integrations/health";
+import {
+  confirmParkingRequest,
+  setParkingStatus,
+  spendCredit,
+} from "@/lib/tegoed/mutations";
+import { getCreditBalanceForAdmin } from "@/lib/tegoed/queries";
+import { checkSpend } from "@/lib/tegoed/regels";
 import { MoneybirdClient } from "@/lib/integrations/moneybird/client";
 import {
   deleteOrganizationPermanently,
@@ -1387,4 +1394,105 @@ export async function verifyOrganizationAction(
   revalidatePath("/admin/organisaties");
   revalidatePath("/admin");
   return { status: "ok", message: "Organisatie gecontroleerd." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* CJP-tegoed                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bevestigt een parkeeraanvraag: het tegoed erbij en de bonuspunten erbij, in
+ * één transactie in de database. Twee keer klikken kan geen kwaad.
+ */
+export async function confirmCjpParkingAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const requestId = String(formData.get("request_id") ?? "");
+  if (!requestId) return { status: "error", message: "Onbekende aanvraag." };
+
+  const result = await confirmParkingRequest({
+    requestId,
+    actorId: session.userId,
+    actorEmail: session.email,
+    note: String(formData.get("note") ?? "").trim() || null,
+  });
+
+  revalidatePath("/admin/cjp-tegoed");
+  revalidatePath("/admin");
+  return result.ok
+    ? { status: "ok", message: result.message }
+    : { status: "error", message: result.message };
+}
+
+/** Zet een aanvraag op In behandeling of Afgewezen. Raakt geen geld en geen punten. */
+export async function setCjpParkingStatusAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const requestId = String(formData.get("request_id") ?? "");
+  const status = String(formData.get("status") ?? "");
+
+  if (!requestId) return { status: "error", message: "Onbekende aanvraag." };
+  if (status !== "in_review" && status !== "rejected") {
+    return { status: "error", message: "Deze status kan hier niet worden gezet." };
+  }
+
+  const note = String(formData.get("note") ?? "").trim() || null;
+  if (status === "rejected" && !note) {
+    return {
+      status: "error",
+      message: "Vul kort in waarom u afwijst. Dat staat later ook bij de aanvraag van de klant.",
+    };
+  }
+
+  const result = await setParkingStatus({
+    requestId,
+    status,
+    actorId: session.userId,
+    actorEmail: session.email,
+    note,
+  });
+
+  revalidatePath("/admin/cjp-tegoed");
+  return result.ok
+    ? { status: "ok", message: result.message }
+    : { status: "error", message: result.message };
+}
+
+/**
+ * Boekt handmatig tegoed af op een boeking.
+ *
+ * Richting Moneybird gaat er niets. Het factuurnummer is alleen een verwijzing
+ * zodat later terug te vinden is waar het bedrag is verrekend.
+ */
+export async function spendCjpCreditAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  if (!organizationId) return { status: "error", message: "Kies eerst een organisatie." };
+
+  const saldo = await getCreditBalanceForAdmin(organizationId);
+  const controle = checkSpend(String(formData.get("amount") ?? ""), saldo.available_cents);
+  if (!controle.ok) return { status: "error", message: controle.message };
+
+  const result = await spendCredit({
+    organizationId,
+    amountCents: controle.cents!,
+    bookingId: String(formData.get("booking_id") ?? "").trim() || null,
+    invoiceNumber: String(formData.get("invoice_number") ?? "").trim() || null,
+    actorId: session.userId,
+    actorEmail: session.email,
+    note: String(formData.get("note") ?? "").trim() || null,
+  });
+
+  revalidatePath("/admin/cjp-tegoed");
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  return result.ok
+    ? { status: "ok", message: result.message }
+    : { status: "error", message: result.message };
 }

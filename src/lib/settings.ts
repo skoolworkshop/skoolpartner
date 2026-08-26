@@ -23,6 +23,13 @@ export const SETTING_DEFAULTS = {
   new_booking_cta_url: "https://skoolworkshop.nl/offerte-aanvraag/",
   new_booking_cta_label: "Nieuwe workshop aanvragen",
   support_email: "boekingen@skoolworkshop.nl",
+  cjp_parking_enabled: true,
+  cjp_bonus_enabled: true,
+  cjp_bonus_points: 1000,
+  cjp_bonus_cooldown_days: 90,
+  cjp_minimum_amount_cents: 5000,
+  /** Leeg betekent: de melding gaat naar support_email. Nooit een persoonlijk adres in de code. */
+  cjp_notify_email: "",
   chat_enabled: true,
   chat_whatsapp_url: "https://wa.me/31850653923",
   chat_label: "Liever even chatten?",

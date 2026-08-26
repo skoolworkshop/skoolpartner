@@ -11,6 +11,11 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { requireAdmin } from "@/lib/auth/session";
 import { getOrganizationDetail } from "@/lib/admin/queries";
+import {
+  getCreditBalanceForAdmin,
+  getCreditTransactionsForAdmin,
+} from "@/lib/tegoed/queries";
+import { CREDIT_TYPE_LABELS } from "@/lib/tegoed/regels";
 import { visibilityLabel } from "@/lib/messaging/visibility";
 import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
@@ -49,7 +54,11 @@ export default async function OrganizationDetailPage({
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
 
-  const settings = await getSettings();
+  const [settings, tegoed, tegoedMutaties] = await Promise.all([
+    getSettings(),
+    getCreditBalanceForAdmin(id),
+    getCreditTransactionsForAdmin(id, 25),
+  ]);
   const members = detail.members as unknown as MemberRow[];
   const mbContacten = detail.moneybirdContacts as unknown as {
     external_id: string;
@@ -250,6 +259,75 @@ export default async function OrganizationDetailPage({
                 </Field>
               </ActionForm>
             </div>
+          </CardBody>
+        </Card>
+
+        {/*
+          CJP-tegoed staat bewust in een eigen kaartje naast SkoolPoints. Het
+          is geld, geen punten, en die twee moeten in het beheer nooit door
+          elkaar gaan lopen.
+        */}
+        <Card>
+          <CardHeader
+            title="CJP-tegoed"
+            description="Een bedrag in euro's dat deze organisatie bij ons heeft geparkeerd. Los van SkoolPoints en zonder vervaldatum."
+            action={
+              <Link href="/admin/cjp-tegoed" className="text-sm underline underline-offset-4">
+                Afboeken
+              </Link>
+            }
+          />
+          <CardBody>
+            <dl className="grid grid-cols-3 gap-4">
+              <div>
+                <dt className="text-sm text-muted">Beschikbaar</dt>
+                <dd className="font-display text-2xl">{formatEuroCents(tegoed.available_cents)}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Geparkeerd</dt>
+                <dd className="font-display text-xl text-muted">
+                  {formatEuroCents(tegoed.added_cents)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Gebruikt</dt>
+                <dd className="font-display text-xl text-muted">
+                  {formatEuroCents(tegoed.spent_cents)}
+                </dd>
+              </div>
+            </dl>
+
+            {tegoedMutaties.length > 0 ? (
+              <ul className="mt-5 divide-y divide-line-soft border-t border-line-soft">
+                {tegoedMutaties.slice(0, 8).map((mutatie) => (
+                  <li key={mutatie.id} className="flex items-start justify-between gap-3 py-2.5">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">
+                        {CREDIT_TYPE_LABELS[mutatie.type] ?? mutatie.type}
+                        {mutatie.bookings ? ` · ${mutatie.bookings.workshop_name}` : ""}
+                      </span>
+                      <span className="block text-sm text-muted">
+                        {formatShortDate(mutatie.occurred_at)}
+                        {mutatie.invoice_number ? ` · factuur ${mutatie.invoice_number}` : ""}
+                        {mutatie.note ? ` · ${mutatie.note}` : ""}
+                      </span>
+                    </span>
+                    <span
+                      className={`shrink-0 font-display text-lg ${
+                        mutatie.amount_cents > 0 ? "text-success" : "text-muted"
+                      }`}
+                    >
+                      {mutatie.amount_cents > 0 ? "+" : "−"}
+                      {formatEuroCents(Math.abs(mutatie.amount_cents))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-5 text-sm text-muted">
+                Deze organisatie heeft nog geen tegoed geparkeerd.
+              </p>
+            )}
           </CardBody>
         </Card>
 

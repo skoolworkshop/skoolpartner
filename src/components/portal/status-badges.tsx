@@ -1,6 +1,7 @@
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import type {
   BookingStatus,
+  CjpParkingStatus,
   InvoiceState,
   LoyaltyTransactionStatus,
   LoyaltyTransactionType,
@@ -65,6 +66,7 @@ const loyaltyTypeLabels: Record<LoyaltyTransactionType, string> = {
   redemption_reserve: "Ingewisseld",
   expiry: "Verlopen",
   reversal: "Teruggedraaid",
+  cjp_bonus: "Bonus bij geparkeerd CJP-tegoed",
 };
 
 export function loyaltyTypeLabel(type: LoyaltyTransactionType): string {
@@ -81,5 +83,21 @@ const redemptionLabels: Record<RedemptionStatus, { label: string; tone: BadgeTon
 
 export function RedemptionStatusBadge({ status }: { status: RedemptionStatus }) {
   const item = redemptionLabels[status] ?? redemptionLabels.requested;
+  return <Badge tone={item.tone}>{item.label}</Badge>;
+}
+
+/**
+ * De status van een aanvraag om CJP-tegoed te parkeren. Bewust dezelfde
+ * kleuren als bij de inwisselverzoeken, zodat het herkenbaar blijft.
+ */
+const parkingLabels: Record<CjpParkingStatus, { label: string; tone: BadgeTone }> = {
+  requested: { label: "Aangevraagd", tone: "warning" },
+  in_review: { label: "In behandeling", tone: "info" },
+  confirmed: { label: "Bevestigd", tone: "success" },
+  rejected: { label: "Afgewezen", tone: "danger" },
+};
+
+export function CjpParkingStatusBadge({ status }: { status: CjpParkingStatus }) {
+  const item = parkingLabels[status] ?? parkingLabels.requested;
   return <Badge tone={item.tone}>{item.label}</Badge>;
 }

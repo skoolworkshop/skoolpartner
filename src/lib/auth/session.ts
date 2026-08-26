@@ -14,6 +14,8 @@ export interface ActiveMembership {
     | "kind"
     | "status"
     | "logo_url"
+    | "cjp_school_number"
+    | "has_cjp"
     | "skoolpartner_enrolled_at"
     | "verified_at"
   >;
@@ -57,7 +59,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
   const { data: memberRows } = await supabase
     .from("organization_members")
     .select(
-      "role, status, organization_id, organizations!inner(id, name, slug, kind, status, logo_url, skoolpartner_enrolled_at, verified_at)"
+      "role, status, organization_id, organizations!inner(id, name, slug, kind, status, logo_url, cjp_school_number, has_cjp, skoolpartner_enrolled_at, verified_at)"
     )
     .eq("user_id", user.id);
 

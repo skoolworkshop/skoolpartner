@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Het gebouwde resultaat van de visuele controle. Broncode staat in
+    // tools/harness en wordt wel gecontroleerd.
+    ".harness/**",
   ]),
 ]);
 

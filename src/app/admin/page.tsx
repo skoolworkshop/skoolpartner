@@ -92,6 +92,12 @@ export default async function AdminHome() {
           href="/admin/berichten?filter=review"
           urgent
         />
+        <Tile
+          label="Open CJP-aanvragen"
+          value={overview.openCjpRequests}
+          href="/admin/cjp-tegoed"
+          urgent
+        />
       </div>
 
       <h2 className="mb-4 mt-8 text-[22px]">Alle klanten</h2>
@@ -105,6 +111,11 @@ export default async function AdminHome() {
           label="Openstaand bedrag"
           value={formatEuroCents(overview.unpaidCents)}
           href="/admin/facturen?filter=unpaid"
+        />
+        <Tile
+          label="Geparkeerd CJP-tegoed"
+          value={formatEuroCents(overview.cjpCreditCents)}
+          href="/admin/cjp-tegoed"
         />
       </div>
     </>

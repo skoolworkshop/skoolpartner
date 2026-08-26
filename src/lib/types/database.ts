@@ -21,7 +21,9 @@ export type InvoiceState =
   | "partially_paid" | "uncollectible" | "reminded" | "unknown";
 export type LoyaltyTransactionType =
   | "earn_workshop" | "earn_review" | "welcome_bonus" | "manual_adjustment"
-  | "redemption_reserve" | "expiry" | "reversal";
+  | "redemption_reserve" | "expiry" | "reversal" | "cjp_bonus";
+export type CjpParkingStatus = "requested" | "in_review" | "confirmed" | "rejected";
+export type CjpCreditType = "parking" | "spend" | "correction" | "refund";
 export type LoyaltyTransactionStatus =
   | "pending" | "available" | "reserved" | "redeemed" | "expired" | "reversed" | "cancelled";
 export type RedemptionStatus = "requested" | "approved" | "rejected" | "applied" | "cancelled";
@@ -475,6 +477,66 @@ export type AppSettingRow = {
   updated_at: string;
 };
 
+/* -------------------------------------------------------------------------- */
+/* CJP-tegoed                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Een aanvraag om CJP-budget te parkeren.
+ *
+ * De velden school_name tot en met holder_phone zijn een momentopname van het
+ * moment van aanvragen. Verandert de contactpersoon later, dan blijft hier
+ * staan wie het destijds was.
+ */
+export type CjpParkingRequestRow = {
+  id: string;
+  organization_id: string;
+  school_name: string;
+  cjp_school_number: string;
+  holder_name: string;
+  holder_email: string;
+  holder_phone: string | null;
+  amount_cents: number;
+  status: CjpParkingStatus;
+  requested_by: string | null;
+  requested_by_email: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  credit_transaction_id: string | null;
+  bonus_transaction_id: string | null;
+  notified_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Het geldgrootboek. Positief is erbij, negatief is eraf. Nooit nul. */
+export type CjpCreditTransactionRow = {
+  id: string;
+  organization_id: string;
+  amount_cents: number;
+  type: CjpCreditType;
+  description: string;
+  request_id: string | null;
+  booking_id: string | null;
+  invoice_number: string | null;
+  external_reference: string | null;
+  created_by: string | null;
+  note: string | null;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Altijd berekend uit het grootboek, nooit uit een losse kolom. */
+export type CjpCreditBalanceRow = {
+  organization_id: string;
+  available_cents: number;
+  added_cents: number;
+  spent_cents: number;
+  last_movement_at: string | null;
+};
+
 export type AuditLogRow = {
   id: string;
   actor_id: string | null;
@@ -582,9 +644,12 @@ export type Database = {
       webhook_events: TableDef<WebhookEventRow>;
       workshop_results: TableDef<WorkshopResultRow>;
       workshop_result_files: TableDef<WorkshopResultFileRow>;
+      cjp_parking_requests: TableDef<CjpParkingRequestRow>;
+      cjp_credit_transactions: TableDef<CjpCreditTransactionRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;
+      cjp_credit_balances: ViewDef<CjpCreditBalanceRow>;
     };
     Functions: {
       request_redemption: {
@@ -606,6 +671,21 @@ export type Database = {
       ensure_loyalty_account: { Args: { p_org: string; p_actor?: string | null }; Returns: string };
       loyalty_available_points: { Args: { p_org: string }; Returns: number };
       is_admin: { Args: { p_user?: string }; Returns: boolean };
+      confirm_cjp_parking: {
+        Args: { p_request: string; p_actor?: string | null; p_note?: string | null };
+        Returns: CjpParkingRequestRow;
+      };
+      spend_cjp_credit: {
+        Args: {
+          p_org: string;
+          p_amount_cents: number;
+          p_booking?: string | null;
+          p_invoice_number?: string | null;
+          p_actor?: string | null;
+          p_note?: string | null;
+        };
+        Returns: CjpCreditTransactionRow;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -4,13 +4,15 @@ import { OrgLogo } from "@/components/portal/org-logo";
 import { PageHeader } from "@/components/portal/page-header";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
 import { checkProfile, missingLabel } from "@/lib/account";
 import { formatPhone } from "@/lib/phone";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatEuroCents } from "@/lib/format";
 import { getEnrolledAt, getOrganizationDetails } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
+import { getCreditBalance } from "@/lib/tegoed/queries";
 import { LeaveOrganizationForm, ProfileForm } from "./account-forms";
 import { OrganisatieGegevens } from "./organisatie-form";
 
@@ -20,9 +22,10 @@ export default async function AccountPage() {
   const session = await requireMember();
   const settings = await getSettings();
 
-  const [enrolledAt, organisatie] = await Promise.all([
+  const [enrolledAt, organisatie, tegoed] = await Promise.all([
     getEnrolledAt(session.activeOrganizationId),
     getOrganizationDetails(session.activeOrganizationId),
+    getCreditBalance(session.activeOrganizationId),
   ]);
 
   // Het inlogadres uit Supabase Auth is leidend, niet het veld in profiles.
@@ -62,6 +65,32 @@ export default async function AccountPage() {
               uw SkoolPartner-account is geactiveerd. Boekingen en facturen van vóór uw deelname
               tellen niet mee.
             </p>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/*
+        Het CJP-tegoed hoort bij het account, want het is geld van de school
+        dat bij ons staat. Wij tonen hier het saldo en de laatste beweging; de
+        volledige historie staat op de tegoedpagina zelf.
+      */}
+      {tegoed.available_cents > 0 || tegoed.added_cents > 0 ? (
+        <Card className="mb-5">
+          <CardBody className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <div>
+              <p className="text-sm text-muted">CJP-tegoed bij Skool Workshop</p>
+              <p className="mt-0.5 font-display text-2xl">
+                {formatEuroCents(tegoed.available_cents)}
+              </p>
+              <p className="text-sm text-muted">
+                Van {formatEuroCents(tegoed.added_cents)} geparkeerd is{" "}
+                {formatEuroCents(tegoed.spent_cents)} gebruikt. Dit is een bedrag in euro&apos;s en
+                staat los van uw {settings.points_name}.
+              </p>
+            </div>
+            <ButtonLink href="/skoolpartner/cjp-tegoed" variant="secondary">
+              Tegoed en historie bekijken
+            </ButtonLink>
           </CardBody>
         </Card>
       ) : null}

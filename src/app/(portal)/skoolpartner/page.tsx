@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Sparkles } from "lucide-react";
+import { PiggyBank, Sparkles } from "lucide-react";
 
 import { PageHeader } from "@/components/portal/page-header";
 import {
@@ -7,7 +7,7 @@ import {
   RedemptionStatusBadge,
 } from "@/components/portal/status-badges";
 import { PartnerCard } from "@/components/skoolpartner/partner-card";
-import { ExternalButtonLink } from "@/components/ui/button";
+import { ButtonLink, ExternalButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
@@ -20,6 +20,7 @@ import {
   getUpcomingBookings,
 } from "@/lib/portal/queries";
 import { getSettings } from "@/lib/settings";
+import { getCreditBalance } from "@/lib/tegoed/queries";
 import { RedeemForm } from "./redeem-form";
 
 export const metadata: Metadata = { title: "SkoolPartner" };
@@ -29,13 +30,15 @@ export default async function SkoolPartnerPage() {
   const settings = await getSettings();
   const organizationId = session.activeOrganizationId;
 
-  const [balance, transactions, redemptions, upcoming] = await Promise.all([
+  const [balance, transactions, redemptions, upcoming, creditBalance] = await Promise.all([
     getLoyaltyBalance(organizationId),
     getLoyaltyTransactions(organizationId),
     getRedemptionRequests(organizationId),
     // Alleen bevestigde workshops in de toekomst. Precies waar de klant zijn
     // punten aan mag koppelen, en waar de database ook op controleert.
     getUpcomingBookings(organizationId, 25),
+    // Euro's, geen punten. Staat hier alleen om het saldo te kunnen tonen.
+    getCreditBalance(organizationId),
   ]);
 
   const organizationName = session.activeMembership.organization.name;
@@ -115,6 +118,31 @@ export default async function SkoolPartnerPage() {
                 </dd>
               </div>
             </dl>
+
+            {/*
+              CJP-tegoed staat bewust in hetzelfde kaartje als de punten, maar
+              wel duidelijk onder een streep. Het hoort bij "wat heb ik
+              openstaan", maar het is geld en geen punten.
+            */}
+            {settings.cjp_parking_enabled || creditBalance.available_cents > 0 ? (
+              <div className="mt-5 border-t border-line-soft pt-5">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-muted">CJP-tegoed bij Skool Workshop</p>
+                    <p className="mt-0.5 font-display text-2xl">
+                      {formatEuroCents(creditBalance.available_cents)}
+                    </p>
+                    <p className="text-sm text-muted">
+                      Een bedrag in euro&apos;s, los van uw {settings.points_name}.
+                    </p>
+                  </div>
+                  <ButtonLink href="/skoolpartner/cjp-tegoed" variant="secondary">
+                    <PiggyBank aria-hidden className="size-4" />
+                    {creditBalance.available_cents > 0 ? "Tegoed bekijken" : "CJP-tegoed parkeren"}
+                  </ButtonLink>
+                </div>
+              </div>
+            ) : null}
           </CardBody>
         </Card>
 
