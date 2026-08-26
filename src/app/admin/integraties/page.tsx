@@ -14,6 +14,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { integrationMode, missingCredentials, publicEnv } from "@/lib/env";
 import { getSyncStates } from "@/lib/integrations/sync-state";
 import { getGmailStatus } from "@/lib/integrations/health";
+import { koppelfout } from "@/lib/integrations/gmail/koppelfouten";
 import { formatDateTime } from "@/lib/format";
 import { runSyncAction, testIntegrationAction } from "../actions";
 import type { IntegrationSyncStateRow } from "@/lib/types/database";
@@ -60,10 +61,22 @@ export default async function AdminIntegrationsPage({
         </Alert>
       ) : null}
       {params.fout ? (
-        <Alert tone="danger" className="mb-5">
-          Koppelen is niet gelukt ({params.fout}). Controleer de Google-credentials en de redirect
-          URI in de Google Cloud Console.
-        </Alert>
+        (() => {
+          const fout = koppelfout(params.fout);
+          return (
+            <Alert tone="danger" title={fout.titel} className="mb-5">
+              <p>{fout.uitleg}</p>
+              {fout.stappen.length > 0 ? (
+                <ol className="mt-2 list-inside list-decimal space-y-1">
+                  {fout.stappen.map((stap) => (
+                    <li key={stap}>{stap}</li>
+                  ))}
+                </ol>
+              ) : null}
+              <p className="mt-2 text-xs opacity-70">Code: {params.fout}</p>
+            </Alert>
+          );
+        })()
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">

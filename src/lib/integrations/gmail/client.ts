@@ -64,23 +64,63 @@ export function createOAuthClient(): OAuth2Client | null {
   return new OAuth2Client({ clientId, clientSecret, redirectUri: redirectUri ?? undefined });
 }
 
-/** Bewaart de refresh token versleuteld. De token verlaat nooit de server. */
+/**
+ * Bewaart de refresh token versleuteld. De token verlaat nooit de server.
+ *
+ * Geeft expliciet terug of het is gelukt. Voorheen werd de uitkomst van de
+ * upsert genegeerd, waardoor een rechtenprobleem op de database zich
+ * voordeed als een geslaagde koppeling: groen vinkje, lege tabel.
+ */
 export async function storeGmailCredentials(params: {
   refreshToken: string;
   accountEmail: string | null;
   scopes: string[];
-}) {
-  const supabase = createServiceSupabase();
-  await supabase.from("integration_credentials").upsert(
+}): Promise<{ ok: boolean; reason?: string; error?: string }> {
+  let payload: string;
+  try {
+    payload = encryptSecret(JSON.stringify({ refresh_token: params.refreshToken }));
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "sleutel-ongeldig",
+      error: error instanceof Error ? error.message : "onbekend",
+    };
+  }
+
+  let supabase: ReturnType<typeof createServiceSupabase>;
+  try {
+    supabase = createServiceSupabase();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "database-sleutel",
+      error: error instanceof Error ? error.message : "onbekend",
+    };
+  }
+
+  const { error } = await supabase.from("integration_credentials").upsert(
     {
       integration: "gmail",
       label: "default",
       account_email: params.accountEmail,
-      encrypted_payload: encryptSecret(JSON.stringify({ refresh_token: params.refreshToken })),
+      encrypted_payload: payload,
       scopes: params.scopes,
     },
     { onConflict: "integration,label" }
   );
+
+  if (error) {
+    // "permission denied" betekent hier bijna altijd dat
+    // SUPABASE_SERVICE_ROLE_KEY niet de echte service role key is.
+    const rechten = /permission denied|row-level security/i.test(error.message);
+    return {
+      ok: false,
+      reason: rechten ? "database-rechten" : "opslaan-mislukt",
+      error: error.message,
+    };
+  }
+
+  return { ok: true };
 }
 
 async function loadRefreshToken(): Promise<string | null> {
