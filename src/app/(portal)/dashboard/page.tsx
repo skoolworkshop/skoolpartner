@@ -9,6 +9,7 @@ import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/stat
 import { PartnerCard } from "@/components/skoolpartner/partner-card";
 import { ExternalButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Alert } from "@/components/ui/feedback";
 import { EmptyState } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
 import {
@@ -76,6 +77,16 @@ export default async function DashboardPage() {
           </ExternalButtonLink>
         }
       />
+
+      {/* Zelf aangemeld en nog niet gekoppeld? Dan verwacht deze klant data die
+          er nog niet is. Dat leggen we uit in plaats van een leeg scherm. */}
+      {session.activeMembership.organization.verified_at === null ? (
+        <Alert tone="info" title="Wij koppelen uw gegevens nog" className="mb-5">
+          Fijn dat u er bent. Uw boekingen, facturen en SkoolPoints verschijnen zodra wij{" "}
+          {organizationName} hebben gekoppeld aan uw dossier. Meestal is dat binnen één werkdag
+          geregeld. U kunt ondertussen gerust rondkijken.
+        </Alert>
+      ) : null}
 
       <DashboardHighlight highlight={highlight} />
 

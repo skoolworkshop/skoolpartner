@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import {
   createOrganization,
+  joinAsFirstMember,
   requestMembership,
   searchOrganizations,
 } from "@/lib/organizations/service";
@@ -94,12 +95,26 @@ export async function requestNewOrganizationAction(
     };
   }
 
-  await requestMembership({
+  // Bestond de organisatie al? Dan is dit iemand die zich bij een bestaande
+  // school aansluit. Dat blijft langs de goedkeuring, want daar hangen wél
+  // gegevens aan.
+  if (created.alreadyExisted) {
+    await requestMembership({
+      userId: session.userId,
+      userEmail: session.email,
+      organizationId: created.organizationId,
+      source: "self_request",
+    });
+    redirect("/wachten");
+  }
+
+  // Een gloednieuwe organisatie: deze persoon is de eerste en er valt nog
+  // niets te beschermen. Dus meteen naar binnen, geen wachtpagina.
+  await joinAsFirstMember({
     userId: session.userId,
     userEmail: session.email,
     organizationId: created.organizationId,
-    source: "self_request",
   });
 
-  redirect("/wachten");
+  redirect("/dashboard");
 }

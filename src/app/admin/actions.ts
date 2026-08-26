@@ -128,6 +128,7 @@ export async function createOrganizationAction(
     city,
     actorId: session.userId,
     actorEmail: session.email,
+    verified: true,
   });
 
   revalidatePath("/admin/organisaties");
@@ -894,4 +895,34 @@ export async function addMemberByEmailAction(
   revalidatePath(`/admin/organisaties/${organizationId}`);
   revalidatePath("/admin/gebruikers");
   return { status: "ok", message: `${profile.email} is toegevoegd als ${role}.` };
+}
+
+/** Markeert een zelf aangemelde organisatie als gecontroleerd. */
+export async function verifyOrganizationAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+
+  const supabase = createServiceSupabase();
+  const { error } = await supabase
+    .from("organizations")
+    .update({ verified_at: new Date().toISOString(), verified_by: session.userId })
+    .eq("id", organizationId);
+
+  if (error) return { status: "error", message: `Bijwerken is niet gelukt: ${error.message}` };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "organization.verified",
+    entityType: "organization",
+    entityId: organizationId,
+    organizationId,
+  });
+
+  revalidatePath("/admin/organisaties");
+  revalidatePath("/admin");
+  return { status: "ok", message: "Organisatie gecontroleerd." };
 }
