@@ -3,11 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Paperclip } from "lucide-react";
 
+import { ActionForm } from "@/components/admin/action-form";
 import { Badge } from "@/components/ui/badge";
+import { setThreadVisibilityAction } from "../../actions";
 import { requireAdmin } from "@/lib/auth/session";
 import { getMessageThreadForAdmin } from "@/lib/admin/queries";
 import { formatDateTime } from "@/lib/format";
-import { visibilityLabel } from "@/lib/messaging/visibility";
+import { isVisibleToCustomer, visibilityLabel } from "@/lib/messaging/visibility";
 import type { ThreadVisibility } from "@/lib/types/database";
 import { cn } from "@/lib/utils";
 
@@ -116,11 +118,37 @@ export default async function AdminThreadPage({ params }: { params: Promise<{ id
         ) : null}
       </div>
 
-      <p className="mt-6">
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-card border border-line-soft bg-white px-5 py-4">
         <Badge tone={visibilityLabel(thread.visibility).tone}>
           {visibilityLabel(thread.visibility).long}
         </Badge>
-      </p>
+
+        {isVisibleToCustomer(thread.visibility) ? (
+          <ActionForm
+            action={setThreadVisibilityAction}
+            submitLabel="Verbergen voor de klant"
+            variant="secondary"
+            inline
+          >
+            <input type="hidden" name="thread_id" value={thread.id} />
+            <input type="hidden" name="visibility" value="blocked" />
+          </ActionForm>
+        ) : (
+          <ActionForm
+            action={setThreadVisibilityAction}
+            submitLabel="Vrijgeven voor de klant"
+            inline
+          >
+            <input type="hidden" name="thread_id" value={thread.id} />
+            <input type="hidden" name="visibility" value="manual_allowed" />
+          </ActionForm>
+        )}
+
+        <p className="w-full text-sm text-muted">
+          Bij twijfel niet vrijgeven. Een gesprek wordt alleen automatisch zichtbaar als er precies
+          één geverifieerde contactpersoon van één organisatie in zit.
+        </p>
+      </div>
     </>
   );
 }

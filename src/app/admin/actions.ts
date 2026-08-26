@@ -19,6 +19,8 @@ import {
   fetchOrganizationLogo,
   setOrganizationLogo,
 } from "@/lib/organizations/logo";
+import { testIntegration } from "@/lib/integrations/health";
+import { MoneybirdClient } from "@/lib/integrations/moneybird/client";
 import {
   deleteOrganizationPermanently,
   deleteUserPermanently,
@@ -252,6 +254,272 @@ export async function fetchOrganizationLogoAction(
   return result.ok
     ? { status: "ok", message: `Logo gevonden via ${result.bron}.` }
     : { status: "error", message: result.message ?? "Er is geen logo gevonden." };
+}
+
+/**
+ * Verbinding testen. Uitsluitend lezen: er wordt niets aangemaakt, gewijzigd,
+ * verstuurd of verwijderd in Moneybird of Gmail.
+ */
+export async function testIntegrationAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const naam = String(formData.get("integration") ?? "");
+
+  if (naam !== "moneybird" && naam !== "gmail" && naam !== "hubspot") {
+    return { status: "error", message: "Onbekende integratie." };
+  }
+
+  const uitkomst = await testIntegration(naam);
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "integration.tested",
+    entityType: "integration",
+    entityId: naam,
+    after: { geslaagd: uitkomst.ok, samenvatting: uitkomst.summary },
+  });
+
+  const regels = uitkomst.details.length > 0 ? ` ${uitkomst.details.join(" ")}` : "";
+
+  return uitkomst.ok
+    ? { status: "ok", message: `${uitkomst.summary}${regels}` }
+    : { status: "error", message: `${uitkomst.summary}${regels}` };
+}
+
+/**
+ * Koppelt een Moneybird-contact aan een organisatie.
+ *
+ * Dit is de betrouwbare koppeling: het Moneybird-contact-ID verandert niet,
+ * een bedrijfsnaam wel. Zonder deze koppeling komt een factuur in de
+ * beheeromgeving terecht als "nog niet gekoppeld" en ziet de klant hem niet.
+ *
+ * Je mag hier ook een zoekterm invullen. Wij zoeken dan in Moneybird, puur
+ * lezend, en koppelen alleen bij precies één treffer. Bij meerdere treffers
+ * krijg je de lijst terug zodat je zelf het juiste ID kiest.
+ */
+export async function linkMoneybirdContactAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  const invoer = String(formData.get("moneybird_contact") ?? "").trim();
+
+  if (!organizationId) return { status: "error", message: "Onbekende organisatie." };
+  if (!invoer) return { status: "error", message: "Vul een contact-ID of een zoekterm in." };
+
+  const client = MoneybirdClient.fromEnv();
+  if (!client) {
+    return {
+      status: "error",
+      message: "Moneybird draait in testmodus. Stel eerst de credentials in.",
+    };
+  }
+
+  try {
+    let contact = null;
+
+    if (/^\d+$/.test(invoer)) {
+      contact = await client.getContact(invoer);
+    } else {
+      const treffers = await client.listContacts({ query: invoer });
+      if (treffers.length === 0) {
+        return { status: "error", message: `Geen Moneybird-contact gevonden voor "${invoer}".` };
+      }
+      if (treffers.length > 1) {
+        const lijst = treffers
+          .slice(0, 8)
+          .map((c) => `${c.company_name ?? `${c.firstname ?? ""} ${c.lastname ?? ""}`.trim()} (${c.id})`)
+          .join(", ");
+        return {
+          status: "error",
+          message: `Meerdere contacten gevonden. Vul het juiste ID in: ${lijst}`,
+        };
+      }
+      contact = treffers[0];
+    }
+
+    if (!contact?.id) {
+      return { status: "error", message: "Dit contact bestaat niet in Moneybird." };
+    }
+
+    const naam =
+      contact.company_name ??
+      (`${contact.firstname ?? ""} ${contact.lastname ?? ""}`.trim() || null);
+
+    const supabase = createServiceSupabase();
+
+    // Hangt dit contact al aan een ANDERE organisatie? Dan niet stilzwijgend
+    // verplaatsen: dan zouden facturen van de ene klant bij de andere komen.
+    const { data: bestaand } = await supabase
+      .from("external_record_mappings")
+      .select("internal_id")
+      .eq("system", "moneybird")
+      .eq("entity_type", "contact")
+      .eq("external_id", contact.id)
+      .maybeSingle();
+
+    if (bestaand && bestaand.internal_id !== organizationId) {
+      const { data: andere } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", bestaand.internal_id)
+        .maybeSingle();
+
+      return {
+        status: "error",
+        message: `Dit Moneybird-contact hangt al aan ${andere?.name ?? "een andere organisatie"}. Haal die koppeling daar eerst weg.`,
+      };
+    }
+
+    const { error } = await supabase.from("external_record_mappings").upsert(
+      {
+        system: "moneybird",
+        entity_type: "contact",
+        internal_table: "organizations",
+        internal_id: organizationId,
+        external_id: contact.id,
+        external_label: naam,
+        created_by: session.userId,
+      },
+      { onConflict: "system,entity_type,external_id" }
+    );
+
+    if (error) return { status: "error", message: `Koppelen is niet gelukt: ${error.message}` };
+
+    await recordAudit({
+      actorId: session.userId,
+      actorEmail: session.email,
+      action: "moneybird_contact.linked",
+      entityType: "organization",
+      entityId: organizationId,
+      organizationId,
+      after: { moneybird_contact_id: contact.id, naam },
+    });
+
+    revalidatePath(`/admin/organisaties/${organizationId}`);
+    return {
+      status: "ok",
+      message: `Gekoppeld aan ${naam ?? "contact"} (${contact.id}). Draai een synchronisatie om de facturen op te halen.`,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: `Moneybird gaf een fout: ${error instanceof Error ? error.message.slice(0, 160) : "onbekend"}`,
+    };
+  }
+}
+
+export async function unlinkMoneybirdContactAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const organizationId = String(formData.get("organization_id") ?? "");
+  const externalId = String(formData.get("external_id") ?? "");
+
+  const supabase = createServiceSupabase();
+  const { error } = await supabase
+    .from("external_record_mappings")
+    .delete()
+    .eq("system", "moneybird")
+    .eq("entity_type", "contact")
+    .eq("external_id", externalId)
+    .eq("internal_id", organizationId);
+
+  if (error) return { status: "error", message: "Ontkoppelen is niet gelukt." };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "moneybird_contact.unlinked",
+    entityType: "organization",
+    entityId: organizationId,
+    organizationId,
+    before: { moneybird_contact_id: externalId },
+  });
+
+  revalidatePath(`/admin/organisaties/${organizationId}`);
+  return { status: "ok", message: "Koppeling verwijderd. Bestaande facturen blijven staan." };
+}
+
+/**
+ * Zichtbaarheid van een e-mailgesprek voor de klant.
+ *
+ * Standaard is de regel streng: alleen gesprekken met precies één geverifieerde
+ * contactpersoon worden automatisch zichtbaar. Alles daarbuiten blijft staan op
+ * "controle nodig" en is voor de klant onzichtbaar. Hiermee kan een beheerder
+ * zo'n gesprek alsnog vrijgeven, of juist definitief verbergen.
+ */
+export async function setThreadVisibilityAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const threadId = String(formData.get("thread_id") ?? "");
+  const keuze = String(formData.get("visibility") ?? "");
+
+  if (keuze !== "manual_allowed" && keuze !== "blocked") {
+    return { status: "error", message: "Onbekende keuze." };
+  }
+
+  const supabase = createServiceSupabase();
+  const { data: thread } = await supabase
+    .from("message_threads")
+    .select("id, organization_id, visibility, subject")
+    .eq("id", threadId)
+    .maybeSingle();
+
+  if (!thread) return { status: "error", message: "Gesprek niet gevonden." };
+
+  // Vrijgeven kan alleen als duidelijk is bij welke organisatie het hoort.
+  // Anders zou een gesprek bij de verkeerde klant terecht kunnen komen.
+  if (keuze === "manual_allowed" && !thread.organization_id) {
+    return {
+      status: "error",
+      message:
+        "Dit gesprek hangt nog aan geen enkele organisatie. Koppel eerst de contactpersoon, anders weten wij niet wie het mag zien.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("message_threads")
+    .update({
+      visibility: keuze,
+      visibility_reason:
+        keuze === "manual_allowed"
+          ? `Handmatig vrijgegeven door ${session.email}`
+          : `Handmatig verborgen door ${session.email}`,
+      allowlisted_by: session.userId,
+      allowlisted_at: new Date().toISOString(),
+    })
+    .eq("id", threadId);
+
+  if (error) return { status: "error", message: "Wijzigen is niet gelukt." };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: keuze === "manual_allowed" ? "message_thread.released" : "message_thread.blocked",
+    entityType: "message_thread",
+    entityId: threadId,
+    organizationId: thread.organization_id,
+    before: { visibility: thread.visibility },
+    after: { visibility: keuze, onderwerp: thread.subject },
+  });
+
+  revalidatePath("/admin/berichten");
+  revalidatePath(`/admin/berichten/${threadId}`);
+  return {
+    status: "ok",
+    message:
+      keuze === "manual_allowed"
+        ? "Gesprek is nu zichtbaar voor deze klant."
+        : "Gesprek is verborgen voor de klant.",
+  };
 }
 
 export async function uploadOrganizationLogoAction(

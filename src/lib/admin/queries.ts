@@ -111,8 +111,17 @@ export async function listOrganizations(query?: string) {
 export async function getOrganizationDetail(id: string) {
   const supabase = createServiceSupabase();
 
-  const [organization, members, domains, contacts, balance, bookings, invoices, threads] =
-    await Promise.all([
+  const [
+    organization,
+    members,
+    domains,
+    contacts,
+    balance,
+    bookings,
+    invoices,
+    threads,
+    moneybirdContacts,
+  ] = await Promise.all([
     supabase.from("organizations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("organization_members")
@@ -140,6 +149,15 @@ export async function getOrganizationDetail(id: string) {
       .eq("organization_id", id)
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(25),
+    // De koppeling met Moneybird. Hierop bepalen wij bij welke klant een
+    // factuur hoort, dus die moet zichtbaar zijn.
+    supabase
+      .from("external_record_mappings")
+      .select("external_id, external_label, created_at")
+      .eq("system", "moneybird")
+      .eq("entity_type", "contact")
+      .eq("internal_id", id)
+      .order("created_at"),
   ]);
 
   if (!organization.data) return null;
@@ -153,6 +171,7 @@ export async function getOrganizationDetail(id: string) {
     bookings: bookings.data ?? [],
     invoices: invoices.data ?? [],
     threads: threads.data ?? [],
+    moneybirdContacts: moneybirdContacts.data ?? [],
   };
 }
 

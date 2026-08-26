@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { safeErrorResponse } from "@/lib/api/guards";
-import { safeEqual } from "@/lib/crypto";
+import { safeEqual, verifyMoneybirdSignature } from "@/lib/crypto";
 import { serverEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { MoneybirdClient } from "@/lib/integrations/moneybird/client";
@@ -24,13 +24,25 @@ interface MoneybirdWebhookPayload {
 /**
  * Ontvangt Moneybird-webhooks.
  *
- * Beveiliging: de webhook_token uit de payload moet overeenkomen met
- * MONEYBIRD_WEBHOOK_TOKEN. Idempotency: elk event wordt één keer verwerkt,
- * afgedwongen met een unieke index op (provider, external_event_id).
+ * Beveiliging, twee lagen:
+ *
+ *   1. De webhook_token uit de payload moet overeenkomen met
+ *      MONEYBIRD_WEBHOOK_TOKEN. Die token krijg je van Moneybird bij het
+ *      aanmaken van de webhook.
+ *   2. Staat MONEYBIRD_WEBHOOK_SECRET ingevuld, dan controleren wij daarbovenop
+ *      de Moneybird-Signature. Dat is de sterkere controle, want die bewijst
+ *      ook dat de inhoud onderweg niet is aangepast. Ontbreekt het secret, dan
+ *      blijft laag 1 gewoon werken.
+ *
+ * Idempotency: elk event wordt één keer verwerkt, afgedwongen met een unieke
+ * index op (provider, external_event_id).
  */
 export async function POST(request: NextRequest) {
   try {
-    const payload = (await request.json()) as MoneybirdWebhookPayload;
+    // Byte voor byte zoals hij binnenkwam. Opnieuw omzetten naar JSON zou de
+    // handtekening kapotmaken.
+    const rawBody = await request.text();
+    const payload = JSON.parse(rawBody) as MoneybirdWebhookPayload;
 
     if (!serverEnv.moneybird.webhookToken) {
       return NextResponse.json(
@@ -40,6 +52,20 @@ export async function POST(request: NextRequest) {
     }
     if (!safeEqual(payload.webhook_token ?? null, serverEnv.moneybird.webhookToken)) {
       return NextResponse.json({ ok: false, error: "Niet geautoriseerd" }, { status: 401 });
+    }
+
+    if (serverEnv.moneybird.webhookSecret) {
+      const geldig = verifyMoneybirdSignature({
+        header: request.headers.get("moneybird-signature"),
+        rawBody,
+        secret: serverEnv.moneybird.webhookSecret,
+      });
+      if (!geldig) {
+        return NextResponse.json(
+          { ok: false, error: "Handtekening klopt niet" },
+          { status: 401 }
+        );
+      }
     }
 
     const idempotencyKey =

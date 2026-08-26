@@ -43,7 +43,14 @@ export const serverEnv = {
   moneybird: {
     apiToken: optional("MONEYBIRD_API_TOKEN"),
     administrationId: optional("MONEYBIRD_ADMINISTRATION_ID"),
+    /** Komt uit de aanmaakrespons van de webhook, veld "token". */
     webhookToken: optional("MONEYBIRD_WEBHOOK_TOKEN"),
+    /**
+     * Optioneel. Veld "secret" uit diezelfde respons. Is dit gevuld, dan
+     * controleren wij bovenop de token ook de Moneybird-Signature van elke
+     * webhook. Ontbreekt het, dan blijft de tokencontrole gewoon werken.
+     */
+    webhookSecret: optional("MONEYBIRD_WEBHOOK_SECRET"),
   },
 
   google: {

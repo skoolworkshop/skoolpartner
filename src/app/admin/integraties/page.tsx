@@ -8,8 +8,9 @@ import { Alert } from "@/components/ui/feedback";
 import { requireAdmin } from "@/lib/auth/session";
 import { integrationMode, missingCredentials, publicEnv } from "@/lib/env";
 import { getSyncStates } from "@/lib/integrations/sync-state";
+import { isGmailConnected } from "@/lib/integrations/health";
 import { formatDateTime } from "@/lib/format";
-import { runSyncAction } from "../actions";
+import { runSyncAction, testIntegrationAction } from "../actions";
 import type { IntegrationSyncStateRow } from "@/lib/types/database";
 
 export const metadata: Metadata = { title: "Integraties" };
@@ -39,7 +40,10 @@ export default async function AdminIntegrationsPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const states = (await getSyncStates()) as IntegrationSyncStateRow[];
+  const [states, gmail] = await Promise.all([
+    getSyncStates() as Promise<IntegrationSyncStateRow[]>,
+    isGmailConnected(),
+  ]);
 
   return (
     <>
@@ -63,16 +67,19 @@ export default async function AdminIntegrationsPage({
           const missing = missingCredentials(name);
           const state = states.find((s) => s.integration === name);
 
+          // Gmail is pas echt verbonden als er ook een token klaarstaat.
+          // Voor de andere koppelingen is het hebben van credentials genoeg,
+          // want die werken met een vast token uit de omgeving.
+          const verbonden = name === "gmail" ? gmail.connected : mode === "live";
+          const label = mode === "mock" ? "Testmodus" : verbonden ? "Verbonden" : "Niet verbonden";
+          const toon = mode === "mock" ? "warning" : verbonden ? "success" : "danger";
+
           return (
             <Card key={name}>
               <CardHeader
                 title={LABELS[name].title}
                 description={LABELS[name].description}
-                action={
-                  <Badge tone={mode === "live" ? "success" : "warning"}>
-                    {mode === "live" ? "Live" : "Testmodus"}
-                  </Badge>
-                }
+                action={<Badge tone={toon}>{label}</Badge>}
               />
               <CardBody className="space-y-4">
                 <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -81,9 +88,17 @@ export default async function AdminIntegrationsPage({
                     <dd className="font-medium">{state?.status ?? "onbekend"}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Laatste succes</dt>
+                    <dt className="text-muted">Laatst gesynchroniseerd</dt>
                     <dd className="font-medium">{formatDateTime(state?.last_success_at)}</dd>
                   </div>
+                  {name === "gmail" && gmail.connected ? (
+                    <div className="col-span-2">
+                      <dt className="text-muted">Gekoppelde mailbox</dt>
+                      <dd className="font-medium break-all">
+                        {gmail.accountEmail ?? "onbekend"}
+                      </dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt className="text-muted">Verwerkt</dt>
                     <dd className="font-medium">{state?.items_processed ?? 0}</dd>
@@ -111,16 +126,30 @@ export default async function AdminIntegrationsPage({
                 ) : null}
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <ActionForm action={runSyncAction} submitLabel="Nu synchroniseren" inline>
+                  <ActionForm action={testIntegrationAction} submitLabel="Verbinding testen" inline>
+                    <input type="hidden" name="integration" value={name} />
+                  </ActionForm>
+
+                  <ActionForm
+                    action={runSyncAction}
+                    submitLabel="Nu synchroniseren"
+                    variant="secondary"
+                    inline
+                  >
                     <input type="hidden" name="integration" value={name} />
                   </ActionForm>
 
                   {name === "gmail" ? (
                     <ButtonLink href="/api/integrations/google/start" variant="secondary" size="sm">
-                      Gmail koppelen via Google
+                      {gmail.connected ? "Opnieuw koppelen" : "Gmail koppelen"}
                     </ButtonLink>
                   ) : null}
                 </div>
+
+                <p className="text-xs text-muted">
+                  Een verbindingstest leest alleen. Er wordt nooit iets aangemaakt, gewijzigd of
+                  verstuurd.
+                </p>
 
                 {name === "gmail" ? (
                   <p className="text-xs text-muted">

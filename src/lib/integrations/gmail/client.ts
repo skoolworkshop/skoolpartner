@@ -129,6 +129,19 @@ export class GmailClient {
     });
   }
 
+  /**
+   * Het profiel van de gekoppelde mailbox. Alleen lezen, en meteen het bewijs
+   * dat de refresh token nog werkt: zonder geldige token komen wij hier niet.
+   */
+  async getProfile() {
+    return this.request<{
+      emailAddress: string;
+      messagesTotal: number;
+      threadsTotal: number;
+      historyId: string;
+    }>("/profile");
+  }
+
   async listLabels() {
     return this.request<{ labels: { id: string; name: string }[] }>("/labels");
   }

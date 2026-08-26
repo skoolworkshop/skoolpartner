@@ -22,6 +22,8 @@ import {
   fetchOrganizationLogoAction,
   setCjpNumberAction,
   uploadOrganizationLogoAction,
+  linkMoneybirdContactAction,
+  unlinkMoneybirdContactAction,
   addOrganizationDomainAction,
   deleteOrganizationAction,
   inviteMemberAction,
@@ -49,6 +51,10 @@ export default async function OrganizationDetailPage({
 
   const settings = await getSettings();
   const members = detail.members as unknown as MemberRow[];
+  const mbContacten = detail.moneybirdContacts as unknown as {
+    external_id: string;
+    external_label: string | null;
+  }[];
   const balance = detail.balance;
 
   return (
@@ -389,6 +395,56 @@ export default async function OrganizationDetailPage({
               <li className="px-5 py-4 text-sm text-muted">Nog geen facturen.</li>
             ) : null}
           </ul>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Moneybird"
+            description="Bepaalt bij welke klant een factuur terechtkomt. Wij koppelen op het Moneybird-contact-ID, want dat verandert niet; een bedrijfsnaam wel."
+          />
+          {mbContacten.length > 0 ? (
+            <ul className="divide-y divide-line-soft">
+              {mbContacten.map((rij) => (
+                <li
+                  key={rij.external_id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {rij.external_label ?? "Moneybird-contact"}
+                    </span>
+                    <span className="block font-mono text-sm text-muted">{rij.external_id}</span>
+                  </span>
+                  <ActionForm
+                    action={unlinkMoneybirdContactAction}
+                    submitLabel="Ontkoppelen"
+                    variant="secondary"
+                    inline
+                  >
+                    <input type="hidden" name="organization_id" value={detail.organization.id} />
+                    <input type="hidden" name="external_id" value={rij.external_id} />
+                  </ActionForm>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-5 py-4 text-sm text-muted">
+              Nog geen Moneybird-contact gekoppeld. Facturen van deze klant komen daardoor binnen
+              als &quot;nog niet gekoppeld&quot; en zijn niet zichtbaar voor de klant zelf.
+            </p>
+          )}
+          <CardBody className="border-t border-line-soft">
+            <ActionForm action={linkMoneybirdContactAction} submitLabel="Koppelen">
+              <input type="hidden" name="organization_id" value={detail.organization.id} />
+              <Field
+                label="Moneybird-contact"
+                htmlFor="mb-contact"
+                hint="Vul het contact-ID in, of zoek op naam. Bij meerdere treffers krijgt u de lijst terug."
+              >
+                <Input id="mb-contact" name="moneybird_contact" placeholder="De Goudse Waarden" />
+              </Field>
+            </ActionForm>
+          </CardBody>
         </Card>
 
         <Card>

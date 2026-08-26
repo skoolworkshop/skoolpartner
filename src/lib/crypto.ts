@@ -56,6 +56,52 @@ export function generateToken(bytes = 32): string {
 }
 
 /** Timing-safe vergelijking voor webhook- en cron-secrets. */
+/**
+ * Controleert de Moneybird-Signature van een webhook.
+ *
+ * De header ziet eruit als "t=1748534400,v1=<hex>". Moneybird tekent de string
+ * "<t>.<ruwe body>" met HMAC-SHA256 en het secret van die webhook. De body moet
+ * daarbij byte voor byte zijn zoals hij binnenkwam: opnieuw omzetten naar JSON
+ * verandert de inhoud en dan klopt de handtekening niet meer.
+ *
+ * Een handtekening ouder dan vijf minuten wijzen wij af, zodat een onderschept
+ * verzoek niet later opnieuw gebruikt kan worden.
+ */
+export function verifyMoneybirdSignature(params: {
+  header: string | null;
+  rawBody: string;
+  secret: string;
+  toleranceSeconds?: number;
+  nowSeconds?: number;
+}): boolean {
+  if (!params.header) return false;
+
+  const onderdelen = new Map<string, string[]>();
+  for (const deel of params.header.split(",")) {
+    const [sleutel, waarde] = deel.trim().split("=");
+    if (!sleutel || !waarde) continue;
+    onderdelen.set(sleutel, [...(onderdelen.get(sleutel) ?? []), waarde]);
+  }
+
+  const tijdstempel = onderdelen.get("t")?.[0];
+  const handtekeningen = onderdelen.get("v1") ?? [];
+  if (!tijdstempel || handtekeningen.length === 0) return false;
+
+  const t = Number.parseInt(tijdstempel, 10);
+  if (!Number.isFinite(t)) return false;
+
+  const nu = params.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const marge = params.toleranceSeconds ?? 300;
+  if (Math.abs(nu - t) > marge) return false;
+
+  const verwacht = crypto
+    .createHmac("sha256", params.secret)
+    .update(`${t}.${params.rawBody}`)
+    .digest("hex");
+
+  return handtekeningen.some((waarde) => safeEqual(verwacht, waarde));
+}
+
 export function safeEqual(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
   const bufA = Buffer.from(a);

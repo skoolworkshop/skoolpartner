@@ -46,6 +46,15 @@ export interface MoneybirdContact {
   send_invoices_to_email: string | null;
 }
 
+export interface MoneybirdAdministration {
+  id: string;
+  name: string | null;
+  language: string | null;
+  currency: string | null;
+  country: string | null;
+  time_zone: string | null;
+}
+
 export class MoneybirdError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -96,6 +105,30 @@ export class MoneybirdClient {
       }
       return (await response.json()) as T;
     });
+  }
+
+  /**
+   * De administraties waar dit token bij mag.
+   *
+   * Dit is het enige eindpunt buiten een administratie om, dus het is de
+   * nette manier om te controleren of het token überhaupt geldig is én of het
+   * ingestelde administratie-ID daadwerkelijk bereikbaar is. Puur lezen.
+   */
+  static async listAdministrations(token: string): Promise<MoneybirdAdministration[]> {
+    const response = await fetch(`${BASE_URL}/administrations.json`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new MoneybirdError(
+        `Moneybird ${response.status}: ${body.slice(0, 200)}`,
+        response.status
+      );
+    }
+
+    return (await response.json()) as MoneybirdAdministration[];
   }
 
   /** Verkoopfacturen sinds een bepaald moment. Standaard gepagineerd per 100. */
