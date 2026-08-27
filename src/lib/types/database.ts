@@ -514,6 +514,7 @@ export type CjpParkingRequestRow = {
   holder_email: string;
   holder_phone: string | null;
   amount_cents: number;
+  school_year: string;
   status: CjpParkingStatus;
   requested_by: string | null;
   requested_by_email: string | null;
@@ -532,6 +533,7 @@ export type CjpCreditTransactionRow = {
   id: string;
   organization_id: string;
   amount_cents: number;
+  school_year: string;
   type: CjpCreditType;
   description: string;
   request_id: string | null;

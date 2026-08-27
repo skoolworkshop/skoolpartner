@@ -5,7 +5,6 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 import { getSettingsWithServiceRole } from "@/lib/settings";
 import { awardPointsForBooking } from "@/lib/loyalty/ledger";
 import { parseConfirmationEmail, type ParserInput, type ParseResult } from "./parser";
-import { emailDomain } from "@/lib/utils";
 import type { Json } from "@/lib/types/database";
 
 export interface IngestOutcome {
@@ -27,13 +26,17 @@ interface OrganizationResolution {
  *
  * Volgorde van betrouwbaarheid:
  *  1. geverifieerde contactpersoon (exact e-mailadres)
- *  2. geverifieerd organisatiedomein, mits uniek en niet publiek
+ *  2. exacte schoolnaam én een passend adres/plaats
  *  3. exacte organisatienaam (alleen als suggestie, nooit als zekerheid)
+ *
+ * Een e-maildomein is bewust nooit voldoende: verschillende locaties van
+ * dezelfde scholengroep mogen niet worden samengevoegd.
  */
 export async function resolveOrganization(params: {
   contactEmail: string | null;
   recipientEmails: string[];
   organizationName: string | null;
+  location: string | null;
 }): Promise<OrganizationResolution> {
   const supabase = createServiceSupabase();
   const reasons: string[] = [];
@@ -59,44 +62,26 @@ export async function resolveOrganization(params: {
     }
   }
 
-  const domains = Array.from(
-    new Set(candidateEmails.map((email) => emailDomain(email)).filter(Boolean) as string[])
-  );
-
-  for (const domain of domains) {
-    const { data: isPublic } = await supabase
-      .from("public_email_domains")
-      .select("domain")
-      .eq("domain", domain)
-      .maybeSingle();
-    if (isPublic) continue;
-
-    const { data: matches } = await supabase
-      .from("organization_domains")
-      .select("organization_id")
-      .eq("domain", domain)
-      .eq("is_verified", true);
-
-    if (matches && matches.length === 1) {
-      return {
-        organizationId: matches[0].organization_id,
-        certain: true,
-        reasons: [],
-        method: `verified_domain:${domain}`,
-      };
-    }
-    if (matches && matches.length > 1) {
-      reasons.push(`Domein ${domain} hoort bij meerdere organisaties`);
-    }
-  }
-
   if (params.organizationName) {
     const { data: byName } = await supabase
       .from("organizations")
-      .select("id")
+      .select("id, name, address_line, street, house_number, postal_code, city")
       .ilike("name", params.organizationName.trim())
       .eq("status", "active")
-      .limit(2);
+      .limit(10);
+
+    const sterkeMatches = (byName ?? []).filter((organization) =>
+      organizationLocationMatches(params.location, organization)
+    );
+    if (sterkeMatches.length === 1) {
+      return {
+        organizationId: sterkeMatches[0].id,
+        certain: true,
+        reasons: [],
+        method: "name_and_location_match",
+      };
+    }
+    if (sterkeMatches.length > 1) reasons.push("Schoolnaam en locatie horen bij meerdere organisaties");
 
     if (byName && byName.length === 1) {
       reasons.push("Organisatie alleen op naam herkend, dit vraagt bevestiging");
@@ -111,6 +96,36 @@ export async function resolveOrganization(params: {
 
   reasons.push("Organisatie kon niet worden bepaald");
   return { organizationId: null, certain: false, reasons, method: "none" };
+}
+
+function normaliseerVergelijking(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function organizationLocationMatches(
+  location: string | null,
+  organization: {
+    address_line: string | null; street: string | null; house_number: string | null;
+    postal_code: string | null; city: string | null;
+  }
+): boolean {
+  const gezocht = normaliseerVergelijking(location);
+  if (gezocht.length < 3) return false;
+  const adres = normaliseerVergelijking([
+    organization.address_line,
+    organization.street,
+    organization.house_number,
+    organization.postal_code,
+    organization.city,
+  ].filter(Boolean).join(" "));
+  const plaats = normaliseerVergelijking(organization.city);
+  return Boolean(adres && (adres.includes(gezocht) || gezocht.includes(adres))) ||
+    Boolean(plaats.length >= 3 && gezocht.includes(plaats));
 }
 
 /**
@@ -149,6 +164,7 @@ export async function ingestConfirmationEmail(input: ParserInput): Promise<Inges
     contactEmail: parsed.extracted.contactEmail,
     recipientEmails: [...(input.to ?? []), ...(input.cc ?? [])],
     organizationName: parsed.extracted.organizationName,
+    location: parsed.extracted.location,
   });
 
   const reviewReasons = [...parsed.reviewReasons, ...resolution.reasons];
@@ -220,6 +236,19 @@ export async function ingestConfirmationEmail(input: ParserInput): Promise<Inges
     // De bevestigingsmail is het moment waarop de boeking tot stand kwam.
     bookedAt: input.receivedAt ?? new Date().toISOString(),
   });
+
+  if (resolution.method === "name_and_location_match" && parsed.extracted.contactEmail) {
+    await supabase.from("organization_contacts").upsert(
+      {
+        organization_id: resolution.organizationId!,
+        email: parsed.extracted.contactEmail.toLowerCase(),
+        full_name: parsed.extracted.contactName,
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,email" }
+    );
+  }
 
   await supabase
     .from("booking_sources")

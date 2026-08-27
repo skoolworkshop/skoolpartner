@@ -89,6 +89,7 @@ export async function createParkingRequest(params: {
       holder_email: params.snapshot.holderEmail,
       holder_phone: params.snapshot.holderPhone,
       amount_cents: params.snapshot.amountCents,
+      school_year: schoolYear(),
       status: "requested",
       requested_by: params.userId,
       requested_by_email: params.userEmail,
@@ -98,7 +99,12 @@ export async function createParkingRequest(params: {
 
   if (error || !request) {
     console.error("[cjp] aanvraag kon niet worden opgeslagen", error?.message);
-    return { ok: false, message: "Uw aanvraag kon niet worden opgeslagen. Probeer het opnieuw." };
+    return {
+      ok: false,
+      message: error?.message?.includes("permission denied")
+        ? "De database mist schrijfrechten voor CJP-aanvragen. Voer de nieuwste Supabase-migratie uit en probeer opnieuw."
+        : `Uw aanvraag kon niet worden opgeslagen${error?.message ? `: ${error.message}` : ". Probeer het opnieuw."}`,
+    };
   }
 
   const row = request as CjpParkingRequestRow;
@@ -148,6 +154,11 @@ export async function createParkingRequest(params: {
     request: row,
     notice: melding.sent ? undefined : melding.reason,
   };
+}
+
+function schoolYear(date = new Date()): string {
+  const year = date.getFullYear();
+  return date.getMonth() >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
 }
 
 /* -------------------------------------------------------------------------- */

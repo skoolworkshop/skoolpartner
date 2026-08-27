@@ -133,7 +133,7 @@ export function matchInvoiceToBooking(
     );
     if (durationHit) {
       score += 0.2;
-      reasons.push("Aantal workshops en duur komen overeen");
+      reasons.push("Aantal rondes en duur komen overeen");
     }
 
     // 4. Factuurdatum ligt dicht bij de workshopdatum.

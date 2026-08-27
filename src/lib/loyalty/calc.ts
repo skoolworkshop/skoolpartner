@@ -79,7 +79,7 @@ export function calculateBookingPoints(
   const minutes = Math.trunc(input.minutesPerWorkshop);
 
   if (!Number.isFinite(count) || count < 1) {
-    warnings.push("Aantal workshops is niet vastgesteld");
+    warnings.push("Aantal rondes is niet vastgesteld");
   }
   if (!Number.isFinite(minutes) || minutes < 1) {
     warnings.push("Workshopduur is niet vastgesteld");
@@ -98,7 +98,7 @@ export function calculateBookingPoints(
     warnings.push(`Workshopduur van ${safeMinutes} minuten is ongebruikelijk lang`);
   }
   if (safeCount > 20) {
-    warnings.push(`Aantal workshops (${safeCount}) is ongebruikelijk hoog`);
+    warnings.push(`Aantal rondes (${safeCount}) is ongebruikelijk hoog`);
   }
 
   const points = pointsForMinutes(qualifyingMinutes, rates.pointsPerHour);
