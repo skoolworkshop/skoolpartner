@@ -10,11 +10,13 @@ export function ParkingSummary({
   snapshot,
   bonusEnabled,
   bonusPoints,
+  bonusMinimumCents,
   pointsName,
 }: {
   snapshot: ParkingSnapshot;
   bonusEnabled: boolean;
   bonusPoints: number;
+  bonusMinimumCents: number;
   pointsName: string;
 }) {
   return (
@@ -32,18 +34,19 @@ export function ParkingSummary({
 
       <div className="mt-4 space-y-2 border-t border-accent/25 pt-4 text-sm text-muted">
         <p>
-          Dit bedrag blijft gewoon geld. Het wordt niet omgezet naar {pointsName} en het vervalt
-          niet.
+          Dit bedrag blijft geld en wordt niet omgezet naar {pointsName}. Het is beschikbaar
+          binnen hetzelfde schooljaar.
         </p>
-        {bonusEnabled ? (
+        {bonusEnabled && snapshot.amountCents >= bonusMinimumCents ? (
           <p>
             Zodra wij de aanvraag bevestigen, krijgt u eenmalig{" "}
             <strong className="text-ink">
               {formatPoints(bonusPoints)} {pointsName}
             </strong>{" "}
-            als bonus. Die staan los van het bedrag: of u nu een klein of een groot bedrag
-            parkeert, de bonus is hetzelfde.
+            als bonus. Deze bonus wordt maar één keer per organisatie toegekend.
           </p>
+        ) : bonusEnabled ? (
+          <p>De eenmalige bonus geldt vanaf {formatEuroCents(bonusMinimumCents)} geparkeerd tegoed.</p>
         ) : null}
         <p>
           U verstuurt nu een aanvraag. Er wordt nog niets afgeschreven en nog niets bijgeschreven.

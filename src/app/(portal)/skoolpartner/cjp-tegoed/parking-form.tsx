@@ -34,6 +34,7 @@ export interface ParkingFormProps {
   minimumCents: number;
   bonusEnabled: boolean;
   bonusPoints: number;
+  bonusMinimumCents: number;
   pointsName: string;
   supportEmail: string;
 }
@@ -43,6 +44,7 @@ export function ParkingForm({
   minimumCents,
   bonusEnabled,
   bonusPoints,
+  bonusMinimumCents,
   pointsName,
   supportEmail,
 }: ParkingFormProps) {
@@ -88,6 +90,7 @@ export function ParkingForm({
           snapshot={snapshot}
           bonusEnabled={bonusEnabled}
           bonusPoints={bonusPoints}
+          bonusMinimumCents={bonusMinimumCents}
           pointsName={pointsName}
         />
 
@@ -140,10 +143,12 @@ export function ParkingForm({
           U parkeert{" "}
           <strong className="font-display text-lg">{formatEuroCents(bedrag.cents!)}</strong> bij
           Skool Workshop
-          {bonusEnabled ? (
+          {bonusEnabled && bedrag.cents! >= bonusMinimumCents ? (
             <>
               , en u krijgt eenmalig {formatPoints(bonusPoints)} {pointsName} als bonus
             </>
+          ) : bonusEnabled ? (
+            <>. Vanaf {formatEuroCents(bonusMinimumCents)} ontvangt uw organisatie eenmalig {formatPoints(bonusPoints)} {pointsName}</>
           ) : null}
           .
         </p>

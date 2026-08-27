@@ -9,6 +9,7 @@ import { listBookings } from "@/lib/admin/queries";
 import { formatShortDate } from "@/lib/format";
 import { calculateBookingPoints } from "@/lib/loyalty/calc";
 import { getSettings, ratesFromSettings } from "@/lib/settings";
+import ReviewQueuePage from "../controle/page";
 
 export const metadata: Metadata = { title: "Boekingen" };
 
@@ -38,6 +39,8 @@ export default async function AdminBookingsPage({
   ]);
   const rates = ratesFromSettings(settings);
   const bookings = rows as unknown as BookingWithOrg[];
+
+  if (filter === "review") return <ReviewQueuePage />;
 
   return (
     <>

@@ -157,6 +157,12 @@ export function RedeemForm({
       </dl>
 
       <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => setPoints(cap)}>
+            Alles inwisselen ({formatPoints(cap)})
+          </Button>
+          <span className="self-center text-sm text-muted">of vul hieronder een deel in</span>
+        </div>
         <Field
           label="Voor welke workshop?"
           htmlFor="booking_id"

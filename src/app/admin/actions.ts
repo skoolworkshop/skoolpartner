@@ -38,7 +38,8 @@ import {
   RESULTS_BUCKET,
 } from "@/lib/results/service";
 import { resolveSiteUrl } from "@/lib/site-url";
-import { publicEnv } from "@/lib/env";
+import { integrationMode, publicEnv, serverEnv } from "@/lib/env";
+import { buildMessageMime, GmailClient } from "@/lib/integrations/gmail/client";
 import { SETTING_DEFAULTS, type SettingKey } from "@/lib/settings";
 import type { Json } from "@/lib/types/database";
 
@@ -218,6 +219,46 @@ export async function inviteMemberAction(
 
   if (error) return { status: "error", message: "Uitnodiging kon niet worden aangemaakt." };
 
+  const inviteUrl = `${publicEnv.siteUrl}/uitnodiging/${token}`;
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  let mailMessage = "De unieke link staat hieronder om te kopiëren.";
+  if (integrationMode("gmail") === "live") {
+    try {
+      const client = await GmailClient.create();
+      if (!client) throw new Error("Gmail is nog niet gekoppeld");
+      await client.sendRaw(
+        buildMessageMime({
+          from: `Skool Workshop <${serverEnv.google.mailbox}>`,
+          to: [email],
+          subject: `Uitnodiging voor ${organization?.name ?? "SkoolPartner"}`,
+          bodyText: [
+            "Beste,",
+            "",
+            `U bent uitgenodigd voor ${organization?.name ?? "uw organisatie"} in SkoolPartner.`,
+            "Open de persoonlijke link om uw account te activeren:",
+            inviteUrl,
+            "",
+            "Deze link is 14 dagen geldig en kan maar één keer worden gebruikt.",
+            "",
+            "Met vriendelijke groet,",
+            "Team Skool Workshop",
+          ].join("\n"),
+        })
+      );
+      mailMessage = `De uitnodiging is automatisch gemaild naar ${email}. De unieke link staat ook hieronder.`;
+    } catch (mailError) {
+      console.error("[invite] mail kon niet worden verstuurd", mailError);
+      mailMessage = "De uitnodiging is aangemaakt, maar de e-mail kon niet worden verstuurd. Kopieer daarom de unieke link hieronder.";
+    }
+  } else {
+    mailMessage = "Gmail staat in testmodus; er is geen echte e-mail verstuurd. Kopieer de unieke link hieronder.";
+  }
+
   await recordAudit({
     actorId: session.userId,
     actorEmail: session.email,
@@ -230,8 +271,8 @@ export async function inviteMemberAction(
   revalidatePath(`/admin/organisaties/${organizationId}`);
   return {
     status: "ok",
-    message: `Uitnodiging aangemaakt voor ${email}. Stuur onderstaande link naar deze persoon.`,
-    inviteUrl: `${publicEnv.siteUrl}/uitnodiging/${token}`,
+    message: mailMessage,
+    inviteUrl,
   };
 }
 

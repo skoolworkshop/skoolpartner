@@ -9,11 +9,13 @@ import { requireAdmin } from "@/lib/auth/session";
 import { listInvoices } from "@/lib/admin/queries";
 import { formatEuroCents, formatShortDate } from "@/lib/format";
 import type { InvoiceState } from "@/lib/types/database";
+import { serverEnv } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Facturen" };
 
 interface InvoiceWithOrg {
   id: string;
+  moneybird_invoice_id: string;
   organization_id: string | null;
   invoice_number: string | null;
   reference: string | null;
@@ -43,6 +45,7 @@ export default async function AdminInvoicesPage({
   const active = filter === "review" || filter === "unpaid" ? filter : "all";
 
   const rows = (await listInvoices({ filter: active, query: q })) as unknown as InvoiceWithOrg[];
+  const administrationId = serverEnv.moneybird.administrationId;
   const totaalOpen = rows.reduce((sum, row) => sum + (row.fully_paid ? 0 : row.total_unpaid_cents), 0);
 
   return (
@@ -100,7 +103,17 @@ export default async function AdminInvoicesPage({
                     {formatShortDate(invoice.invoice_date)}
                   </td>
                   <td className="px-5 py-2.5 whitespace-nowrap font-semibold">
-                    {invoice.invoice_number ?? "—"}
+                    {administrationId ? (
+                      <a
+                        href={`https://moneybird.com/${encodeURIComponent(administrationId)}/sales_invoices/${encodeURIComponent(invoice.moneybird_invoice_id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-4"
+                        title="Open deze factuur rechtstreeks in Moneybird"
+                      >
+                        {invoice.invoice_number ?? "Open in Moneybird"}
+                      </a>
+                    ) : invoice.invoice_number ?? "—"}
                   </td>
                   <td className="px-5 py-2.5">
                     {invoice.organization_id ? (

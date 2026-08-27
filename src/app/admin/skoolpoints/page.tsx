@@ -119,7 +119,7 @@ export default async function AdminLoyaltyPage() {
                       >
                         <input type="hidden" name="transaction_id" value={transaction.id} />
                         <Field
-                          label="Reden"
+                          label="Reden voor terugdraaien"
                           htmlFor={`reason-${transaction.id}`}
                           className="w-48"
                         >
@@ -128,7 +128,7 @@ export default async function AdminLoyaltyPage() {
                             name="reason"
                             required
                             minLength={3}
-                            placeholder="Verplicht"
+                            placeholder="Leg vast waarom deze boeking wordt teruggedraaid"
                           />
                         </Field>
                       </ActionForm>

@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireMember } from "@/lib/auth/session";
 import { recordAudit } from "@/lib/audit";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { integrationMode, serverEnv } from "@/lib/env";
+import { buildMessageMime, GmailClient } from "@/lib/integrations/gmail/client";
+import { getSettingsWithServiceRole } from "@/lib/settings";
 
 export interface RedemptionState {
   status: "idle" | "ok" | "error";
@@ -62,6 +65,37 @@ export async function requestRedemption(
     organizationId: session.activeOrganizationId,
     after: { points, booking_id: bookingId },
   });
+
+  // De aanvraag is al veilig gereserveerd. Een mailfout mag dat niet terugdraaien.
+  if (integrationMode("gmail") === "live") {
+    try {
+      const [settings, { data: organization }, { data: booking }] = await Promise.all([
+        getSettingsWithServiceRole(),
+        supabase.from("organizations").select("name").eq("id", session.activeOrganizationId).maybeSingle(),
+        supabase.from("bookings").select("workshop_name, scheduled_date").eq("id", bookingId).maybeSingle(),
+      ]);
+      const client = await GmailClient.create();
+      if (client) {
+        await client.sendRaw(buildMessageMime({
+          from: `SkoolPartner <${serverEnv.google.mailbox}>`,
+          to: [settings.support_email],
+          subject: `Nieuw inwisselverzoek van ${organization?.name ?? session.email}`,
+          bodyText: [
+            `Organisatie: ${organization?.name ?? session.activeOrganizationId}`,
+            `Aanvrager: ${session.email}`,
+            `Punten: ${points}`,
+            `Boeking: ${booking?.workshop_name ?? bookingId}`,
+            booking?.scheduled_date ? `Datum: ${booking.scheduled_date}` : null,
+            note ? `Opmerking: ${note}` : null,
+            "",
+            `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/admin/inwisselen`,
+          ].filter(Boolean).join("\n"),
+        }));
+      }
+    } catch (mailError) {
+      console.error("[redemption] beheerdermail mislukt", mailError);
+    }
+  }
 
   revalidatePath("/skoolpartner");
   revalidatePath("/dashboard");

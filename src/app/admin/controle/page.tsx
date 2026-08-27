@@ -98,24 +98,6 @@ export default async function ReviewQueuePage() {
                   </div>
                 ) : null}
 
-                {parsed.signals && parsed.signals.length > 0 ? (
-                  <div>
-                    <p className="text-sm font-semibold">Herkende signalen</p>
-                    <ul className="mt-1 list-inside list-disc space-y-0.5 text-sm text-muted">
-                      {parsed.signals.map((signal, index) => (
-                        <li key={index}>{signal}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                <details className="rounded-card border border-line-soft bg-surface-2 px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-semibold">Bronmail bekijken</summary>
-                  <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-sm text-muted">
-                    {source.body_text ?? source.snippet ?? "Geen inhoud beschikbaar"}
-                  </pre>
-                </details>
-
                 <div className="rounded-card border border-line-soft px-4 py-3 text-sm">
                   Bij goedkeuring met deze waarden:{" "}
                   <strong>{preview.qualifyingMinutes} minuten</strong> ={" "}
@@ -144,16 +126,10 @@ export default async function ReviewQueuePage() {
                       </Select>
                     </Field>
 
-                    <Field label="Workshop" htmlFor={`workshop-${source.id}`} required>
-                      <Input
-                        id={`workshop-${source.id}`}
-                        name="workshop_name"
-                        defaultValue={extracted.workshopName ?? ""}
-                        required
-                      />
-                    </Field>
+                    <div className="text-sm"><span className="block text-muted">Workshop</span><strong>{extracted.workshopName ?? "Niet herkend"}</strong></div>
+                    <input type="hidden" name="workshop_name" value={extracted.workshopName ?? "Workshop"} />
 
-                    <Field label="Aantal workshops" htmlFor={`count-${source.id}`} required>
+                    <Field label="Aantal rondes" htmlFor={`count-${source.id}`} required>
                       <Input
                         id={`count-${source.id}`}
                         name="workshop_count"
@@ -164,7 +140,7 @@ export default async function ReviewQueuePage() {
                       />
                     </Field>
 
-                    <Field label="Duur per workshop (minuten)" htmlFor={`minutes-${source.id}`} required>
+                    <Field label="Duur per ronde (minuten)" htmlFor={`minutes-${source.id}`} required>
                       <Input
                         id={`minutes-${source.id}`}
                         name="minutes_per_workshop"
@@ -175,30 +151,10 @@ export default async function ReviewQueuePage() {
                       />
                     </Field>
 
-                    <Field label="Datum" htmlFor={`date-${source.id}`}>
-                      <Input
-                        id={`date-${source.id}`}
-                        name="scheduled_date"
-                        type="date"
-                        defaultValue={extracted.date ?? ""}
-                      />
-                    </Field>
-
-                    <Field label="Locatie" htmlFor={`location-${source.id}`}>
-                      <Input
-                        id={`location-${source.id}`}
-                        name="location"
-                        defaultValue={extracted.location ?? ""}
-                      />
-                    </Field>
-
-                    <Field label="Boekingsreferentie" htmlFor={`ref-${source.id}`}>
-                      <Input
-                        id={`ref-${source.id}`}
-                        name="reference"
-                        defaultValue={extracted.reference ?? ""}
-                      />
-                    </Field>
+                    <div className="text-sm"><span className="block text-muted">Datum en locatie uit bevestiging</span><strong>{extracted.date ?? "—"} · {extracted.location ?? "—"}</strong></div>
+                    <input type="hidden" name="scheduled_date" value={extracted.date ?? ""} />
+                    <input type="hidden" name="location" value={extracted.location ?? ""} />
+                    <input type="hidden" name="reference" value={extracted.reference ?? ""} />
                   </div>
                 </ActionForm>
 

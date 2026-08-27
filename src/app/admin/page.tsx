@@ -59,7 +59,7 @@ export default async function AdminHome() {
         <Tile
           label="Controle nodig"
           value={overview.reviewQueue}
-          href="/admin/controle"
+          href="/admin/boekingen?filter=review"
           urgent
         />
         <Tile
@@ -84,12 +84,6 @@ export default async function AdminHome() {
           label="Facturen zonder koppeling"
           value={overview.invoicesNeedingReview}
           href="/admin/facturen?filter=review"
-          urgent
-        />
-        <Tile
-          label="Gesprekken die controle nodig hebben"
-          value={overview.threadsNeedingReview}
-          href="/admin/berichten?filter=review"
           urgent
         />
         <Tile

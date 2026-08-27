@@ -27,7 +27,7 @@ const LABELS: Record<string, { title: string; description: string }> = {
   gmail: {
     title: "Gmail",
     description:
-      "Leest en verstuurt de klantcommunicatie van het boekingenadres. Bron voor het berichtencentrum en voor het herkennen van definitieve boekingsbevestigingen.",
+      "Leest boekingsbevestigingen van het boekingenadres en verstuurt functionele klantmails, zoals uitnodigingen en resultaten.",
   },
   moneybird: {
     title: "Moneybird",

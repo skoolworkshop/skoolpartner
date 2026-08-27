@@ -10,10 +10,10 @@ import { createClient } from "@/lib/supabase/client";
 import { RESULTS_BUCKET } from "@/lib/results/constants";
 import { confirmUpload, requestUploadTarget } from "./upload-actions";
 
-type Regel = { naam: string; status: "bezig" | "klaar" | "fout"; melding?: string };
+type Regel = { naam: string; grootte: number; status: "wachten" | "bezig" | "klaar" | "fout"; melding?: string };
 
 /**
- * Uploadt bestanden rechtstreeks naar Supabase Storage, één voor één, met een
+ * Uploadt bestanden rechtstreeks naar Supabase Storage, maximaal drie tegelijk, met een
  * tijdelijke link die de server per bestand aanmaakt. De voortgang blijft
  * zichtbaar, ook als er iets misgaat bij één bestand.
  */
@@ -31,9 +31,10 @@ export function ResultUploader({
   const [, startTransition] = useTransition();
 
   async function uploadEen(file: File): Promise<Regel> {
+    setRegels((vorige) => vorige.map((r) => r.naam === file.name ? { ...r, status: "bezig" } : r));
     const doel = await requestUploadTarget(resultId, file.name, file.size);
     if ("error" in doel) {
-      return { naam: file.name, status: "fout", melding: doel.error };
+      return { naam: file.name, grootte: file.size, status: "fout", melding: doel.error };
     }
 
     const supabase = createClient();
@@ -42,7 +43,7 @@ export function ResultUploader({
       .uploadToSignedUrl(doel.path, doel.token, file);
 
     if (error) {
-      return { naam: file.name, status: "fout", melding: error.message };
+      return { naam: file.name, grootte: file.size, status: "fout", melding: error.message };
     }
 
     const bevestigd = await confirmUpload({
@@ -54,9 +55,9 @@ export function ResultUploader({
     });
 
     if (!bevestigd.ok) {
-      return { naam: file.name, status: "fout", melding: bevestigd.error };
+      return { naam: file.name, grootte: file.size, status: "fout", melding: bevestigd.error };
     }
-    return { naam: file.name, status: "klaar" };
+    return { naam: file.name, grootte: file.size, status: "klaar" };
   }
 
   async function onChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -64,13 +65,11 @@ export function ResultUploader({
     if (files.length === 0) return;
 
     setBezig(true);
-    setRegels(files.map((f) => ({ naam: f.name, status: "bezig" as const })));
+    setRegels(files.map((f) => ({ naam: f.name, grootte: f.size, status: "wachten" as const })));
 
-    const resultaten: Regel[] = [];
-    for (const file of files) {
-      const regel = await uploadEen(file);
-      resultaten.push(regel);
-      setRegels((vorige) => vorige.map((r) => (r.naam === regel.naam ? regel : r)));
+    for (let start = 0; start < files.length; start += 3) {
+      const blok = await Promise.all(files.slice(start, start + 3).map(uploadEen));
+      setRegels((vorige) => vorige.map((r) => blok.find((klaar) => klaar.naam === r.naam) ?? r));
     }
 
     setBezig(false);
@@ -106,10 +105,16 @@ export function ResultUploader({
       </p>
 
       {regels.length > 0 ? (
-        <ul className="space-y-1 text-sm" aria-live="polite">
+        <div aria-live="polite">
+          <p className="mb-2 text-sm font-medium">
+            {regels.filter((regel) => regel.status === "klaar").length} van {regels.length} bestanden klaar
+          </p>
+        <ul className="space-y-1 text-sm">
           {regels.map((regel) => (
             <li key={regel.naam} className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{regel.naam}</span>
+              <span className="text-muted">{(regel.grootte / 1024 / 1024).toFixed(1)} MB</span>
+              {regel.status === "wachten" ? <span className="text-muted">wacht…</span> : null}
               {regel.status === "bezig" ? <span className="text-muted">bezig…</span> : null}
               {regel.status === "klaar" ? <span className="text-muted">geüpload</span> : null}
               {regel.status === "fout" ? (
@@ -120,6 +125,7 @@ export function ResultUploader({
             </li>
           ))}
         </ul>
+        </div>
       ) : null}
     </div>
   );

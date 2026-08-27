@@ -42,7 +42,7 @@ function BookingRowItem({
           {booking.location ? ` · ${booking.location}` : ""}
         </p>
         <p className="mt-0.5 text-sm text-muted">
-          {booking.workshop_count > 1 ? `${booking.workshop_count} workshops · ` : ""}
+          {booking.workshop_count > 1 ? `${booking.workshop_count} rondes · ` : ""}
           {formatDuration(booking.minutes_per_workshop)}
           {booking.participants ? ` · ${booking.participants} deelnemers` : ""}
         </p>

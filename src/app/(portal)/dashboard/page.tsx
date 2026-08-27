@@ -213,7 +213,7 @@ export default async function DashboardPage() {
                 {formatDate(nextBooking.scheduled_date)} · {relativeDay(nextBooking.scheduled_date)}
               </p>
               <p className="text-sm text-muted">
-                {nextBooking.workshop_count > 1 ? `${nextBooking.workshop_count} workshops · ` : ""}
+                {nextBooking.workshop_count > 1 ? `${nextBooking.workshop_count} rondes · ` : ""}
                 {formatDuration(nextBooking.minutes_per_workshop)}
                 {nextBooking.location ? ` · ${nextBooking.location}` : ""}
               </p>

@@ -44,7 +44,7 @@ export default async function CjpTegoedPage() {
         backLabel={`Terug naar ${settings.program_name}`}
         eyebrow="CJP"
         title="CJP-tegoed parkeren"
-        description="Houdt u aan het eind van het schooljaar CJP-budget over? Dan kunt u dat bij ons parkeren. Het blijft gewoon uw geld en u besteedt het wanneer het u uitkomt."
+        description="Houdt u CJP-budget over? Dan kunt u dat bij ons parkeren voor gebruik binnen hetzelfde schooljaar."
       />
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -76,8 +76,8 @@ export default async function CjpTegoedPage() {
             <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-muted">
               Dit tegoed is een bedrag in euro&apos;s en staat helemaal los van uw{" "}
               {settings.points_name}. Wij zetten het nooit om naar punten en er zit geen
-              vervaldatum op. U geeft bij een boeking gewoon aan dat u het wilt gebruiken, dan
-              verrekenen wij het op de factuur.
+              onbeperkte looptijd op: u gebruikt het binnen hetzelfde schooljaar. U geeft bij een
+              boeking aan dat u het wilt gebruiken, dan verrekenen wij het op de factuur.
             </p>
           </CardBody>
         </Card>
@@ -118,6 +118,7 @@ export default async function CjpTegoedPage() {
                 minimumCents={settings.cjp_minimum_amount_cents}
                 bonusEnabled={settings.cjp_bonus_enabled}
                 bonusPoints={settings.cjp_bonus_points}
+                bonusMinimumCents={settings.cjp_bonus_minimum_amount_cents}
                 pointsName={settings.points_name}
                 supportEmail={settings.support_email}
               />

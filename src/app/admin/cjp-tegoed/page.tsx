@@ -96,9 +96,7 @@ export default async function AdminCjpPage() {
             </p>
             <p className="text-sm text-muted">
               {settings.cjp_bonus_enabled
-                ? settings.cjp_bonus_cooldown_days > 0
-                  ? `Eén keer per ${settings.cjp_bonus_cooldown_days} dagen per organisatie`
-                  : "Bij elke bevestigde aanvraag"
+                ? `Eenmalig per organisatie, vanaf ${formatEuroCents(settings.cjp_bonus_minimum_amount_cents)}`
                 : "Staat uit bij de instellingen"}
             </p>
           </CardBody>
@@ -147,6 +145,7 @@ export default async function AdminCjpPage() {
                         </Regel>
                         <Regel label="Schoolnaam bij aanvraag">{aanvraag.school_name}</Regel>
                         <Regel label="CJP-schoolnummer">{aanvraag.cjp_school_number}</Regel>
+                        <Regel label="Schooljaar">{aanvraag.school_year}</Regel>
                         <Regel label="Budgethouder">{aanvraag.holder_name}</Regel>
                         <Regel label="E-mail">{aanvraag.holder_email}</Regel>
                         <Regel label="Telefoon">

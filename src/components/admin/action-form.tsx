@@ -59,9 +59,19 @@ export function ActionForm({
         <Alert tone="success" className={inline ? "w-full" : undefined}>
           {state.message}
           {state.inviteUrl ? (
-            <code className="mt-2 block break-all rounded bg-white px-2 py-1 text-xs">
-              {state.inviteUrl}
-            </code>
+            <div className="mt-2 space-y-2">
+              <code className="block break-all rounded bg-white px-2 py-1 text-xs">
+                {state.inviteUrl}
+              </code>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => navigator.clipboard.writeText(state.inviteUrl!)}
+              >
+                Link kopiëren
+              </Button>
+            </div>
           ) : null}
         </Alert>
       ) : null}

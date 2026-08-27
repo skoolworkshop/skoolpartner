@@ -16,13 +16,11 @@ import {
   getCreditTransactionsForAdmin,
 } from "@/lib/tegoed/queries";
 import { CREDIT_TYPE_LABELS } from "@/lib/tegoed/regels";
-import { visibilityLabel } from "@/lib/messaging/visibility";
 import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import { OrgLogo } from "@/components/portal/org-logo";
 import {
-  addMemberByEmailAction,
   clearOrganizationLogoAction,
   fetchOrganizationLogoAction,
   setCjpNumberAction,
@@ -370,19 +368,6 @@ export default async function OrganizationDetailPage({
               </Field>
             </ActionForm>
 
-            <p className="mb-3 mt-6 text-sm font-semibold">
-              Bestaand account direct toevoegen
-            </p>
-            <p className="mb-3 text-sm text-muted">
-              Heeft deze persoon al een account in SkoolPartner? Dan hoeft er geen uitnodiging
-              heen: voeg het adres hier toe en de toegang staat meteen open.
-            </p>
-            <ActionForm action={addMemberByEmailAction} submitLabel="Direct toevoegen">
-              <input type="hidden" name="organization_id" value={detail.organization.id} />
-              <Field label="E-mailadres" htmlFor="direct-email" required>
-                <Input id="direct-email" name="email" type="email" required />
-              </Field>
-            </ActionForm>
           </CardBody>
         </Card>
 
@@ -525,36 +510,6 @@ export default async function OrganizationDetailPage({
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Berichten"
-            description="Alle e-mailgesprekken van deze organisatie, ook de gesprekken die de klant zelf niet ziet."
-          />
-          <ul className="divide-y divide-line-soft">
-            {detail.threads.map((thread) => (
-              <li key={thread.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                <span className="min-w-0">
-                  <Link
-                    href={`/admin/berichten/${thread.id}`}
-                    className="block truncate font-medium underline underline-offset-4"
-                  >
-                    {thread.subject ?? "Zonder onderwerp"}
-                  </Link>
-                  <span className="block text-sm text-muted">
-                    {formatShortDate(thread.last_message_at)} · {thread.message_count}{" "}
-                    {thread.message_count === 1 ? "bericht" : "berichten"}
-                  </span>
-                </span>
-                <Badge tone={visibilityLabel(thread.visibility).tone}>
-                  {visibilityLabel(thread.visibility).short}
-                </Badge>
-              </li>
-            ))}
-            {detail.threads.length === 0 ? (
-              <li className="px-5 py-4 text-sm text-muted">Nog geen berichten.</li>
-            ) : null}
-          </ul>
-        </Card>
 
         {session.profile?.is_super_admin ? (
           <Card className="lg:col-span-2 border-danger/40">
