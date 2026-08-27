@@ -56,7 +56,7 @@ Productiedomein: `https://mijn.skoolworkshop.nl`
 - Audit log van elke belangrijke handeling
 
 **Nog te doen door jou** (zie [Integraties koppelen](#integraties-koppelen)): de externe
-credentials invullen. Zolang die ontbreken draaien Moneybird, Gmail en HubSpot in
+credentials invullen. Zolang die ontbreken draaien Moneybird en Gmail in
 **testmodus** met realistische voorbeelddata, zodat alles te bekijken en te testen is.
 
 ---
@@ -73,7 +73,6 @@ credentials invullen. Zolang die ontbreken draaien Moneybird, Gmail en HubSpot i
 | Hosting | Vercel |
 | Financieel | Moneybird API |
 | E-mail | Gmail API |
-| CRM | HubSpot API |
 | Tests | Vitest |
 
 Er wordt bewust **geen AI-dienst** gebruikt tijdens normaal gebruik. Het herkennen van
@@ -170,7 +169,6 @@ Alles staat toegelicht in `.env.example`. Kort overzicht van wat je waar vandaan
 | `GOOGLE_CLIENT_SECRET` | idem | Gmail |
 | `GOOGLE_REDIRECT_URI` | `<site-url>/api/integrations/google/callback` | Gmail |
 | `GMAIL_MAILBOX` | `boekingen@skoolworkshop.nl` | Gmail |
-| `HUBSPOT_PRIVATE_APP_TOKEN` | HubSpot > Instellingen > Integraties > Private Apps | CRM |
 
 In Vercel voer je ze in onder **Project Settings > Environment Variables**, en vink je per
 variabele aan voor welke omgevingen hij geldt (Development, Preview, Production). Zet
@@ -299,13 +297,6 @@ precies welke variabelen er nog ontbreken.
    boekingsbevestiging. Dat label is het sterkste signaal voor de parser. De naam is aan te
    passen in Admin > Instellingen.
 
-### HubSpot
-
-1. HubSpot > Instellingen > Integraties > Private Apps > maak een app.
-2. Benodigde scopes (alleen lezen): `crm.objects.companies.read`,
-   `crm.objects.contacts.read`, `crm.objects.deals.read`.
-3. Zet het token in `HUBSPOT_PRIVATE_APP_TOKEN`.
-
 ---
 
 ## Deployen naar Vercel
@@ -324,7 +315,7 @@ De cron jobs staan in `vercel.json`:
 | Pad | Schema | Doel |
 | --- | --- | --- |
 | `/api/cron/verval-punten` | dagelijks, rond 03:00 UTC | verlopen SkoolPoints registreren |
-| `/api/cron/sync` | dagelijks, rond 05:00 UTC | Gmail, Moneybird en HubSpot synchroniseren |
+| `/api/cron/sync` | dagelijks, rond 05:00 UTC | Gmail en Moneybird synchroniseren |
 
 Beide staan bewust op één keer per dag. Het Vercel Hobby-plan staat namelijk maximaal één
 uitvoering per dag toe: een expressie als `0 * * * *` laat de deployment mislukken met de
@@ -463,7 +454,7 @@ klanten gaan via `boekingen@skoolworkshop.nl` en blijven in dezelfde Gmail-threa
   lidmaatschap heeft.
 - De service-role key wordt alleen server-side gebruikt en komt nooit in de browser.
 - Externe API's worden uitsluitend server-side aangeroepen. De klantbrowser krijgt nooit
-  toegang tot Gmail, Moneybird of HubSpot.
+  toegang tot Gmail of Moneybird.
 - De Gmail refresh token staat versleuteld (AES-256-GCM) in `integration_credentials`. Die
   tabel heeft bewust geen enkele policy: alleen de service role komt erbij.
 - Uitnodigingstokens worden alleen als hash bewaard.

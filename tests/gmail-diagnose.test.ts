@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { rolUitSupabaseSleutel } from "@/lib/integrations/gmail/diagnose";
+import { rolUitSupabaseSleutel, verklaarDatabasefout } from "@/lib/integrations/gmail/diagnose";
 
 /**
  * De rol uit een Supabase-sleutel lezen.
@@ -51,5 +51,48 @@ describe("de lengte van APP_ENCRYPTION_KEY", () => {
 
   it("wijst een zelfverzonnen wachtwoord af", () => {
     expect(Buffer.from("mijn-geheime-wachtwoord", "base64").length).not.toBe(32);
+  });
+});
+
+describe("wat de database terugstuurt", () => {
+  it("herkent een rechtenprobleem", () => {
+    const regel = verklaarDatabasefout({
+      message: "permission denied for table integration_credentials",
+      code: "42501",
+    });
+    expect(regel.uitkomst).toBe("fout");
+    expect(regel.waarde).toContain("weigert deze sleutel");
+    expect(regel.oplossing).toContain("setup-alles.sql");
+  });
+
+  it("herkent een ontbrekende tabel aan de PostgREST-code", () => {
+    const regel = verklaarDatabasefout({
+      message: "Could not find the table 'public.integration_credentials' in the schema cache",
+      code: "PGRST205",
+    });
+    expect(regel.waarde).toContain("bestaat niet op dit project");
+    expect(regel.oplossing).toContain("NEXT_PUBLIC_SUPABASE_URL");
+  });
+
+  it("herkent een ontbrekende tabel ook zonder code", () => {
+    const regel = verklaarDatabasefout({
+      message: 'relation "public.integration_credentials" does not exist',
+    });
+    expect(regel.waarde).toContain("bestaat niet op dit project");
+  });
+
+  it("toont een onbekende fout gewoon, ingekort", () => {
+    const regel = verklaarDatabasefout({ message: "x".repeat(500) });
+    expect(regel.waarde.length).toBeLessThanOrEqual(200);
+  });
+
+  /**
+   * De melding komt in de browser van de beheerder. PostgREST noemt alleen
+   * tabellen en redenen, maar wij korten hem hoe dan ook in, zodat er nooit
+   * een lange sleutelachtige reeks in beeld kan komen.
+   */
+  it("kort lange meldingen af", () => {
+    const regel = verklaarDatabasefout({ message: `fout ${"A".repeat(300)}` });
+    expect(regel.waarde.length).toBeLessThanOrEqual(200);
   });
 });
