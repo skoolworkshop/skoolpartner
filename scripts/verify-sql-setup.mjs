@@ -219,9 +219,9 @@ async function main() {
     counts.facturen === 5 &&
     counts.berichten === 6 &&
     counts.resultaten === 2 &&
-    // Euro's, los van de punten hierboven: 750,00 geparkeerd, 250,00 gebruikt.
-    tegoed.beschikbaar === 50000 &&
-    tegoed.bijgeschreven === 75000 &&
+    // Euro's, los van de punten hierboven: 1.200,00 geparkeerd, 250,00 gebruikt.
+    tegoed.beschikbaar === 95000 &&
+    tegoed.bijgeschreven === 120000 &&
     tegoed.gebruikt === 25000 &&
     tegoed.bonussen === 1 &&
     tegoed.open_aanvragen === 1;

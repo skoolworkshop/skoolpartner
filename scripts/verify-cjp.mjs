@@ -8,7 +8,7 @@
  *   2. Twee keer draaien verandert niets (herhaalbaar).
  *   3. Twee keer bevestigen levert precies één keer tegoed en één keer bonus op.
  *   4. Meer afboeken dan er staat wordt geweigerd.
- *   5. Een tweede aanvraag binnen de wachttijd geeft wel tegoed, geen tweede bonus.
+ *   5. Een tweede aanvraag geeft wel tegoed, maar nooit een tweede bonus.
  *   6. Euro's en punten blijven volledig gescheiden.
  *
  *   node scripts/verify-cjp-voorstel.mjs
@@ -19,7 +19,7 @@ import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 
 const MIGRATIONS_DIR = path.join(process.cwd(), "supabase", "migrations");
-const VOORSTEL = path.join(process.cwd(), "supabase", "migrations", "20260826120600_cjp_tegoed.sql");
+const VOORSTEL = path.join(process.cwd(), "supabase", "migrations", "20260827130000_verbeteringen_augustus.sql");
 
 const SUPABASE_STUBS = `
 create role anon;
@@ -92,7 +92,7 @@ async function main() {
   const instellingen = (
     await db.query(`select count(*)::int as n from public.app_settings where key like 'cjp\\_%'`)
   ).rows[0].n;
-  check(instellingen === 6, `Zes CJP-instellingen aanwezig, niet gedupliceerd (gevonden: ${instellingen})`);
+  check(instellingen === 7, `Zeven CJP-instellingen aanwezig, niet gedupliceerd (gevonden: ${instellingen})`);
 
   // Row Level Security moet ook op de nieuwe tabellen aan staan.
   const zonderRls = (
@@ -149,7 +149,7 @@ async function main() {
   // -------------------------------------------------------------------------
   // 3. Aanvragen levert nog niets op
   // -------------------------------------------------------------------------
-  const aanvraag1 = await nieuweAanvraag(50000); // 500 euro
+  const aanvraag1 = await nieuweAanvraag(120000); // 1.200 euro: boven de bonusgrens
   let s = await saldo();
   let p = await punten();
   check(
@@ -172,8 +172,8 @@ async function main() {
     )
   ).rows[0];
   check(
-    credits.n === 1 && credits.som === 50000,
-    `Vier keer bevestigen geeft precies één bijschrijving van 500,00 euro (gevonden: ${credits.n} regels, ${credits.som} cent)`
+    credits.n === 1 && credits.som === 120000,
+    `Vier keer bevestigen geeft precies één bijschrijving van 1.200,00 euro (gevonden: ${credits.n} regels, ${credits.som} cent)`
   );
 
   const bonussen = (
@@ -199,7 +199,7 @@ async function main() {
   );
 
   s = await saldo();
-  check(s.available_cents === 50000 && s.added_cents === 50000, "Het saldo in de view klopt");
+  check(s.available_cents === 120000 && s.added_cents === 120000, "Het saldo in de view klopt");
 
   // -------------------------------------------------------------------------
   // 5. Tweede aanvraag binnen de wachttijd: wel tegoed, geen tweede bonus
@@ -214,10 +214,10 @@ async function main() {
     )
   ).rows[0].n;
   check(
-    s.available_cents === 75000,
+    s.available_cents === 145000,
     `Een tweede bevestigde aanvraag schrijft het tegoed gewoon bij (saldo: ${s.available_cents} cent)`
   );
-  check(bonussen2 === 1, `Binnen de wachttijd komt er geen tweede bonus bij (bonussen: ${bonussen2})`);
+  check(bonussen2 === 1, `Een organisatie krijgt nooit een tweede bonus (bonussen: ${bonussen2})`);
 
   // -------------------------------------------------------------------------
   // 6. Een afgewezen aanvraag kan niet alsnog bevestigd worden
@@ -233,7 +233,7 @@ async function main() {
   // -------------------------------------------------------------------------
   // 7. Afboeken
   // -------------------------------------------------------------------------
-  fout = await faalt(db, `select public.spend_cjp_credit('${ORG}'::uuid, 80000, null, null, null, null);`);
+  fout = await faalt(db, `select public.spend_cjp_credit('${ORG}'::uuid, 150000, null, null, null, null);`);
   check(
     fout !== null && fout.includes("Onvoldoende tegoed"),
     `Meer afboeken dan er staat wordt geweigerd (${fout ?? "werd toegestaan"})`
@@ -256,14 +256,14 @@ async function main() {
   );
   s = await saldo();
   check(
-    s.available_cents === 45000 && s.spent_cents === 30000,
-    `Na afboeken van 300,00 euro blijft 450,00 euro over (saldo: ${s.available_cents}, gebruikt: ${s.spent_cents})`
+    s.available_cents === 115000 && s.spent_cents === 30000,
+    `Na afboeken van 300,00 euro blijft 1.150,00 euro over (saldo: ${s.available_cents}, gebruikt: ${s.spent_cents})`
   );
 
   // Precies het restant afboeken moet nog net kunnen, één cent meer niet.
-  fout = await faalt(db, `select public.spend_cjp_credit('${ORG}'::uuid, 45001, null, null, null, null);`);
+  fout = await faalt(db, `select public.spend_cjp_credit('${ORG}'::uuid, 115001, null, null, null, null);`);
   check(fout !== null, "Eén cent meer dan het restant wordt geweigerd");
-  await db.exec(`select public.spend_cjp_credit('${ORG}'::uuid, 45000, null, null, null, null);`);
+  await db.exec(`select public.spend_cjp_credit('${ORG}'::uuid, 115000, null, null, null, null);`);
   s = await saldo();
   check(s.available_cents === 0, "Precies het restant afboeken mag, en het saldo komt op nul");
 
@@ -348,7 +348,7 @@ async function main() {
   check(naUit === 1, "Met de bonus uit komen er geen bonuspunten bij");
   check(s.available_cents === 20000, "Met de bonus uit wordt het tegoed nog wel gewoon bijgeschreven");
 
-  // Wachttijd op nul en bonus weer aan: dan levert elke aanvraag wel de bonus op.
+  // Bonus weer aan: de organisatie heeft hem al gehad en krijgt hem dus niet opnieuw.
   await db.exec(`update public.app_settings set value = 'true'::jsonb where key = 'cjp_bonus_enabled';`);
   const aanvraag5 = await nieuweAanvraag(15000);
   await db.exec(`select public.confirm_cjp_parking('${aanvraag5}'::uuid, null, null);`);
@@ -357,7 +357,7 @@ async function main() {
       `select count(*)::int as n from public.loyalty_transactions where organization_id = '${ORG}' and type = 'cjp_bonus'`
     )
   ).rows[0].n;
-  check(naAan === 2, `Met wachttijd nul levert een volgende aanvraag wel weer de bonus op (${naAan})`);
+  check(naAan === 1, `Ook na opnieuw aanzetten blijft de bonus eenmalig (${naAan})`);
 
   await db.close();
 

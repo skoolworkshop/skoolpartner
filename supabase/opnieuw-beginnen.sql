@@ -753,7 +753,7 @@ begin
     ) values (
       '00000000-0000-4000-8000-0000000c1901',
       v_org1, 'De Goudse Waarden', '123456', 'Sanne de Vries',
-      v_email, '+31612345678', 75000, 'confirmed', v_user,
+      v_email, '+31612345678', 120000, 'confirmed', v_user,
       v_email, v_beheerder, now() - interval '12 days', 'Bedrag ontvangen van CJP.',
       now() - interval '14 days', now() - interval '14 days'
     );
@@ -762,7 +762,7 @@ begin
       organization_id, amount_cents, type, description, request_id,
       external_reference, created_by, occurred_at
     ) values (
-      v_org1, 75000, 'parking', 'CJP-tegoed toegevoegd',
+      v_org1, 120000, 'parking', 'CJP-tegoed toegevoegd',
       '00000000-0000-4000-8000-0000000c1901',
       'request:00000000-0000-4000-8000-0000000c1901', v_beheerder,
       now() - interval '12 days'
@@ -789,6 +789,12 @@ begin
       now() - interval '12 days', v_beheerder, now() - interval '12 days'
     ) on conflict (organization_id, type, external_reference)
       where external_reference is not null do nothing;
+
+    insert into public.cjp_bonus_awards (organization_id, request_id, transaction_id, awarded_at)
+    select v_org1, '00000000-0000-4000-8000-0000000c1901', id, now() - interval '12 days'
+    from public.loyalty_transactions
+    where external_reference = 'cjp:00000000-0000-4000-8000-0000000c1901'
+    on conflict (organization_id) do nothing;
 
     update public.cjp_parking_requests
     set credit_transaction_id = (

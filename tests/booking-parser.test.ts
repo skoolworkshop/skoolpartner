@@ -41,7 +41,7 @@ function makeInput(overrides: Partial<ParserInput> = {}): ParserInput {
     from: "boekingen@skoolworkshop.nl",
     to: ["s.devries@goudsewaarden.nl"],
     cc: [],
-    subject: "Boekingsbevestiging Cultuurdag 12 maart",
+    subject: "Bevestiging Workshops op 01 09 2026 in Gouda",
     bodyText: confirmationBody,
     labels: ["Mijn Skool/Boekingsbevestiging"],
     receivedAt: "2026-03-02T09:12:00.000Z",

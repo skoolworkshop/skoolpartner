@@ -58,11 +58,12 @@ export function Harness() {
               holderName: "Sanne de Vries",
               holderEmail: "planning@skoolworkshop.nl",
               holderPhone: "+31 6 12345678",
-              amount: "750,00",
+              amount: "1.200,00",
             }}
             minimumCents={5000}
             bonusEnabled
             bonusPoints={1000}
+            bonusMinimumCents={100000}
             pointsName="SkoolPoints"
             supportEmail="boekingen@skoolworkshop.nl"
           />
@@ -80,10 +81,11 @@ export function Harness() {
               holderName: "Sanne de Vries",
               holderEmail: "planning@skoolworkshop.nl",
               holderPhone: "+31 6 12345678",
-              amountCents: 75000,
+              amountCents: 120000,
             }}
             bonusEnabled
             bonusPoints={1000}
+            bonusMinimumCents={100000}
             pointsName="SkoolPoints"
           />
         </CardBody>

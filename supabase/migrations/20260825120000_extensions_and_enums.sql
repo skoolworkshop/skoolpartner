@@ -56,7 +56,8 @@ do $$ begin
     'manual_adjustment',
     'redemption_reserve',
     'expiry',
-    'reversal'
+    'reversal',
+    'cjp_bonus'
   );
 exception when duplicate_object then null; end $$;
 
