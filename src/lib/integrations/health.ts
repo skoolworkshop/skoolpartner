@@ -294,13 +294,5 @@ export async function getGmailStatus(): Promise<GmailStatus> {
 
 export async function testIntegration(name: IntegrationName): Promise<HealthCheck> {
   if (name === "moneybird") return testMoneybird();
-  if (name === "gmail") return testGmail();
-  return {
-    ok: integrationMode("hubspot") === "live",
-    summary:
-      integrationMode("hubspot") === "live"
-        ? "HubSpot-token is ingesteld."
-        : "HubSpot draait in testmodus.",
-    details: [],
-  };
+  return testGmail();
 }

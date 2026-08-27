@@ -236,7 +236,7 @@ export async function createBookingFromSource(params: {
   sourceId: string | null;
   organizationId: string;
   extracted: ParseResult["extracted"];
-  origin: "email_parser" | "admin_manual" | "import" | "hubspot";
+  origin: "email_parser" | "admin_manual" | "import";
   createdBy?: string | null;
   needsReview?: boolean;
   reviewReasons?: string[];

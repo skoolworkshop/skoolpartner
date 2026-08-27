@@ -48,7 +48,7 @@ export async function markSyncSuccess(
 
 /**
  * Registreert een fout zonder data te beschadigen. Een tijdelijke storing bij
- * Gmail, HubSpot of Moneybird laat de bestaande gegevens dus ongemoeid.
+ * Gmail of Moneybird laat de bestaande gegevens dus ongemoeid.
  */
 export async function markSyncError(
   integration: IntegrationSystem,

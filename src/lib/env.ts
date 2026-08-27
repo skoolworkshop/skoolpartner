@@ -60,10 +60,6 @@ export const serverEnv = {
     mailbox: optional("GMAIL_MAILBOX") ?? "boekingen@skoolworkshop.nl",
   },
 
-  hubspot: {
-    token: optional("HUBSPOT_PRIVATE_APP_TOKEN"),
-  },
-
   /** Forceer mockmodus, ook als er credentials aanwezig zijn. */
   forceMock: optional("INTEGRATIONS_FORCE_MOCK") === "true",
 };
@@ -76,7 +72,15 @@ export function hasServiceRole(): boolean {
   return Boolean(serverEnv.supabaseServiceRoleKey);
 }
 
-export type IntegrationName = "moneybird" | "gmail" | "hubspot";
+/**
+ * De koppelingen die SkoolPartner actief gebruikt.
+ *
+ * Bewust iets anders dan IntegrationSystem in types/database.ts: dat type
+ * spiegelt de enum in de database, waar de waarde hubspot nog in staat omdat
+ * daar historische rijen aan hangen. Deze lijst gaat over wat de applicatie
+ * daadwerkelijk aanroept.
+ */
+export type IntegrationName = "moneybird" | "gmail";
 
 export function integrationMode(name: IntegrationName): "live" | "mock" {
   if (serverEnv.forceMock) return "mock";
@@ -85,8 +89,6 @@ export function integrationMode(name: IntegrationName): "live" | "mock" {
       return serverEnv.moneybird.apiToken && serverEnv.moneybird.administrationId ? "live" : "mock";
     case "gmail":
       return serverEnv.google.clientId && serverEnv.google.clientSecret ? "live" : "mock";
-    case "hubspot":
-      return serverEnv.hubspot.token ? "live" : "mock";
   }
 }
 
@@ -103,9 +105,6 @@ export function missingCredentials(name: IntegrationName): string[] {
     if (!serverEnv.google.clientSecret) missing.push("GOOGLE_CLIENT_SECRET");
     if (!serverEnv.google.redirectUri) missing.push("GOOGLE_REDIRECT_URI");
     if (!serverEnv.appEncryptionKey) missing.push("APP_ENCRYPTION_KEY");
-  }
-  if (name === "hubspot") {
-    if (!serverEnv.hubspot.token) missing.push("HUBSPOT_PRIVATE_APP_TOKEN");
   }
   return missing;
 }

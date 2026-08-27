@@ -53,6 +53,51 @@ export function rolUitSupabaseSleutel(sleutel: string | null | undefined): strin
   }
 }
 
+/**
+ * Zegt in gewone taal wat de database terugstuurde.
+ *
+ * De melding van PostgREST bevat nooit een sleutel of wachtwoord, alleen de
+ * naam van een tabel en een reden. Die tonen wij daarom gewoon: zonder die
+ * tekst blijft het gissen tussen "geen rechten" en "tabel bestaat niet", en
+ * dat zijn twee heel verschillende problemen met twee verschillende
+ * oplossingen.
+ */
+export function verklaarDatabasefout(error: { message: string; code?: string }): DiagnoseRegel {
+  const tekst = error.message ?? "";
+  const kort = tekst.slice(0, 200);
+
+  if (/permission denied|row-level security/i.test(tekst)) {
+    return {
+      label: "Schrijfrechten op de database",
+      uitkomst: "fout",
+      waarde: `de database weigert deze sleutel: ${kort}`,
+      oplossing:
+        "De sleutel is van de juiste rol, maar mist rechten op de tabel. Draai setup-alles.sql opnieuw op dit project; onderaan staan de grants.",
+    };
+  }
+
+  if (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    /does not exist|could not find the table|schema cache/i.test(tekst)
+  ) {
+    return {
+      label: "Schrijfrechten op de database",
+      uitkomst: "fout",
+      waarde: `de tabel bestaat niet op dit project: ${kort}`,
+      oplossing:
+        "Draai supabase/setup-alles.sql in de SQL Editor van dit Supabase-project. Wijst NEXT_PUBLIC_SUPABASE_URL wel naar hetzelfde project waar je de migraties hebt gedraaid?",
+    };
+  }
+
+  return {
+    label: "Schrijfrechten op de database",
+    uitkomst: "fout",
+    waarde: kort || "onbekende fout",
+    oplossing: "Controleer of de migraties op dit Supabase-project zijn uitgevoerd.",
+  };
+}
+
 function sleutelRegel(): DiagnoseRegel {
   const sleutel = serverEnv.appEncryptionKey;
 
@@ -115,15 +160,7 @@ async function databaseRegels(): Promise<DiagnoseRegel[]> {
       .select("integration", { count: "exact", head: true });
 
     if (error) {
-      const rechten = /permission denied|row-level security/i.test(error.message);
-      regels.push({
-        label: "Schrijfrechten op de database",
-        uitkomst: "fout",
-        waarde: rechten ? "de database weigert deze sleutel" : "de tabel is niet bereikbaar",
-        oplossing: rechten
-          ? "Dit bevestigt dat de sleutel hierboven niet de service role key is. Dezelfde oorzaak blokkeert ook de facturensync."
-          : "Controleer of de migraties zijn uitgevoerd op dit Supabase-project.",
-      });
+      regels.push(verklaarDatabasefout(error));
     } else {
       regels.push({
         label: "Schrijfrechten op de database",
@@ -142,7 +179,7 @@ async function databaseRegels(): Promise<DiagnoseRegel[]> {
   return regels;
 }
 
-function googleRegels(): DiagnoseRegel[] {
+function googleRegels(gekoppeldAccount: string | null): DiagnoseRegel[] {
   const verwachteUri = `${publicEnv.siteUrl}/api/integrations/google/callback`;
   const ingesteld = serverEnv.google.redirectUri;
 
@@ -183,13 +220,53 @@ function googleRegels(): DiagnoseRegel[] {
     });
   }
 
+  const mailbox = serverEnv.google.mailbox;
+
+  if (!mailbox) {
+    regels.push({
+      label: "GMAIL_MAILBOX",
+      uitkomst: "fout",
+      waarde: "ontbreekt",
+      oplossing: "Vul hier het adres in waarmee jullie met klanten mailen.",
+    });
+  } else if (gekoppeldAccount && normaliseer(gekoppeldAccount) === normaliseer(mailbox)) {
+    /*
+      Dit is geen technische fout, maar wel een privacyrisico dat je moet zien.
+
+      Staat hier het persoonlijke inlogadres, dan valt de filter weg die
+      voorkomt dat privémail in SkoolPartner belandt: alles wat aan dat adres
+      is gericht telt dan opeens als klantcommunicatie. En uitgaande post naar
+      klanten komt dan van dat persoonlijke adres.
+    */
+    regels.push({
+      label: "GMAIL_MAILBOX",
+      uitkomst: "fout",
+      waarde: `${mailbox}, hetzelfde als het inlogaccount`,
+      oplossing:
+        "Hier hoort het gedeelde boekingenadres te staan, niet het persoonlijke inlogadres. Staan ze gelijk, dan telt alle post aan dat adres als klantcommunicatie en verliest de privacyfilter zijn werking.",
+    });
+  } else {
+    regels.push({
+      label: "GMAIL_MAILBOX",
+      uitkomst: "goed",
+      waarde: `${mailbox} (het adres waarmee wij met klanten mailen)`,
+    });
+  }
+
   regels.push({
-    label: "GMAIL_MAILBOX",
-    uitkomst: serverEnv.google.mailbox ? "goed" : "fout",
-    waarde: serverEnv.google.mailbox || "ontbreekt",
+    label: "Supabase-project",
+    uitkomst: publicEnv.supabaseUrl ? "goed" : "fout",
+    waarde: publicEnv.supabaseUrl || "ontbreekt",
+    oplossing: publicEnv.supabaseUrl
+      ? undefined
+      : "Zet NEXT_PUBLIC_SUPABASE_URL in Vercel en deploy opnieuw.",
   });
 
   return regels;
+}
+
+function normaliseer(waarde: string | null | undefined): string {
+  return (waarde ?? "").trim().toLowerCase();
 }
 
 export interface Diagnose {
@@ -198,7 +275,11 @@ export interface Diagnose {
   kanKoppelen: boolean;
 }
 
-export async function diagnoseGmail(): Promise<Diagnose> {
-  const regels = [sleutelRegel(), ...(await databaseRegels()), ...googleRegels()];
+export async function diagnoseGmail(gekoppeldAccount: string | null = null): Promise<Diagnose> {
+  const regels = [
+    sleutelRegel(),
+    ...(await databaseRegels()),
+    ...googleRegels(gekoppeldAccount),
+  ];
   return { regels, kanKoppelen: regels.every((r) => r.uitkomst !== "fout") };
 }

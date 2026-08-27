@@ -14,6 +14,14 @@ export type MembershipRole = "beheerder" | "lid";
 export type MembershipStatus = "pending" | "active" | "rejected" | "removed";
 export type MembershipSource = "invite" | "domain_match" | "self_request" | "admin_manual" | "import";
 export type BookingStatus = "concept" | "confirmed" | "completed" | "cancelled";
+/**
+ * Spiegelt de enum booking_origin in de database.
+ *
+ * De waarde "hubspot" staat er nog in omdat een enumwaarde in Postgres niet
+ * zonder meer te verwijderen is en er historische rijen aan kunnen hangen.
+ * SkoolPartner maakt er zelf geen boekingen meer mee aan; zie de smallere
+ * union in src/lib/bookings/ingest.ts.
+ */
 export type BookingOrigin = "email_parser" | "admin_manual" | "import" | "hubspot";
 export type SourceMatchStatus = "pending" | "matched" | "needs_review" | "rejected" | "ignored";
 export type InvoiceState =
@@ -27,6 +35,13 @@ export type CjpCreditType = "parking" | "spend" | "correction" | "refund";
 export type LoyaltyTransactionStatus =
   | "pending" | "available" | "reserved" | "redeemed" | "expired" | "reversed" | "cancelled";
 export type RedemptionStatus = "requested" | "approved" | "rejected" | "applied" | "cancelled";
+/**
+ * Spiegelt de enum integration_system in de database.
+ *
+ * "hubspot" blijft hier staan zolang de enumwaarde in Postgres bestaat en er
+ * nog een rij in integration_sync_state aan hangt. De koppelingen die de
+ * applicatie daadwerkelijk gebruikt staan in IntegrationName (src/lib/env.ts).
+ */
 export type IntegrationSystem = "gmail" | "moneybird" | "hubspot" | "supabase";
 export type ThreadVisibility = "needs_review" | "auto_allowed" | "manual_allowed" | "blocked";
 export type MessageDirection = "inbound" | "outbound";
@@ -148,6 +163,7 @@ export type OrganizationContactRow = {
   is_verified: boolean;
   verified_at: string | null;
   verified_by: string | null;
+  /** Historisch veld. Wordt niet meer gevuld; blijft staan voor bestaande data. */
   hubspot_contact_id: string | null;
   moneybird_contact_id: string | null;
   created_at: string;
@@ -174,6 +190,7 @@ export type BookingRow = {
   booking_source_id: string | null;
   contact_email: string | null;
   contact_name: string | null;
+  /** Historisch veld. Wordt niet meer gevuld; blijft staan voor bestaande data. */
   hubspot_deal_id: string | null;
   notes: string | null;
   needs_review: boolean;
