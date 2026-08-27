@@ -274,7 +274,7 @@ export async function testIntegrationAction(
   const session = await requireAdmin();
   const naam = String(formData.get("integration") ?? "");
 
-  if (naam !== "moneybird" && naam !== "gmail" && naam !== "hubspot") {
+  if (naam !== "moneybird" && naam !== "gmail") {
     return { status: "error", message: "Onbekende integratie." };
   }
 
@@ -1023,10 +1023,9 @@ export async function runSyncAction(_prev: AdminState, formData: FormData): Prom
 
   const { syncGmail } = await import("@/lib/integrations/gmail/sync");
   const { syncMoneybirdInvoices } = await import("@/lib/integrations/moneybird/sync");
-  const { syncHubSpot } = await import("@/lib/integrations/hubspot/sync");
 
   const runner =
-    which === "gmail" ? syncGmail : which === "moneybird" ? syncMoneybirdInvoices : which === "hubspot" ? syncHubSpot : null;
+    which === "gmail" ? syncGmail : which === "moneybird" ? syncMoneybirdInvoices : null;
 
   if (!runner) return { status: "error", message: "Onbekende integratie." };
 

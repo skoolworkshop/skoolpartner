@@ -34,11 +34,6 @@ const LABELS: Record<string, { title: string; description: string }> = {
     description:
       "Primaire financiële bron: facturen, bedragen en betaalstatus. Bepaalt wanneer SkoolPoints van 'in behandeling' naar 'beschikbaar' gaan.",
   },
-  hubspot: {
-    title: "HubSpot",
-    description:
-      "Aanvullende CRM-bron voor bedrijven en contactpersonen. Wordt nooit als enige bron voor workshopuren gebruikt.",
-  },
 };
 
 export default async function AdminIntegrationsPage({
@@ -48,11 +43,12 @@ export default async function AdminIntegrationsPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [states, gmail, diagnose] = await Promise.all([
+  const [states, gmail] = await Promise.all([
     getSyncStates() as Promise<IntegrationSyncStateRow[]>,
     getGmailStatus(),
-    diagnoseGmail(),
   ]);
+  // Pas hierna, want de diagnose wil weten met welk account is gekoppeld.
+  const diagnose = await diagnoseGmail(gmail.accountEmail);
 
   return (
     <>
@@ -83,7 +79,7 @@ export default async function AdminIntegrationsPage({
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        {(["gmail", "moneybird", "hubspot"] as const).map((name) => {
+        {(["gmail", "moneybird"] as const).map((name) => {
           const mode = integrationMode(name);
           const missing = missingCredentials(name);
           const state = states.find((s) => s.integration === name);
