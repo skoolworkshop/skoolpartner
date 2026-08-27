@@ -5,20 +5,19 @@ import { ActionForm } from "@/components/admin/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
-import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Input } from "@/components/ui/form";
 import { requireAdmin } from "@/lib/auth/session";
 import { listOrganizations } from "@/lib/admin/queries";
 import { formatDateTime } from "@/lib/format";
 import { getAllResults } from "@/lib/results/service";
 import { getSettings } from "@/lib/settings";
-import { createServiceSupabase } from "@/lib/supabase/server";
 import {
   addResultLinkAction,
-  createResultAction,
   deleteResultAction,
   deleteResultFileAction,
   publishResultAction,
 } from "../actions";
+import { NewResultForm } from "./new-result-form";
 import { ResultUploader } from "./uploader";
 
 export const metadata: Metadata = { title: "Resultaten" };
@@ -32,16 +31,10 @@ function formatBytes(bytes: number | null): string {
 export default async function AdminResultsPage() {
   await requireAdmin();
 
-  const supabase = createServiceSupabase();
-  const [results, organizations, settings, { data: bookings }] = await Promise.all([
+  const [results, organizations, settings] = await Promise.all([
     getAllResults(),
     listOrganizations(),
     getSettings(),
-    supabase
-      .from("bookings")
-      .select("id, reference, workshop_name, scheduled_date, organization_id, contact_email")
-      .order("scheduled_date", { ascending: false })
-      .limit(120),
   ]);
 
   return (
@@ -57,55 +50,14 @@ export default async function AdminResultsPage() {
       <Card className="mb-6">
         <CardHeader title="Nieuwe set aanmaken" />
         <CardBody>
-          <ActionForm action={createResultAction} submitLabel="Aanmaken">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Organisatie" htmlFor="organization_id">
-                <Select id="organization_id" name="organization_id" required>
-                  <option value="">Kies een organisatie</option>
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <Field
-                label="Boeking"
-                htmlFor="booking_id"
-                hint="Bepaalt naar welke contactpersoon de mail gaat."
-              >
-                <Select id="booking_id" name="booking_id">
-                  <option value="">Geen boeking koppelen</option>
-                  {(bookings ?? []).map((booking) => (
-                    <option key={booking.id} value={booking.id}>
-                      {booking.reference ? `${booking.reference} · ` : ""}
-                      {booking.workshop_name}
-                      {booking.scheduled_date ? ` · ${booking.scheduled_date}` : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-
-            <Field label="Titel" htmlFor="title">
-              <Input
-                id="title"
-                name="title"
-                required
-                placeholder="Bijvoorbeeld: Cultuurdag 14 maart"
-              />
-            </Field>
-
-            <Field label="Toelichting" htmlFor="description">
-              <Textarea
-                id="description"
-                name="description"
-                rows={3}
-                placeholder="Korte tekst die de klant bij de bestanden ziet."
-              />
-            </Field>
-          </ActionForm>
+          <NewResultForm
+            organizations={organizations.map((organization) => ({
+              id: organization.id,
+              name: organization.name,
+              city: organization.city,
+            }))}
+            maxMb={settings.results_max_upload_mb}
+          />
         </CardBody>
       </Card>
 

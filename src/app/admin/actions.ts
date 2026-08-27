@@ -46,6 +46,7 @@ export interface AdminState {
   status: "idle" | "ok" | "error";
   message?: string;
   inviteUrl?: string;
+  resultId?: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1067,19 +1068,53 @@ export async function createResultAction(
   if (title.length < 2) return { status: "error", message: "Vul een titel in." };
 
   const supabase = createServiceSupabase();
-  const { error } = await supabase.from("workshop_results").insert({
-    organization_id: organizationId,
-    booking_id: bookingId || null,
-    title,
-    description: description || null,
-    status: "concept",
-    created_by: session.userId,
-  });
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("id", organizationId)
+    .maybeSingle();
 
-  if (error) return { status: "error", message: error.message };
+  if (!organization) return { status: "error", message: "Deze organisatie bestaat niet meer." };
+
+  if (bookingId) {
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("id")
+      .eq("id", bookingId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    if (!booking) {
+      return {
+        status: "error",
+        message: "Deze boeking hoort niet bij de gekozen organisatie. Kies de boeking opnieuw.",
+      };
+    }
+  }
+
+  const { data: created, error } = await supabase
+    .from("workshop_results")
+    .insert({
+      organization_id: organizationId,
+      booking_id: bookingId || null,
+      title,
+      description: description || null,
+      status: "concept",
+      created_by: session.userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) {
+    return { status: "error", message: error?.message ?? "De set kon niet worden aangemaakt." };
+  }
 
   revalidatePath("/admin/resultaten");
-  return { status: "ok", message: "Set aangemaakt. Voeg nu bestanden of links toe." };
+  return {
+    status: "ok",
+    message: "Set aangemaakt. Voeg nu bestanden of downloadlinks toe.",
+    resultId: created.id,
+  };
 }
 
 export async function addResultLinkAction(
