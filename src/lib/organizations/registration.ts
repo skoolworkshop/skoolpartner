@@ -22,12 +22,12 @@ import type { RegistrationDetails } from "@/lib/types/database";
  *                        te beschermen. Hij komt meteen binnen en SkoolPartner
  *                        begint nu.
  *
- *   Bestaande organisatie De aanvraag gaat altijd langs een beheerder, ook bij
- *                        een domeinmatch. Wat de aanvrager invulde over die
- *                        organisatie wordt bewaard in requested_details en pas
- *                        overgenomen na goedkeuring. Zo kan niemand het adres
- *                        of telefoonnummer van een bestaande school wijzigen
- *                        door zich aan te melden.
+ *   Bestaande organisatie Een geverifieerd organisatieadres of een
+ *                        geverifieerd schooldomein geeft direct toegang. Een
+ *                        onbekend adres gaat langs een beheerder. Zo komt een
+ *                        echte collega na afronden meteen in het klantportaal,
+ *                        zonder organisatiegegevens voor buitenstaanders open
+ *                        te zetten.
  */
 
 export type RegistrationOutcome =
@@ -266,6 +266,78 @@ export async function completeRegistration(params: {
     .eq("organization_id", organizationId)
     .eq("user_id", params.userId)
     .maybeSingle();
+
+  const normalizedEmail = params.userEmail.trim().toLowerCase();
+  const domain = emailDomain(normalizedEmail);
+  const [{ data: verifiedContact }, { data: verifiedDomain }] = await Promise.all([
+    supabase
+      .from("organization_contacts")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .ilike("email", normalizedEmail)
+      .eq("is_verified", true)
+      .maybeSingle(),
+    domain
+      ? supabase
+          .from("organization_domains")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .eq("domain", domain)
+          .eq("is_verified", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const magDirectNaarPortaal =
+    bestaandLid?.status === "active" || Boolean(verifiedContact || verifiedDomain);
+
+  if (magDirectNaarPortaal) {
+    if (bestaandLid?.status !== "active") {
+      const { error } = await supabase.from("organization_members").upsert(
+        {
+          organization_id: organizationId,
+          user_id: params.userId,
+          role: "lid",
+          status: "active",
+          source: "self_request",
+          approved_at: new Date().toISOString(),
+        },
+        { onConflict: "organization_id,user_id" }
+      );
+
+      if (error) return { ok: false, message: "Uw aanmelding kon niet worden opgeslagen." };
+    }
+
+    await supabase.from("organization_contacts").upsert(
+      {
+        organization_id: organizationId,
+        email: normalizedEmail,
+        full_name: values.fullName,
+        user_id: params.userId,
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,email" }
+    );
+
+    await recordAudit({
+      actorId: params.userId,
+      actorEmail: params.userEmail,
+      actorRole: "klant",
+      action: "registration.completed",
+      entityType: "organization_member",
+      entityId: organizationId,
+      organizationId,
+      after: {
+        status: "active",
+        organisatie: values.organizationName,
+        nieuw: false,
+        directe_toegang: verifiedContact ? "contact" : verifiedDomain ? "domein" : "bestaand_lid",
+      },
+    });
+
+    return { ok: true, state: "active", organizationId };
+  }
 
   if (bestaandLid?.status !== "active") {
     const { error } = await supabase.from("organization_members").upsert(
