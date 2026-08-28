@@ -2,7 +2,6 @@ import "server-only";
 
 import { recordAudit } from "@/lib/audit";
 import { awardWelcomeBonus } from "@/lib/loyalty/ledger";
-import { fetchOrganizationLogo } from "@/lib/organizations/logo";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { emailDomain, slugify } from "@/lib/utils";
 import type { RegistrationValues } from "@/lib/registration";
@@ -63,13 +62,13 @@ export async function completeRegistration(params: {
   //    nooit uit het formulier.
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({
+    .upsert({
+      id: params.userId,
       full_name: values.fullName,
       phone: values.phone,
       job_title: values.jobTitle,
       email: params.userEmail,
-    })
-    .eq("id", params.userId);
+    }, { onConflict: "id" });
 
   if (profileError) {
     console.error("[registratie] basisprofiel opslaan mislukt", {
@@ -256,18 +255,6 @@ export async function completeRegistration(params: {
       organizationId,
       after: { status: "active", organisatie: values.organizationName, nieuw: true },
     });
-
-    // Het logo zoeken op het eigen domein van de school. Lukt dat niet, dan
-    // blijft het gebouwicoon staan; de registratie mag hier nooit op stuklopen.
-    try {
-      await fetchOrganizationLogo({
-        organizationId,
-        actorId: params.userId,
-        actorEmail: params.userEmail,
-      });
-    } catch (error) {
-      console.error("[registratie] logo ophalen mislukt", error);
-    }
 
     return { ok: true, state: "active", organizationId };
   }

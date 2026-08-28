@@ -22,6 +22,7 @@ export function Field({
   hint,
   error,
   required,
+  showOptional = true,
   children,
   className,
 }: {
@@ -30,6 +31,8 @@ export function Field({
   hint?: string;
   error?: string | null;
   required?: boolean;
+  /** Verberg alleen het woord 'optioneel'; het veld blijft technisch optioneel. */
+  showOptional?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -41,9 +44,9 @@ export function Field({
           <span className="ml-1 text-accent-strong" aria-hidden>
             *
           </span>
-        ) : (
+        ) : showOptional ? (
           <span className="ml-1 font-normal text-muted-soft">(optioneel)</span>
-        )}
+        ) : null}
       </label>
       {hint ? (
         <p id={`${htmlFor}-hint`} className="text-sm text-muted">

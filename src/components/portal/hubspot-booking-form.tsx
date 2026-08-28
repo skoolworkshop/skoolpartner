@@ -1,11 +1,13 @@
 "use client";
 
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Alert, Skeleton } from "@/components/ui/feedback";
 
 const TARGET_ID = "hubspot-new-booking-form";
+const FORM_ID = "cf6c7f07-c534-4859-bc01-c79700b78330";
 
 export type HubSpotBookingPrefill = {
   firstName?: string | null;
@@ -96,15 +98,24 @@ type HubSpotWindow = Window & {
         target: string;
         locale?: "nl";
         onFormReady?(form: HubSpotFormHandle): void;
+        onFormSubmitted?(): void;
       }): void;
     };
   };
 };
 
 export function HubSpotBookingForm({ prefill }: { prefill: HubSpotBookingPrefill }) {
+  const router = useRouter();
   const created = useRef(false);
   const ready = useRef(false);
+  const submitted = useRef(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  const showThankYouPage = useCallback(() => {
+    if (submitted.current) return;
+    submitted.current = true;
+    router.push("/nieuwe-boeking/bedankt");
+  }, [router]);
 
   const createForm = useCallback(() => {
     const hubspot = (window as HubSpotWindow).hbspt;
@@ -118,7 +129,7 @@ export function HubSpotBookingForm({ prefill }: { prefill: HubSpotBookingPrefill
       hubspot.forms.create({
         region: "eu1",
         portalId: "144599131",
-        formId: "cf6c7f07-c534-4859-bc01-c79700b78330",
+        formId: FORM_ID,
         target: `#${TARGET_ID}`,
         locale: "nl",
         onFormReady: (form) => {
@@ -126,12 +137,32 @@ export function HubSpotBookingForm({ prefill }: { prefill: HubSpotBookingPrefill
           ready.current = true;
           setStatus("ready");
         },
+        onFormSubmitted: showThankYouPage,
       });
       created.current = true;
     } catch {
       setStatus("error");
     }
-  }, [prefill]);
+  }, [prefill, showThankYouPage]);
+
+  useEffect(() => {
+    // HubSpot verstuurt dit bericht pas nadat de inzending is opgeslagen.
+    // De globale listener is een betrouwbare aanvulling op de embed-callback,
+    // onder andere wanneer HubSpot het formulier in een iframe rendert.
+    function onHubSpotMessage(event: MessageEvent) {
+      const data = event.data as { type?: string; eventName?: string; id?: string } | null;
+      if (
+        data?.type === "hsFormCallback" &&
+        data.eventName === "onFormSubmitted" &&
+        data.id === FORM_ID
+      ) {
+        showThankYouPage();
+      }
+    }
+
+    window.addEventListener("message", onHubSpotMessage);
+    return () => window.removeEventListener("message", onHubSpotMessage);
+  }, [showThankYouPage]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

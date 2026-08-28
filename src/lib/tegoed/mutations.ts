@@ -3,13 +3,13 @@ import "server-only";
 import { recordAudit } from "@/lib/audit";
 import { getSettingsWithServiceRole } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/server";
-import { notifyNewParkingRequest } from "@/lib/tegoed/notify";
 import type { ParkingSnapshot } from "@/lib/tegoed/regels";
 import type { CjpParkingRequestRow } from "@/lib/types/database";
 
 export interface CreateResult {
   ok: boolean;
   request?: CjpParkingRequestRow;
+  organizationName?: string;
   message?: string;
   /** De melding is los van de aanvraag: die kan mislukken zonder gevolgen voor de klant. */
   notice?: string;
@@ -151,12 +151,10 @@ export async function createParkingRequest(params: {
     },
   });
 
-  const melding = await notifyNewParkingRequest(row, organization.name);
-
   return {
     ok: true,
     request: row,
-    notice: melding.sent ? undefined : melding.reason,
+    organizationName: organization.name,
   };
 }
 
