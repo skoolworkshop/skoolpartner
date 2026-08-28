@@ -43,6 +43,8 @@ export interface CustomerPreview {
   userId: string;
   userName: string;
   userEmail: string;
+  administratorId: string;
+  administratorEmail: string;
 }
 
 /**
@@ -128,7 +130,7 @@ export async function requireMember(): Promise<
   let customerPreview: CustomerPreview | null = null;
   const cookieStore = await cookies();
 
-  // Een beheerder kan een klantportaal read-only bekijken. De cookie is nooit
+  // Een beheerder kan een klantportaal bekijken en klantgegevens beheren. De cookie is nooit
   // voldoende op zichzelf: alleen een op dit moment geautoriseerde beheerder
   // komt in deze tak, en het doelaccount wordt opnieuw server-side opgezocht.
   const previewUserId = context.isAdmin
@@ -136,6 +138,8 @@ export async function requireMember(): Promise<
     : null;
 
   if (previewUserId) {
+    const administratorId = context.userId;
+    const administratorEmail = context.email;
     const service = createServiceSupabase();
     const [{ data: profile }, { data: memberRows }] = await Promise.all([
       service.from("profiles").select("*").eq("id", previewUserId).maybeSingle(),
@@ -171,6 +175,8 @@ export async function requireMember(): Promise<
         userId: profile.id,
         userName: profile.full_name ?? profile.email,
         userEmail: profile.email,
+        administratorId,
+        administratorEmail,
       };
     }
   }
