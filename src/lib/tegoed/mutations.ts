@@ -56,12 +56,20 @@ export async function createParkingRequest(params: {
 
   // Eén open aanvraag tegelijk. Voorkomt dubbelklikken en voorkomt dat iemand
   // hetzelfde bedrag in stukjes indient om vaker de bonus te proberen.
-  const { data: open } = await supabase
+  const { data: open, error: openError } = await supabase
     .from("cjp_parking_requests")
     .select("id")
     .eq("organization_id", params.organizationId)
     .in("status", ["requested", "in_review"])
     .limit(1);
+
+  if (openError) {
+    console.error("[cjp] openstaande aanvragen ophalen mislukt", {
+      code: openError.code,
+      message: openError.message,
+    });
+    return { ok: false, message: vertaalOpslagFout(openError.message, openError.code) };
+  }
 
   if (open && open.length > 0) {
     return {
@@ -98,12 +106,13 @@ export async function createParkingRequest(params: {
     .single();
 
   if (error || !request) {
-    console.error("[cjp] aanvraag kon niet worden opgeslagen", error?.message);
+    console.error("[cjp] aanvraag kon niet worden opgeslagen", {
+      code: error?.code,
+      message: error?.message,
+    });
     return {
       ok: false,
-      message: error?.message?.includes("permission denied")
-        ? "De database mist schrijfrechten voor CJP-aanvragen. Voer de nieuwste Supabase-migratie uit en probeer opnieuw."
-        : `Uw aanvraag kon niet worden opgeslagen${error?.message ? `: ${error.message}` : ". Probeer het opnieuw."}`,
+      message: vertaalOpslagFout(error?.message, error?.code),
     };
   }
 
@@ -161,6 +170,21 @@ export async function createParkingRequest(params: {
 function schoolYear(date = new Date()): string {
   const year = date.getFullYear();
   return date.getMonth() >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
+function vertaalOpslagFout(message?: string, code?: string): string {
+  const normalized = message?.toLowerCase() ?? "";
+  if (
+    code === "PGRST205" ||
+    normalized.includes("cjp_parking_requests") ||
+    normalized.includes("schema cache")
+  ) {
+    return "CJP-tegoed is nog niet volledig geïnstalleerd in de database. De beheerder moet eenmalig de nieuwste Supabase-installatie uitvoeren.";
+  }
+  if (normalized.includes("permission denied")) {
+    return "De database mist schrijfrechten voor CJP-aanvragen. De beheerder moet de nieuwste Supabase-installatie uitvoeren.";
+  }
+  return "Uw aanvraag kon niet worden opgeslagen. Probeer het opnieuw of neem contact met ons op.";
 }
 
 /* -------------------------------------------------------------------------- */
