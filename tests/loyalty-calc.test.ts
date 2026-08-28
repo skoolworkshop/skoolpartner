@@ -74,6 +74,7 @@ describe("waarde van SkoolPoints", () => {
     expect(pointsToCents(150, 250)).toBe(375);
     expect(pointsToCents(500, 250)).toBe(1250);
     expect(pointsToCents(1000, 250)).toBe(2500);
+    expect(pointsToCents(1600, 250)).toBe(4000);
     expect(pointsToCents(2500, 250)).toBe(6250);
     expect(pointsToCents(5000, 250)).toBe(12500);
     expect(pointsToCents(10000, 250)).toBe(25000);

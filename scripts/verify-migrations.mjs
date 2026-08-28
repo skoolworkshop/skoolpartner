@@ -93,19 +93,21 @@ async function main() {
     insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111', 'test@voorbeeld.nl');
     insert into public.organizations (id, name, slug)
       values ('22222222-2222-2222-2222-222222222222', 'Testschool', 'testschool');
+    insert into public.organization_members (organization_id, user_id, role, status, source)
+      values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'beheerder', 'active', 'admin_manual');
   `);
   const accountId = (
     await db.query(
-      `select public.ensure_loyalty_account('22222222-2222-2222-2222-222222222222'::uuid, null) as id`
+      `select public.ensure_loyalty_account('22222222-2222-2222-2222-222222222222'::uuid, '11111111-1111-1111-1111-111111111111'::uuid) as id`
     )
   ).rows[0].id;
 
   await db.exec(`
     insert into public.loyalty_transactions
-      (organization_id, account_id, type, status, points, point_value_cents_per_100, description, external_reference)
+      (organization_id, user_id, account_id, type, status, points, point_value_cents_per_100, description, external_reference)
     values
-      ('22222222-2222-2222-2222-222222222222', '${accountId}', 'earn_workshop', 'available', 600, 250, '4 x 90 minuten', 'booking:test-1'),
-      ('22222222-2222-2222-2222-222222222222', '${accountId}', 'redemption_reserve', 'reserved', -500, 250, 'Gereserveerd', 'red:test-1');
+      ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', '${accountId}', 'earn_workshop', 'available', 600, 250, '4 x 90 minuten', 'booking:test-1'),
+      ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', '${accountId}', 'redemption_reserve', 'reserved', -500, 250, 'Gereserveerd', 'red:test-1');
   `);
 
   const balance = (
@@ -131,8 +133,8 @@ async function main() {
   try {
     await db.exec(`
       insert into public.loyalty_transactions
-        (organization_id, account_id, type, status, points, point_value_cents_per_100, description, external_reference)
-      values ('22222222-2222-2222-2222-222222222222', '${accountId}', 'earn_workshop', 'available', 600, 250, 'dubbel', 'booking:test-1');
+        (organization_id, user_id, account_id, type, status, points, point_value_cents_per_100, description, external_reference)
+      values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', '${accountId}', 'earn_workshop', 'available', 600, 250, 'dubbel', 'booking:test-1');
     `);
   } catch {
     duplicateBlocked = true;
@@ -167,18 +169,18 @@ async function main() {
     return;
   }
 
-  // De welkomstbonus: precies één per organisatie, hoe vaak je het ook probeert.
+  // De welkomstbonus: precies één per gebruiker, hoe vaak je het ook probeert.
   const bonus = `
     insert into public.loyalty_transactions
-      (organization_id, account_id, type, status, points, point_value_cents_per_100,
+      (organization_id, user_id, account_id, type, status, points, point_value_cents_per_100,
        description, source, external_reference, available_at)
-    values ('22222222-2222-2222-2222-222222222222', '${accountId}', 'welcome_bonus', 'available',
+    values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', '${accountId}', 'welcome_bonus', 'available',
             100, 250, 'Welkomstbonus SkoolPartner', 'portal', 'welcome', now())
-    on conflict (organization_id, type, external_reference) where external_reference is not null
+    on conflict (organization_id, user_id, type, external_reference) where external_reference is not null
     do nothing;
   `;
   // Vier pogingen: opnieuw registreren, opnieuw verifiëren, opnieuw inloggen,
-  // en een tweede medewerker die erbij komt.
+  // en een herhaalde callback.
   await db.exec(bonus);
   await db.exec(bonus);
   await db.exec(bonus);
@@ -195,7 +197,7 @@ async function main() {
   const bonusOk = bonusRows.aantal === 1 && bonusRows.punten === 100;
   console.log(
     bonusOk
-      ? "  Welkomstbonus: vier pogingen leveren precies één bonus van 100 punten op"
+      ? "  Welkomstbonus: vier pogingen leveren per gebruiker precies één bonus op"
       : `  FOUT: welkomstbonus gaf ${bonusRows.aantal} transacties met ${bonusRows.punten} punten`
   );
   if (!bonusOk) {
@@ -208,8 +210,8 @@ async function main() {
   try {
     await db.exec(`
       insert into public.loyalty_transactions
-        (organization_id, account_id, type, status, points, point_value_cents_per_100, description)
-      values ('22222222-2222-2222-2222-222222222222', '${accountId}', 'manual_adjustment', 'available', 50, 250, 'zonder reden');
+        (organization_id, user_id, account_id, type, status, points, point_value_cents_per_100, description)
+      values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', '${accountId}', 'manual_adjustment', 'available', 50, 250, 'zonder reden');
     `);
   } catch {
     reasonRequired = true;
