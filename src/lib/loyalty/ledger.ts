@@ -44,10 +44,34 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
   if (booking.needs_review) return { ok: false, skipped: "Boeking wacht nog op controle" };
   if (booking.points_awarded) return { ok: false, skipped: "Punten zijn al toegekend" };
 
+  // Een boeking levert punten op voor de bijbehorende contactpersoon, nooit
+  // voor alle medewerkers van de school samen.
+  const contactEmail = booking.contact_email?.trim().toLowerCase();
+  if (!contactEmail) return { ok: false, skipped: "Boeking heeft geen contactpersoon" };
+  const { data: beneficiary } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", contactEmail)
+    .maybeSingle();
+  if (!beneficiary) return { ok: false, skipped: "Contactpersoon heeft nog geen account" };
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("id")
+    .eq("organization_id", booking.organization_id)
+    .eq("user_id", beneficiary.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!membership) return { ok: false, skipped: "Contactpersoon is geen actief lid van deze school" };
+
+  await supabase.rpc("ensure_loyalty_account", {
+    p_org: booking.organization_id,
+    p_actor: beneficiary.id,
+  });
   const { data: account } = await supabase
     .from("loyalty_accounts")
     .select("id, enrolled_at, is_active")
     .eq("organization_id", booking.organization_id)
+    .eq("user_id", beneficiary.id)
     .maybeSingle();
 
   if (!account || !account.is_active) {
@@ -81,6 +105,7 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
     .upsert(
       {
         organization_id: booking.organization_id,
+        user_id: beneficiary.id,
         account_id: account.id,
         type: "earn_workshop",
         status: "pending",
@@ -100,7 +125,7 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
           ? new Date(booking.scheduled_date).toISOString()
           : new Date().toISOString(),
       },
-      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
+      { onConflict: "organization_id,user_id,type,external_reference", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
@@ -158,10 +183,12 @@ export async function awardWelcomeBonus(params: {
     return { ok: false, skipped: "Welkomstbonus staat op 0 punten" };
   }
 
+  if (!params.actorId) return { ok: false, skipped: "Geen gebruiker voor welkomstbonus" };
   const { data: account } = await supabase
     .from("loyalty_accounts")
     .select("id, is_active")
     .eq("organization_id", params.organizationId)
+    .eq("user_id", params.actorId)
     .maybeSingle();
 
   // Geen account betekent: nog niet echt geactiveerd. Dan ook geen bonus.
@@ -174,6 +201,7 @@ export async function awardWelcomeBonus(params: {
     .upsert(
       {
         organization_id: params.organizationId,
+        user_id: params.actorId,
         account_id: account.id,
         type: "welcome_bonus",
         status: "available",
@@ -190,7 +218,7 @@ export async function awardWelcomeBonus(params: {
           : null,
         created_by: params.actorId ?? null,
       },
-      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
+      { onConflict: "organization_id,user_id,type,external_reference", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
@@ -199,7 +227,7 @@ export async function awardWelcomeBonus(params: {
 
   // Geen rij terug betekent: er was er al een. Dat is geen fout, dat is de
   // bedoeling.
-  if (!transaction) return { ok: false, skipped: "Deze organisatie had de welkomstbonus al" };
+  if (!transaction) return { ok: false, skipped: "Deze gebruiker had de welkomstbonus al" };
 
   await recordAudit({
     actorId: params.actorId ?? null,
@@ -240,11 +268,13 @@ export async function awardReviewBonus(params: {
 
   if (!review) return { ok: false, message: "Review niet gevonden" };
   if (review.status !== "verified") return { ok: false, skipped: "Review is nog niet geverifieerd" };
+  if (!review.submitted_by) return { ok: false, skipped: "Review heeft geen gekoppelde gebruiker" };
 
   const { data: account } = await supabase
     .from("loyalty_accounts")
     .select("id, is_active")
     .eq("organization_id", review.organization_id)
+    .eq("user_id", review.submitted_by)
     .maybeSingle();
 
   if (!account?.is_active) {
@@ -256,6 +286,7 @@ export async function awardReviewBonus(params: {
     .upsert(
       {
         organization_id: review.organization_id,
+        user_id: review.submitted_by,
         account_id: account.id,
         type: "earn_review",
         status: "available",
@@ -274,7 +305,7 @@ export async function awardReviewBonus(params: {
           : null,
         created_by: params.adminId,
       },
-      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
+      { onConflict: "organization_id,user_id,type,external_reference", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
@@ -297,6 +328,7 @@ export async function awardReviewBonus(params: {
 /** Handmatige correctie door een admin. Een reden is verplicht. */
 export async function manualAdjustment(params: {
   organizationId: string;
+  userId: string;
   points: number;
   reason: string;
   description?: string;
@@ -317,15 +349,19 @@ export async function manualAdjustment(params: {
     .from("loyalty_accounts")
     .select("id")
     .eq("organization_id", params.organizationId)
+    .eq("user_id", params.userId)
     .maybeSingle();
 
   if (!account) return { ok: false, message: "Deze organisatie heeft nog geen SkoolPartner-account." };
 
   if (params.points < 0) {
-    const { data: available } = await supabase.rpc("loyalty_available_points", {
-      p_org: params.organizationId,
-    });
-    if (typeof available === "number" && available + params.points < 0) {
+    const { data: balance } = await supabase
+      .from("loyalty_balances")
+      .select("available_points")
+      .eq("account_id", account.id)
+      .maybeSingle();
+    const available = balance?.available_points ?? 0;
+    if (available + params.points < 0) {
       return { ok: false, message: `Onvoldoende saldo: er is ${available} beschikbaar.` };
     }
   }
@@ -334,6 +370,7 @@ export async function manualAdjustment(params: {
     .from("loyalty_transactions")
     .insert({
       organization_id: params.organizationId,
+      user_id: params.userId,
       account_id: account.id,
       type: "manual_adjustment",
       status: "available",
@@ -399,6 +436,7 @@ export async function reverseTransaction(params: {
     .from("loyalty_transactions")
     .insert({
       organization_id: typed.organization_id,
+      user_id: typed.user_id,
       account_id: typed.account_id,
       type: "reversal",
       status: "reversed",

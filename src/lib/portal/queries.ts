@@ -17,6 +17,7 @@ import type {
 
 const EMPTY_BALANCE: LoyaltyBalanceRow = {
   organization_id: "",
+  user_id: null,
   account_id: "",
   enrolled_at: new Date().toISOString(),
   is_active: false,

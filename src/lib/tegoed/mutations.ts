@@ -109,21 +109,25 @@ export async function createParkingRequest(params: {
 
   const row = request as CjpParkingRequestRow;
 
-  // Het nummer bewaren op de organisatie als het daar nog niet stond. Wij
-  // overschrijven een bestaand nummer nooit stilzwijgend.
-  if (!organization.cjp_school_number) {
+  // Het nummer hoort bij de contactpersoon, niet bij alle medewerkers van de school.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("cjp_school_number")
+    .eq("id", params.userId)
+    .maybeSingle();
+  if (!profile?.cjp_school_number) {
     await supabase
-      .from("organizations")
+      .from("profiles")
       .update({ cjp_school_number: params.snapshot.cjpSchoolNumber, has_cjp: true })
-      .eq("id", params.organizationId);
+      .eq("id", params.userId);
 
     await recordAudit({
       actorId: params.userId,
       actorEmail: params.userEmail,
       actorRole: "klant",
-      action: "organization.cjp_number_set",
-      entityType: "organization",
-      entityId: params.organizationId,
+      action: "profile.cjp_number_set",
+      entityType: "profile",
+      entityId: params.userId,
       organizationId: params.organizationId,
       before: { cjp_school_number: null },
       after: { cjp_school_number: params.snapshot.cjpSchoolNumber },

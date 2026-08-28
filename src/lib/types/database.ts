@@ -58,6 +58,8 @@ export type ProfileRow = {
   last_name: string | null;
   phone: string | null;
   job_title: string | null;
+  cjp_school_number: string | null;
+  has_cjp: boolean | null;
   is_admin: boolean;
   is_super_admin: boolean;
   is_blocked: boolean;
@@ -316,6 +318,7 @@ export type ExternalRecordMappingRow = {
 export type LoyaltyAccountRow = {
   id: string;
   organization_id: string;
+  user_id: string | null;
   enrolled_at: string;
   enrolled_by: string | null;
   is_active: boolean;
@@ -326,6 +329,7 @@ export type LoyaltyAccountRow = {
 export type LoyaltyTransactionRow = {
   id: string;
   organization_id: string;
+  user_id: string | null;
   account_id: string;
   type: LoyaltyTransactionType;
   status: LoyaltyTransactionStatus;
@@ -362,6 +366,7 @@ export type LoyaltyTransactionEventRow = {
 
 export type LoyaltyBalanceRow = {
   organization_id: string;
+  user_id: string | null;
   account_id: string;
   enrolled_at: string;
   is_active: boolean;
@@ -612,6 +617,7 @@ export type WorkshopResultFileRow = {
   storage_path: string | null;
   external_url: string | null;
   file_name: string;
+  description: string | null;
   mime_type: string | null;
   size_bytes: number | null;
   position: number;

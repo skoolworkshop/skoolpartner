@@ -192,7 +192,8 @@ export async function registerUploadedFile(params: {
 export async function addExternalLink(params: {
   resultId: string;
   url: string;
-  label: string;
+  fileName: string;
+  description?: string | null;
   userId: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const url = params.url.trim();
@@ -210,7 +211,8 @@ export async function addExternalLink(params: {
     result_id: params.resultId,
     kind: "link",
     external_url: url,
-    file_name: params.label.trim() || "Externe link",
+    file_name: params.fileName.trim() || "Downloadbestand",
+    description: params.description?.trim() || null,
     position: count ?? 0,
     created_by: params.userId,
   });
@@ -242,8 +244,6 @@ export async function createDownloadUrl(params: {
     .maybeSingle();
 
   if (!file || file.removed_at) return { error: "Dit bestand is niet meer beschikbaar." };
-  if (file.kind === "link" && file.external_url) return { url: file.external_url };
-  if (!file.storage_path) return { error: "Dit bestand is niet meer beschikbaar." };
 
   const { data: result } = await supabase
     .from("workshop_results")
@@ -266,6 +266,12 @@ export async function createDownloadUrl(params: {
 
     if (!membership) return { error: "U heeft geen toegang tot dit bestand." };
   }
+
+  // Ook externe links gaan pas naar buiten nadat de setstatus en het actieve
+  // lidmaatschap zijn gecontroleerd. Een geraden UUID geeft dus nooit toegang
+  // tot een link van een andere klant of een conceptset.
+  if (file.kind === "link" && file.external_url) return { url: file.external_url };
+  if (!file.storage_path) return { error: "Dit bestand is niet meer beschikbaar." };
 
   const { data, error } = await supabase.storage
     .from(RESULTS_BUCKET)

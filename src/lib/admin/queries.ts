@@ -125,7 +125,7 @@ export async function getOrganizationDetail(id: string) {
     members,
     domains,
     contacts,
-    balance,
+    balances,
     bookings,
     invoices,
     threads,
@@ -139,7 +139,7 @@ export async function getOrganizationDetail(id: string) {
       .order("created_at"),
     supabase.from("organization_domains").select("*").eq("organization_id", id).order("domain"),
     supabase.from("organization_contacts").select("*").eq("organization_id", id).order("email"),
-    supabase.from("loyalty_balances").select("*").eq("organization_id", id).maybeSingle(),
+    supabase.from("loyalty_balances").select("*").eq("organization_id", id),
     supabase
       .from("bookings")
       .select("*")
@@ -176,7 +176,7 @@ export async function getOrganizationDetail(id: string) {
     members: members.data ?? [],
     domains: domains.data ?? [],
     contacts: contacts.data ?? [],
-    balance: balance.data,
+    balances: balances.data ?? [],
     bookings: bookings.data ?? [],
     invoices: invoices.data ?? [],
     threads: threads.data ?? [],
@@ -276,7 +276,7 @@ export async function listLoyaltyTransactions(organizationId?: string) {
   const supabase = createServiceSupabase();
   let request = supabase
     .from("loyalty_transactions")
-    .select("*, organizations(name)")
+    .select("*, organizations(name), profiles!loyalty_transactions_user_id_fkey(email, full_name)")
     .order("created_at", { ascending: false })
     .limit(150);
   if (organizationId) request = request.eq("organization_id", organizationId);

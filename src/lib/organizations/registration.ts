@@ -46,8 +46,6 @@ function detailsFrom(values: RegistrationValues): RegistrationDetails {
     city: values.city,
     phone: values.phone,
     job_title: values.jobTitle,
-    has_cjp: values.hasCjp,
-    cjp_school_number: values.cjpSchoolNumber ?? undefined,
   };
 }
 
@@ -71,6 +69,8 @@ export async function completeRegistration(params: {
       full_name: values.fullName,
       phone: values.phone,
       job_title: values.jobTitle,
+      has_cjp: values.hasCjp,
+      cjp_school_number: values.cjpSchoolNumber,
       email: params.userEmail,
     })
     .eq("id", params.userId);
@@ -110,8 +110,6 @@ export async function completeRegistration(params: {
           house_number_addition: values.houseNumberAddition,
           postal_code: values.postalCode,
           city: values.city,
-          has_cjp: values.hasCjp,
-          cjp_school_number: values.cjpSchoolNumber,
         })
         .select("id")
         .single();

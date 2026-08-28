@@ -10,9 +10,8 @@ import { createServiceSupabase } from "@/lib/supabase/server";
  * Dit is onomkeerbaar en bedoeld voor het recht op vergetelheid uit de AVG.
  * Uitgangspunten:
  *
- *  * Alleen een super admin mag dit. De controle daarop staat in de server
- *    action, niet hier, maar deze functies weigeren ook zelf een paar dingen
- *    die nooit mogen gebeuren.
+ *  * Alleen een ingelogde beheerder bereikt de server action. De eigen
+ *    beheeraccount kan nooit via deze route worden verwijderd.
  *  * Voordat er iets weggaat, gaat er een regel in het auditlogboek. Dat is de
  *    enige plek waar achteraf nog staat dát er iets is verwijderd, en door wie.
  *    Er blijft daarbij bewust geen persoonsgegeven over, alleen het adres, want
@@ -42,20 +41,12 @@ export async function deleteUserPermanently(params: {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, full_name, is_super_admin")
+    .select("id, email, full_name")
     .eq("id", params.userId)
     .maybeSingle();
 
   if (!profile) {
     return { ok: false, message: "Deze gebruiker bestaat niet (meer)." };
-  }
-
-  if (profile.is_super_admin) {
-    return {
-      ok: false,
-      message:
-        "Een super admin kan niet zomaar worden verwijderd. Neem eerst die rechten af en probeer het daarna opnieuw.",
-    };
   }
 
   await recordAudit({

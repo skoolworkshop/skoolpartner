@@ -197,17 +197,15 @@ export async function approveMembership(params: {
 
   await supabase.rpc("ensure_loyalty_account", {
     p_org: member.organization_id,
-    p_actor: params.adminId,
+    p_actor: member.user_id,
   });
 
   // Activeert deze organisatie hiermee voor het eerst, dan hoort daar het
-  // welkomsttegoed bij. Bestond het al, dan doet dit niets: de unieke index in
-  // de database laat maar één welkomstbonus per organisatie toe. Een tweede
-  // contactpersoon levert dus nooit een tweede bonus op.
+  // persoonlijke welkomsttegoed bij. De unieke index laat dit per gebruiker
+  // maar eenmaal toe, ook als een aanvraag dubbel wordt verwerkt.
   await awardWelcomeBonus({
     organizationId: member.organization_id,
-    actorId: params.adminId,
-    actorEmail: params.adminEmail,
+    actorId: member.user_id,
   });
 
   // Wat de aanvrager invulde over deze organisatie stond geparkeerd. Nu een

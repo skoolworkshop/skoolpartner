@@ -2,7 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
 import type { MembershipRole, OrganizationRow, ProfileRow } from "@/lib/types/database";
 
 export interface ActiveMembership {
@@ -36,6 +36,13 @@ export interface SessionContext {
   memberships: ActiveMembership[];
   pendingMemberships: { organizationId: string; organizationName: string }[];
   isAdmin: boolean;
+}
+
+export interface CustomerPreview {
+  active: true;
+  userId: string;
+  userName: string;
+  userEmail: string;
 }
 
 /**
@@ -100,6 +107,7 @@ export async function requireUser(): Promise<SessionContext> {
 }
 
 export const ACTIVE_ORGANIZATION_COOKIE = "mijnskool.org";
+export const CUSTOMER_PREVIEW_COOKIE = "mijnskool.preview_user";
 
 /**
  * Vereist een ingelogde gebruiker met minimaal één actieve organisatie.
@@ -110,21 +118,79 @@ export const ACTIVE_ORGANIZATION_COOKIE = "mijnskool.org";
  * gemanipuleerde waarde geeft nooit toegang tot een andere organisatie.
  */
 export async function requireMember(): Promise<
-  SessionContext & { activeOrganizationId: string; activeMembership: ActiveMembership }
+  SessionContext & {
+    activeOrganizationId: string;
+    activeMembership: ActiveMembership;
+    customerPreview: CustomerPreview | null;
+  }
 > {
-  const context = await requireUser();
+  let context = await requireUser();
+  let customerPreview: CustomerPreview | null = null;
+  const cookieStore = await cookies();
+
+  // Een beheerder kan een klantportaal read-only bekijken. De cookie is nooit
+  // voldoende op zichzelf: alleen een op dit moment geautoriseerde beheerder
+  // komt in deze tak, en het doelaccount wordt opnieuw server-side opgezocht.
+  const previewUserId = context.isAdmin
+    ? cookieStore.get(CUSTOMER_PREVIEW_COOKIE)?.value ?? null
+    : null;
+
+  if (previewUserId) {
+    const service = createServiceSupabase();
+    const [{ data: profile }, { data: memberRows }] = await Promise.all([
+      service.from("profiles").select("*").eq("id", previewUserId).maybeSingle(),
+      service
+        .from("organization_members")
+        .select(
+          "role, status, organization_id, organizations!inner(id, name, slug, kind, status, logo_url, cjp_school_number, has_cjp, skoolpartner_enrolled_at, verified_at)"
+        )
+        .eq("user_id", previewUserId),
+    ]);
+
+    const rows = (memberRows ?? []) as unknown as {
+      role: MembershipRole;
+      status: string;
+      organization_id: string;
+      organizations: ActiveMembership["organization"];
+    }[];
+    const memberships = rows
+      .filter((row) => row.status === "active" && row.organizations?.status === "active")
+      .map((row) => ({ organization: row.organizations, role: row.role }));
+
+    if (profile && !profile.is_admin && !profile.is_blocked && memberships.length > 0) {
+      context = {
+        ...context,
+        userId: profile.id,
+        email: profile.email,
+        profile,
+        memberships,
+        pendingMemberships: [],
+      };
+      customerPreview = {
+        active: true,
+        userId: profile.id,
+        userName: profile.full_name ?? profile.email,
+        userEmail: profile.email,
+      };
+    }
+  }
+
   if (context.memberships.length === 0) {
     // Een beheerder hoort niet in de klantonboarding thuis.
     if (context.isAdmin) redirect("/admin");
     redirect(context.pendingMemberships.length > 0 ? "/wachten" : "/aanmelden");
   }
 
-  const cookieStore = await cookies();
   const preferred = cookieStore.get(ACTIVE_ORGANIZATION_COOKIE)?.value;
   const active =
     context.memberships.find((m) => m.organization.id === preferred) ?? context.memberships[0];
 
-  return { ...context, activeOrganizationId: active.organization.id, activeMembership: active };
+  return {
+    ...context,
+    activeOrganizationId: active.organization.id,
+    activeMembership: active,
+    customerPreview,
+  };
 }
 
 /** Vereist adminrechten. */
