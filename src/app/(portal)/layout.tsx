@@ -7,7 +7,7 @@ import { MobileNav, SidebarNav } from "@/components/portal/portal-nav";
 import { OrgSwitcher } from "@/components/portal/org-switcher";
 import { ProfileReminder } from "@/components/portal/profile-reminder";
 import { ChatFloatingButton } from "@/components/portal/chat-cta";
-import { Button, ExternalButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
@@ -41,14 +41,13 @@ export default async function PortalLayout({ children }: { children: React.React
         </div>
 
         <div className="space-y-3 border-t border-line-soft pt-5">
-          <ExternalButtonLink
-            href={settings.new_booking_cta_url}
-            target="_blank"
+          <ButtonLink
+            href="/nieuwe-boeking"
             size="sm"
             className="w-full"
           >
             {settings.new_booking_cta_label}
-          </ExternalButtonLink>
+          </ButtonLink>
 
           {session.isAdmin ? (
             <Link

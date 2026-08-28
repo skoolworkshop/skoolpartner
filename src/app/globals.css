@@ -129,6 +129,13 @@
   color: var(--color-ink);
 }
 
+.hubspot-booking-form,
+.hubspot-booking-form > div,
+.hubspot-booking-form iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 /* Sla-over-link voor schermlezers en toetsenbordnavigatie. */
 .skip-link {
   position: absolute;

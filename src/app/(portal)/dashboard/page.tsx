@@ -8,7 +8,7 @@ import { WorkshopPhoto } from "@/components/portal/workshop-photo";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { PartnerCard } from "@/components/skoolpartner/partner-card";
 import { WelcomeBonusCard } from "@/components/skoolpartner/welcome-bonus-card";
-import { ExternalButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { EmptyState } from "@/components/ui/feedback";
@@ -80,9 +80,9 @@ export default async function DashboardPage() {
         title={`${greetingForTime()} ${firstName(session.profile?.full_name, session.email)}`}
         description={organizationName}
         action={
-          <ExternalButtonLink href={settings.new_booking_cta_url} target="_blank">
+          <ButtonLink href="/nieuwe-boeking">
             {settings.new_booking_cta_label}
-          </ExternalButtonLink>
+          </ButtonLink>
         }
       />
 

@@ -7,7 +7,7 @@ import {
   RedemptionStatusBadge,
 } from "@/components/portal/status-badges";
 import { PartnerCard } from "@/components/skoolpartner/partner-card";
-import { ButtonLink, ExternalButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
@@ -65,9 +65,9 @@ export default async function SkoolPartnerPage() {
         title={settings.program_name}
         description={settings.how_it_works_text || undefined}
         action={
-          <ExternalButtonLink href={settings.new_booking_cta_url} target="_blank">
+          <ButtonLink href="/nieuwe-boeking">
             {settings.new_booking_cta_label}
-          </ExternalButtonLink>
+          </ButtonLink>
         }
       />
 
@@ -266,9 +266,9 @@ export default async function SkoolPartnerPage() {
               title={`Nog geen ${settings.points_name}`}
               description="Zodra uw eerste workshop is bevestigd, ziet u hier hoeveel punten u heeft verdiend."
               action={
-                <ExternalButtonLink href={settings.new_booking_cta_url} target="_blank">
+                <ButtonLink href="/nieuwe-boeking">
                   {settings.new_booking_cta_label}
-                </ExternalButtonLink>
+                </ButtonLink>
               }
             />
           )}

@@ -4,7 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { PageHeader } from "@/components/portal/page-header";
 import { BookingStatusBadge } from "@/components/portal/status-badges";
 import { WorkshopThumb } from "@/components/portal/workshop-photo";
-import { ExternalButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
@@ -18,11 +18,9 @@ export const metadata: Metadata = { title: "Boekingen" };
 
 function BookingRowItem({
   booking,
-  ctaUrl,
   images,
 }: {
   booking: BookingRow;
-  ctaUrl: string;
   images: WorkshopImageMap;
 }) {
   const timeRange =
@@ -52,15 +50,14 @@ function BookingRowItem({
         <span className="text-sm text-muted sm:hidden">{relativeDay(booking.scheduled_date)}</span>
         <BookingStatusBadge status={booking.status} />
         {booking.status === "completed" || booking.status === "confirmed" ? (
-          <ExternalButtonLink
-            href={ctaUrl}
-            target="_blank"
+          <ButtonLink
+            href="/nieuwe-boeking"
             variant="secondary"
             size="sm"
             className="hidden sm:inline-flex"
           >
             Opnieuw aanvragen
-          </ExternalButtonLink>
+          </ButtonLink>
         ) : null}
       </div>
     </li>
@@ -85,9 +82,9 @@ export default async function BookingsPage() {
         title="Boekingen"
         description="Alle workshops van uw organisatie, van aankomend tot afgerond."
         action={
-          <ExternalButtonLink href={settings.new_booking_cta_url} target="_blank">
+          <ButtonLink href="/nieuwe-boeking">
             {settings.new_booking_cta_label}
-          </ExternalButtonLink>
+          </ButtonLink>
         }
       />
 
@@ -103,7 +100,6 @@ export default async function BookingsPage() {
                 <BookingRowItem
                   key={booking.id}
                   booking={booking}
-                  ctaUrl={settings.new_booking_cta_url}
                   images={workshopImages}
                 />
               ))}
@@ -114,9 +110,9 @@ export default async function BookingsPage() {
               title="Geen aankomende workshops"
               description="Zodra een nieuwe boeking definitief is bevestigd, verschijnt die hier automatisch."
               action={
-                <ExternalButtonLink href={settings.new_booking_cta_url} target="_blank">
+                <ButtonLink href="/nieuwe-boeking">
                   {settings.new_booking_cta_label}
-                </ExternalButtonLink>
+                </ButtonLink>
               }
             />
           )}
@@ -130,7 +126,6 @@ export default async function BookingsPage() {
                 <BookingRowItem
                   key={booking.id}
                   booking={booking}
-                  ctaUrl={settings.new_booking_cta_url}
                   images={workshopImages}
                 />
               ))}
