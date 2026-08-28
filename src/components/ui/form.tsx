@@ -34,8 +34,8 @@ export function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={htmlFor} className="block text-sm font-semibold text-ink">
+    <div className={cn("min-w-0 space-y-1.5", className)}>
+      <label htmlFor={htmlFor} className="block break-words text-sm font-semibold text-ink">
         {label}
         {required ? (
           <span className="ml-1 text-accent-strong" aria-hidden>
@@ -61,7 +61,7 @@ export function Field({
 }
 
 export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(controlBase, singleLine, className)} {...props} />;
+  return <input className={cn(controlBase, singleLine, "min-w-0 max-w-full", className)} {...props} />;
 }
 
 export function Textarea({
