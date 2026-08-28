@@ -43,7 +43,7 @@ const EMPTY_BALANCE: LoyaltyBalanceRow = {
  */
 
 /**
- * De gegevens van de organisatie zelf: naam, logo en CJP-schoolnummer.
+ * De gedeelde gegevens van de organisatie zelf.
  *
  * Draait onder de sessie van de gebruiker, dus RLS bepaalt wat er terugkomt.
  * Een organisatie waar iemand geen lid van is, levert altijd niets op.
@@ -52,7 +52,7 @@ export async function getOrganizationDetails(organizationId: string) {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("organizations")
-    .select("id, name, logo_url, logo_source, website, cjp_school_number, has_cjp")
+    .select("id, name, logo_url, logo_source, website, phone, address_line, street, house_number, house_number_addition, postal_code, city, cjp_school_number, has_cjp")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -63,6 +63,13 @@ export async function getOrganizationDetails(organizationId: string) {
       logo_url: null,
       logo_source: null,
       website: null,
+      phone: null,
+      address_line: null,
+      street: null,
+      house_number: null,
+      house_number_addition: null,
+      postal_code: null,
+      city: null,
       cjp_school_number: null,
       has_cjp: null,
     }
