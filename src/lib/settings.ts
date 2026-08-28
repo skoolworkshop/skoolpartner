@@ -20,7 +20,7 @@ export const SETTING_DEFAULTS = {
   points_expiry_enabled: true,
   points_validity_months: 24,
   milestone_step_points: 500,
-  new_booking_cta_url: "https://skoolworkshop.nl/offerte-aanvraag/",
+  new_booking_cta_url: "/nieuwe-boeking",
   new_booking_cta_label: "Nieuwe workshop aanvragen",
   support_email: "boekingen@skoolworkshop.nl",
   cjp_parking_enabled: true,
