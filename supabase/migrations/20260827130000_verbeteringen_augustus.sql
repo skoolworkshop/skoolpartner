@@ -41,10 +41,14 @@ create table if not exists public.cjp_bonus_awards (
   awarded_at timestamptz not null default now()
 );
 
+-- Naar text casten is hier bewust: bij een bestaande database kan cjp_bonus
+-- eerder in dezelfde SQL-run aan de enum zijn toegevoegd. PostgreSQL staat
+-- direct enumgebruik dan pas na een commit toe, terwijl een tekstvergelijking
+-- in dezelfde veilige, herhaalbare installatie wel geldig is.
 insert into public.cjp_bonus_awards (organization_id, transaction_id, awarded_at)
 select distinct on (organization_id) organization_id, id, occurred_at
 from public.loyalty_transactions
-where type = 'cjp_bonus' and status <> 'cancelled'
+where cast(type as text) = 'cjp_bonus' and status <> 'cancelled'
 order by organization_id, occurred_at
 on conflict (organization_id) do nothing;
 

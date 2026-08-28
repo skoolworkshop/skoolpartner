@@ -57,6 +57,16 @@ async function main() {
   const db = await PGlite.create();
   await db.exec(SUPABASE_STUBS);
 
+  // Bootst een ouder productieproject na: het enumtype bestaat al, maar de
+  // later toegevoegde CJP-waarde nog niet. setup-alles.sql moet ook vanaf die
+  // toestand in één keer foutloos kunnen upgraden.
+  await db.exec(`
+    create type public.loyalty_transaction_type as enum (
+      'earn_workshop', 'earn_review', 'manual_adjustment',
+      'redemption_reserve', 'expiry', 'reversal'
+    );
+  `);
+
   const q = async (sql) => (await db.query(sql)).rows;
 
   // 1. Volledige installatie
