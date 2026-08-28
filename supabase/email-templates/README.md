@@ -17,8 +17,9 @@ Remove-Item Env:SUPABASE_ACCESS_TOKEN
 ```
 
 Het token wordt niet in bestanden opgeslagen. Trek het na gebruik desgewenst
-weer in via Supabase. Het script stelt alle dertien templates in. De zeven
-beveiligingsmeldingen worden daarbij ingeschakeld.
+weer in via Supabase. Het script stelt alle dertien templates in, zet de
+e-mail-OTP-lengte vast op **6 cijfers** en schakelt de zeven
+beveiligingsmeldingen in.
 
 | Supabase-template | Onderwerp | Bericht |
 |---|---|---|
@@ -54,3 +55,6 @@ De Magic Link-mail bevat bewust zowel `{{ .Token }}` als
 De huidige SkoolPartner-app gebruikt deze template voor zowel inloggen als het
 aanmaken van een account. De Change Email Address-template wordt gebruikt als
 een bestaande gebruiker zijn e-mailadres wijzigt.
+
+Na het wijzigen van de OTP-lengte moet altijd een nieuwe code worden
+aangevraagd. Een eerder verstuurde code houdt zijn oude lengte.

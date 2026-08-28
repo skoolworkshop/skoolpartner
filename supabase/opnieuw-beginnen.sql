@@ -322,14 +322,14 @@ begin
   -- zou krijgen. Twee keer draaien levert er nooit een tweede op: de unieke
   -- index op (organisatie, soort, bronverwijzing) staat dat niet toe.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     description, source, external_reference, occurred_at, available_at
   ) values (
-    v_org1, v_acc1, 'welcome_bonus', 'available', 100, 250,
+    v_org1, v_acc1, v_user, 'welcome_bonus', 'available', 100, 250,
     'Welkomstbonus SkoolPartner', 'portal', 'welcome',
     now() - interval '20 days', now() - interval '20 days'
   )
-  on conflict (organization_id, type, external_reference) where external_reference is not null
+  on conflict (organization_id, user_id, type, external_reference) where external_reference is not null
   do nothing;
 
   ---------------------------------------------------------------------------
@@ -592,117 +592,117 @@ begin
   --    De Goudse Waarden komt uit op 350 beschikbaar en 300 in behandeling.
   ---------------------------------------------------------------------------
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     points_per_hour_at_time, qualifying_minutes, description, source,
     external_reference, booking_id, invoice_id, available_at, expires_at, occurred_at
   ) values (
-    v_org1, v_acc1, 'earn_workshop', 'available', 600, 250, 100, 360,
+    v_org1, v_acc1, v_user, 'earn_workshop', 'available', 600, 250, 100, 360,
     'Graffiti, 4 x 90 minuten', 'demo', 'booking:' || v_b1::text, v_b1, v_inv1,
     now() - interval '95 days', now() + interval '15 months', now() - interval '120 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     points_per_hour_at_time, qualifying_minutes, description, source,
     external_reference, booking_id, invoice_id, available_at, expires_at, occurred_at
   ) values (
-    v_org1, v_acc1, 'earn_workshop', 'available', 450, 250, 100, 270,
+    v_org1, v_acc1, v_user, 'earn_workshop', 'available', 450, 250, 100, 270,
     'Dans, 3 x 90 minuten', 'demo', 'booking:' || v_b4::text, v_b4, v_inv,
     now() - interval '35 days', now() + interval '22 months', now() - interval '60 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     description, source, external_reference, review_id, available_at, expires_at, occurred_at
   ) values (
-    v_org1, v_acc1, 'earn_review', 'available', 50, 250,
+    v_org1, v_acc1, v_user, 'earn_review', 'available', 50, 250,
     'Bonus voor een geverifieerde review', 'demo', 'review:demo-review-1', v_rev,
     now() - interval '100 days', now() + interval '14 months', now() - interval '100 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   -- Nog niet beschikbaar: de bijbehorende factuur staat nog open.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     points_per_hour_at_time, qualifying_minutes, description, source,
     external_reference, booking_id, invoice_id, occurred_at
   ) values (
-    v_org1, v_acc1, 'earn_workshop', 'pending', 300, 250, 100, 180,
+    v_org1, v_acc1, v_user, 'earn_workshop', 'pending', 300, 250, 100, 180,
     'Podcast maken, 2 x 90 minuten', 'demo', 'booking:' || v_b2::text, v_b2, v_inv2,
     now() - interval '8 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   -- Gereserveerd voor een openstaand inwisselverzoek.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     description, source, external_reference, occurred_at
   ) values (
-    v_org1, v_acc1, 'redemption_reserve', 'reserved', -500, 250,
+    v_org1, v_acc1, v_user, 'redemption_reserve', 'reserved', -500, 250,
     'Gereserveerd voor inwisselverzoek', 'demo', 'redemption:demo-1',
     now() - interval '4 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   -- Al toegepast op een eerdere boeking.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     description, source, external_reference, occurred_at
   ) values (
-    v_org1, v_acc1, 'redemption_reserve', 'redeemed', -250, 250,
+    v_org1, v_acc1, v_user, 'redemption_reserve', 'redeemed', -250, 250,
     'Ingewisseld als voordeel op boeking SW-2026-0244', 'demo', 'redemption:demo-2',
     now() - interval '50 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   -- Verlopen punten uit een oud saldo.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     description, source, external_reference, occurred_at
   ) values (
-    v_org1, v_acc1, 'expiry', 'expired', -100, 250,
+    v_org1, v_acc1, v_user, 'expiry', 'expired', -100, 250,
     'Verlopen na 24 maanden', 'demo', 'expiry:demo-1',
     now() - interval '15 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   -- Handmatige correctie door de beheerder, met verplichte reden.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     description, source, external_reference, reason, created_by, available_at,
     expires_at, occurred_at
   ) values (
-    v_org1, v_acc1, 'manual_adjustment', 'available', 100, 250,
+    v_org1, v_acc1, v_user, 'manual_adjustment', 'available', 100, 250,
     'Correctie na verkeerd geregistreerde workshopduur', 'demo', 'manual:demo-1',
     'Bij boeking SW-2026-0123 stond 90 minuten te weinig geregistreerd.',
     v_user, now() - interval '10 days', now() + interval '23 months',
     now() - interval '10 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   -- Het Vrije College: 300 beschikbaar, 150 in behandeling.
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     points_per_hour_at_time, qualifying_minutes, description, source,
     external_reference, booking_id, available_at, expires_at, occurred_at
   ) values (
-    v_org2, v_acc2, 'earn_workshop', 'available', 300, 250, 100, 180,
+    v_org2, v_acc2, v_user, 'earn_workshop', 'available', 300, 250, 100, 180,
     'Graffiti, 2 x 90 minuten', 'demo', 'booking:' || v_b7::text, v_b7,
     now() - interval '20 days', now() + interval '23 months', now() - interval '25 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   insert into public.loyalty_transactions (
-    organization_id, account_id, type, status, points, point_value_cents_per_100,
+    organization_id, account_id, user_id, type, status, points, point_value_cents_per_100,
     points_per_hour_at_time, qualifying_minutes, description, source,
     external_reference, occurred_at
   ) values (
-    v_org2, v_acc2, 'earn_workshop', 'pending', 150, 250, 100, 90,
+    v_org2, v_acc2, v_user, 'earn_workshop', 'pending', 150, 250, 100, 90,
     'Rap en songwriting, 1 x 90 minuten', 'demo', 'booking-toekomst:demo-1',
     now() - interval '2 days'
-  ) on conflict (organization_id, type, external_reference)
+  ) on conflict (organization_id, user_id, type, external_reference)
     where external_reference is not null do nothing;
 
   update public.bookings set points_awarded = true
@@ -779,15 +779,15 @@ begin
     );
 
     insert into public.loyalty_transactions (
-      organization_id, account_id, type, status, points,
+      organization_id, account_id, user_id, type, status, points,
       point_value_cents_per_100, description, source, external_reference,
       available_at, created_by, occurred_at
     ) values (
-      v_org1, v_acc1, 'cjp_bonus', 'available', 1000, 250,
+      v_org1, v_acc1, v_user, 'cjp_bonus', 'available', 1000, 250,
       'Bonus bij geparkeerd CJP-tegoed', 'portal',
       'cjp:00000000-0000-4000-8000-0000000c1901',
       now() - interval '12 days', v_beheerder, now() - interval '12 days'
-    ) on conflict (organization_id, type, external_reference)
+    ) on conflict (organization_id, user_id, type, external_reference)
       where external_reference is not null do nothing;
 
     insert into public.cjp_bonus_awards (organization_id, request_id, transaction_id, awarded_at)

@@ -39,6 +39,10 @@ const securityDefinitions = [
 ];
 
 const payload = {};
+// Het SkoolPartner-inlogscherm toont zes afzonderlijke invoervakken. Leg dit
+// daarom samen met de templates vast, zodat Supabase nooit een 8- of
+// 10-cijferige code verstuurt die niet in het scherm past.
+payload.mailer_otp_length = 6;
 for (const [supabaseName, fileName] of definitions) {
   payload[`mailer_subjects_${supabaseName}`] = (
     await readFile(path.join(templateDirectory, `${fileName}-subject.txt`), "utf8")
