@@ -1838,9 +1838,9 @@ insert into public.app_settings (key, value, label, description, group_name, val
   ('milestone_step_points', '500'::jsonb, 'Mijlpaal per aantal punten',
    'Gebruikt voor de subtiele voortgangsmelding op het dashboard.', 'programma', 'number', true, 120),
 
-  ('new_booking_cta_url', '"https://skoolworkshop.nl/offerte-aanvraag/"'::jsonb, 'URL nieuwe workshop aanvragen',
-   'SkoolPartner bouwt geen eigen boekingssysteem. Deze knop verwijst naar de bestaande offerteaanvraag.',
-   'programma', 'url', true, 130),
+  ('new_booking_cta_url', '"/nieuwe-boeking"'::jsonb, 'Interne route nieuwe workshop aanvragen',
+   'Opent het HubSpot-aanvraagformulier binnen het klantportaal.',
+   'programma', 'text', true, 130),
 
   ('new_booking_cta_label', '"Nieuwe workshop aanvragen"'::jsonb, 'Tekst op de knop',
    null, 'programma', 'text', true, 140),
@@ -3275,4 +3275,3 @@ revoke all on function public.spend_cjp_credit(uuid, integer, uuid, text, uuid, 
 grant execute on function public.confirm_cjp_parking(uuid, uuid, text) to service_role;
 grant execute on function public.spend_cjp_credit(uuid, integer, uuid, text, uuid, text) to service_role;
 notify pgrst, 'reload schema';
-
