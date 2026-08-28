@@ -11,7 +11,6 @@ import { createBookingFromSource } from "@/lib/bookings/ingest";
 import { awardPointsForBooking, manualAdjustment, reverseTransaction } from "@/lib/loyalty/ledger";
 import {
   approveMembership,
-  createOrganization,
   setMembershipStatus,
 } from "@/lib/organizations/service";
 import { generateToken, hashToken } from "@/lib/crypto";
@@ -176,28 +175,6 @@ export async function setUserBlockedAction(
 
   revalidatePath("/admin/gebruikers");
   return { status: "ok", message: blocked ? "Account geblokkeerd." : "Blokkade opgeheven." };
-}
-
-export async function createOrganizationAction(
-  _prev: AdminState,
-  formData: FormData
-): Promise<AdminState> {
-  const session = await requireAdmin();
-  const name = String(formData.get("name") ?? "");
-  const city = String(formData.get("city") ?? "").trim() || null;
-
-  const result = await createOrganization({
-    name,
-    city,
-    actorId: session.userId,
-    actorEmail: session.email,
-    verified: true,
-  });
-
-  revalidatePath("/admin/organisaties");
-  return result.ok
-    ? { status: "ok", message: "Organisatie aangemaakt." }
-    : { status: "error", message: result.message };
 }
 
 export async function addOrganizationDomainAction(
