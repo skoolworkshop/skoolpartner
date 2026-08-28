@@ -64,19 +64,45 @@ export async function completeRegistration(params: {
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
-      first_name: values.firstName,
-      last_name: values.lastName,
       full_name: values.fullName,
       phone: values.phone,
       job_title: values.jobTitle,
-      has_cjp: values.hasCjp,
-      cjp_school_number: values.cjpSchoolNumber,
       email: params.userEmail,
     })
     .eq("id", params.userId);
 
   if (profileError) {
-    return { ok: false, message: "Uw gegevens konden niet worden opgeslagen." };
+    console.error("[registratie] basisprofiel opslaan mislukt", {
+      userId: params.userId,
+      code: profileError.code,
+      message: profileError.message,
+      details: profileError.details,
+    });
+    return {
+      ok: false,
+      message: "Uw gegevens konden niet worden opgeslagen. Probeer het opnieuw of neem contact met ons op.",
+      technicalReason: profileError.message,
+    };
+  }
+
+  // Nieuwere, aanvullende profielvelden mogen een registratie nooit volledig
+  // blokkeren wanneer een deployment en database-update enkele seconden uit
+  // elkaar lopen. Ze worden na de kerngegevens apart opgeslagen.
+  const { error: extraProfileError } = await supabase
+    .from("profiles")
+    .update({
+      first_name: values.firstName,
+      last_name: values.lastName,
+      has_cjp: values.hasCjp,
+      cjp_school_number: values.cjpSchoolNumber,
+    })
+    .eq("id", params.userId);
+  if (extraProfileError) {
+    console.error("[registratie] aanvullende profielgegevens opslaan mislukt", {
+      userId: params.userId,
+      code: extraProfileError.code,
+      message: extraProfileError.message,
+    });
   }
 
   // 2. Welke organisatie wordt het?

@@ -49,6 +49,27 @@ export async function deleteUserPermanently(params: {
     return { ok: false, message: "Deze gebruiker bestaat niet (meer)." };
   }
 
+  const { data: memberships } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", profile.id)
+    .in("status", ["active", "pending"]);
+
+  // Hoort een organisatie uitsluitend bij deze gebruiker, dan horen de
+  // boekingen, bestanden, punten en facturen volgens de verwijderopdracht ook
+  // bij deze verwijdering. Zodra er nog een andere actieve of wachtende
+  // gebruiker is, blijft de volledige organisatie juist intact.
+  const organizationsToDelete: string[] = [];
+  for (const membership of memberships ?? []) {
+    const { count } = await supabase
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", membership.organization_id)
+      .neq("user_id", profile.id)
+      .in("status", ["active", "pending"]);
+    if ((count ?? 0) === 0) organizationsToDelete.push(membership.organization_id);
+  }
+
   await recordAudit({
     actorId: params.actorId,
     actorEmail: params.actorEmail,
@@ -58,6 +79,20 @@ export async function deleteUserPermanently(params: {
     before: { email: profile.email },
     reason: "Definitief verwijderd door een beheerder",
   });
+
+  for (const organizationId of organizationsToDelete) {
+    const organizationResult = await deleteOrganizationPermanently({
+      organizationId,
+      actorId: params.actorId,
+      actorEmail: params.actorEmail,
+    });
+    if (!organizationResult.ok) {
+      return {
+        ok: false,
+        message: `De gebruiker is nog niet verwijderd, omdat de gekoppelde organisatie niet volledig kon worden verwijderd: ${organizationResult.message}`,
+      };
+    }
+  }
 
   // Het profiel hangt met on delete cascade aan auth.users, en lidmaatschappen
   // hangen weer aan het profiel. Eén verwijdering ruimt dus de hele keten op.
@@ -69,7 +104,12 @@ export async function deleteUserPermanently(params: {
     return { ok: false, message: `Verwijderen is niet gelukt: ${error.message}` };
   }
 
-  return { ok: true, message: `${profile.email} is definitief verwijderd.` };
+  return {
+    ok: true,
+    message: organizationsToDelete.length > 0
+      ? `${profile.email} en ${organizationsToDelete.length} organisatie(s) zonder andere gebruikers zijn definitief verwijderd.`
+      : `${profile.email} is definitief verwijderd. Gedeelde organisaties en hun gegevens zijn behouden.`,
+  };
 }
 
 /* -------------------------------------------------------------------------- */

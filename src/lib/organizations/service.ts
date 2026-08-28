@@ -8,7 +8,7 @@ import { emailDomain, slugify } from "@/lib/utils";
 import type { MembershipSource, OrganizationRow } from "@/lib/types/database";
 
 export interface OrganizationSuggestion {
-  organization: Pick<OrganizationRow, "id" | "name" | "city" | "kind">;
+  organization: Pick<OrganizationRow, "id" | "name" | "city" | "kind" | "street" | "house_number" | "house_number_addition" | "postal_code">;
   reason: "verified_domain" | "invite";
 }
 
@@ -37,7 +37,7 @@ export async function suggestOrganizationsForEmail(
 
   const { data } = await supabase
     .from("organization_domains")
-    .select("organization_id, is_verified, organizations!inner(id, name, city, kind, status)")
+    .select("organization_id, is_verified, organizations!inner(id, name, city, kind, status, street, house_number, house_number_addition, postal_code)")
     .eq("domain", domain)
     .eq("is_verified", true);
 
@@ -58,7 +58,7 @@ export async function searchOrganizations(query: string, limit = 8) {
   const supabase = createServiceSupabase();
   const { data } = await supabase
     .from("organizations")
-    .select("id, name, city, kind")
+    .select("id, name, city, kind, street, house_number, house_number_addition, postal_code")
     .eq("status", "active")
     .ilike("name", `%${term}%`)
     .order("name")

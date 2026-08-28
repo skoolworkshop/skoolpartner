@@ -196,12 +196,15 @@ export async function listPendingMembers() {
 
 export async function listUsers(query?: string) {
   const supabase = createServiceSupabase();
-  let request = supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(200);
-  if (query && query.trim().length >= 2) {
-    request = request.ilike("email", `%${query.trim()}%`);
-  }
-  const { data } = await request;
-  return data ?? [];
+  const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(200);
+  const rows = data ?? [];
+  const term = query?.trim().toLocaleLowerCase("nl-NL");
+  if (!term || term.length < 2) return rows;
+  return rows.filter((row) =>
+    [row.email, row.full_name, row.first_name, row.last_name]
+      .filter(Boolean)
+      .some((value) => String(value).toLocaleLowerCase("nl-NL").includes(term))
+  );
 }
 
 export async function listBookings(filter?: "review" | "all") {
