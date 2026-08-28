@@ -19,7 +19,7 @@ export async function replyToThread(
 ): Promise<ReplyState> {
   const session = await requireMember();
   if (session.customerPreview) {
-    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+    return { status: "error", message: "Berichten verstuurt u vanuit het beheerportaal, zodat duidelijk blijft wie de afzender is." };
   }
   const threadId = String(formData.get("thread_id") ?? "");
   const body = String(formData.get("body") ?? "");

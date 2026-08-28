@@ -116,10 +116,10 @@ export default async function PortalLayout({ children }: { children: React.React
           </span>
 
           {session.customerPreview ? (
-            <Alert tone="warning" title={`Je bekijkt momenteel het klantportaal van ${session.customerPreview.userName}`} className="mb-5">
+            <Alert tone="warning" title={`Je beheert momenteel het klantportaal van ${session.customerPreview.userName}`} className="mb-5">
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="min-w-0 break-all text-sm">
-                  {session.customerPreview.userEmail} · alleen-lezen voor beheer
+                  {session.customerPreview.userEmail} · klantgegevens kunnen worden aangepast
                 </span>
                 <form action={stopCustomerPreview}>
                   <Button type="submit" variant="secondary" size="sm" className="w-full sm:w-auto">

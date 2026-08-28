@@ -20,7 +20,7 @@ const items = [
   { href: "/admin/audit", label: "Audit log" },
 ];
 
-export function AdminNav() {
+export function AdminNav({ variant = "header" }: { variant?: "header" | "sidebar" | "mobile" }) {
   const pathname = usePathname();
   const router = useRouter();
   const current =
@@ -29,7 +29,7 @@ export function AdminNav() {
     )?.href ?? "/admin";
 
   return (
-    <nav aria-label="Beheernavigatie" className="-mb-px">
+    <nav aria-label="Beheernavigatie" className={cn(variant === "header" && "-mb-px")}>
       <label htmlFor="admin-mobile-nav" className="sr-only">
         Kies een beheeronderdeel
       </label>
@@ -37,7 +37,10 @@ export function AdminNav() {
         id="admin-mobile-nav"
         value={current}
         onChange={(event) => router.push(event.target.value)}
-        className="mb-3 h-11 w-full rounded-card border border-white/25 bg-white px-3 text-base font-semibold text-ink md:hidden"
+        className={cn(
+          "h-11 w-full rounded-card border border-line bg-white px-3 text-base font-semibold text-ink",
+          variant === "sidebar" ? "hidden" : variant === "mobile" ? "block" : "mb-3 md:hidden"
+        )}
       >
         {items.map((item) => (
           <option key={item.href} value={item.href}>
@@ -46,7 +49,15 @@ export function AdminNav() {
         ))}
       </select>
 
-      <ul className="hidden flex-wrap gap-1 md:flex">
+      <ul
+        className={cn(
+          variant === "sidebar"
+            ? "flex flex-col gap-1"
+            : variant === "mobile"
+              ? "hidden"
+              : "hidden flex-wrap gap-1 md:flex"
+        )}
+      >
         {items.map((item) => {
           const active = item.exact
             ? pathname === item.href
@@ -57,10 +68,17 @@ export function AdminNav() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-block border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors",
-                  active
-                    ? "border-accent text-white"
-                    : "border-transparent text-white/60 hover:text-white"
+                  "text-sm font-semibold transition-colors",
+                  variant === "sidebar"
+                    ? "relative flex w-full items-center rounded-card px-4 py-2.5"
+                    : "inline-block border-b-2 px-3 py-2.5",
+                  variant === "sidebar"
+                    ? active
+                      ? "bg-accent-wash text-ink before:absolute before:left-0 before:h-6 before:w-1 before:rounded-pill before:bg-accent"
+                      : "text-muted hover:bg-surface-2 hover:text-ink"
+                    : active
+                      ? "border-accent text-white"
+                      : "border-transparent text-white/60 hover:text-white"
                 )}
               >
                 {item.label}

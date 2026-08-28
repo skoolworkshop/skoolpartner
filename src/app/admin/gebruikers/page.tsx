@@ -146,7 +146,7 @@ export default async function AdminUsersPage({
         <Card>
           <CardHeader
             title="Alle gebruikers"
-            description="Er zijn twee rollen: beheerder en klant. Vanuit een klant opent u veilig een alleen-lezen voorvertoning van diens portaal."
+            description="Er zijn twee rollen: beheerder en klant. Open vanuit een klant diens portaal om gegevens te bekijken en aan te passen."
             action={
               <form className="flex gap-2">
                 <label htmlFor="q" className="sr-only">

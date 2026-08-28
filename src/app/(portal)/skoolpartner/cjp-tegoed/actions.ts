@@ -27,7 +27,7 @@ export async function submitParkingRequest(
 ): Promise<ParkingFormState> {
   const session = await requireMember();
   if (session.customerPreview) {
-    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+    return { status: "error", message: "CJP-aanvragen verwerkt u vanuit het beheerportaal en niet namens de klant." };
   }
   const settings = await getSettings();
 

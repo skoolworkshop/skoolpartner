@@ -52,7 +52,7 @@ export interface AdminState {
   resultId?: string;
 }
 
-/** Start een read-only klantvoorvertoning voor een gewone klant. */
+/** Open het klantportaal van een gewone klant als beheerder. */
 export async function startCustomerPreviewAction(
   _prev: AdminState,
   formData: FormData

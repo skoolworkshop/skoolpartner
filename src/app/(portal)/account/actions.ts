@@ -25,7 +25,6 @@ export async function updateProfile(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const fullName = String(formData.get("full_name") ?? "").trim();
   const jobTitle = String(formData.get("job_title") ?? "").trim() || null;
 
@@ -64,6 +63,18 @@ export async function updateProfile(
 
   if (error) return { status: "error", message: "Opslaan is niet gelukt." };
 
+  await recordAudit({
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
+    actorRole: session.customerPreview ? "admin" : "klant",
+    action: "profile.updated",
+    entityType: "profile",
+    entityId: session.userId,
+    organizationId: session.activeOrganizationId,
+    after: { full_name: fullName, phone: phoneResult.value, job_title: jobTitle },
+    reason: session.customerPreview ? "Aangepast vanuit klantportaal door beheerder" : null,
+  });
+
   revalidatePath("/account");
   revalidatePath("/", "layout");
   return { status: "ok", message: "Uw gegevens zijn opgeslagen." };
@@ -84,7 +95,6 @@ export async function updateCjpNumber(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
 
   const resultaat = normalizeCjpNumber(String(formData.get("cjp_school_number") ?? ""));
   if (!resultaat.ok) {
@@ -111,9 +121,9 @@ export async function updateCjpNumber(
   if (error) return { status: "error", message: "Opslaan is niet gelukt." };
 
   await recordAudit({
-    actorId: session.userId,
-    actorEmail: session.email,
-    actorRole: "klant",
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
+    actorRole: session.customerPreview ? "admin" : "klant",
     action: "profile.cjp_updated",
     entityType: "profile",
     entityId: session.userId,
@@ -142,7 +152,6 @@ export async function updateOrganizationWebsite(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const ingevuld = String(formData.get("website") ?? "").trim();
 
   if (ingevuld === "") {
@@ -178,9 +187,9 @@ export async function updateOrganizationWebsite(
   if (error) return { status: "error", message: "Opslaan is niet gelukt." };
 
   await recordAudit({
-    actorId: session.userId,
-    actorEmail: session.email,
-    actorRole: "klant",
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
+    actorRole: session.customerPreview ? "admin" : "klant",
     action: "organization.website_updated",
     entityType: "organization",
     entityId: session.activeOrganizationId,
@@ -196,12 +205,11 @@ export async function updateOrganizationWebsite(
 /** Het logo laten ophalen van de eigen website. */
 export async function fetchOwnLogo(): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
 
   const result = await fetchOrganizationLogo({
     organizationId: session.activeOrganizationId,
-    actorId: session.userId,
-    actorEmail: session.email,
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
     // De klant vraagt er zelf om, dus een eerder ingesteld logo mag vervangen.
     force: true,
   });
@@ -220,7 +228,6 @@ export async function uploadOwnLogo(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const bestand = formData.get("logo");
 
   if (!(bestand instanceof File) || bestand.size === 0) {
@@ -234,9 +241,9 @@ export async function uploadOwnLogo(
   const result = await setOrganizationLogo({
     organizationId: session.activeOrganizationId,
     file: await bestand.arrayBuffer(),
-    actorId: session.userId,
-    actorEmail: session.email,
-    actorRole: "klant",
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
+    actorRole: session.customerPreview ? "admin" : "klant",
   });
 
   revalidatePath("/account");
@@ -250,12 +257,11 @@ export async function uploadOwnLogo(
 /** Terug naar het standaardicoon. */
 export async function removeOwnLogo(): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
 
   await clearOrganizationLogo({
     organizationId: session.activeOrganizationId,
-    actorId: session.userId,
-    actorEmail: session.email,
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
   });
 
   revalidatePath("/account");
@@ -273,7 +279,7 @@ export async function leaveOrganization(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+  if (session.customerPreview) return { status: "error", message: "Lidmaatschappen beheert u vanuit het beheerportaal." };
   const organizationId = String(formData.get("organization_id") ?? "");
 
   if (!session.memberships.some((m) => m.organization.id === organizationId)) {
@@ -314,7 +320,7 @@ export async function leaveOrganization(
  */
 export async function deactivateAccount(): Promise<AccountState> {
   const session = await requireMember();
-  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+  if (session.customerPreview) return { status: "error", message: "Accounts verwijdert of blokkeert u vanuit het beheerportaal." };
   const supabase = createServiceSupabase();
 
   await supabase

@@ -28,7 +28,7 @@ export async function requestRedemption(
 ): Promise<RedemptionState> {
   const session = await requireMember();
   if (session.customerPreview) {
-    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+    return { status: "error", message: "Punten verwerkt u vanuit het beheerportaal en niet namens de klant." };
   }
   const points = Number.parseInt(String(formData.get("points") ?? ""), 10);
   const bookingId = String(formData.get("booking_id") ?? "").trim() || null;
@@ -116,7 +116,7 @@ export async function cancelRedemption(
 ): Promise<RedemptionState> {
   const session = await requireMember();
   if (session.customerPreview) {
-    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+    return { status: "error", message: "Punten verwerkt u vanuit het beheerportaal en niet namens de klant." };
   }
   const id = String(formData.get("request_id") ?? "");
   if (!id) return { status: "error", message: "Onbekend verzoek." };
