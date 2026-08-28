@@ -20,12 +20,14 @@ function Save({ children = "Opslaan" }: { children?: React.ReactNode }) {
 }
 
 export function ProfileForm({
-  fullName,
+  firstName,
+  lastName,
   phone,
   jobTitle,
   email,
 }: {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   jobTitle: string;
   email: string;
@@ -37,17 +39,22 @@ export function ProfileForm({
       {state.status === "ok" ? <Alert tone="success">{state.message}</Alert> : null}
       {state.status === "error" ? <Alert tone="danger">{state.message}</Alert> : null}
 
-      <Field label="Naam" htmlFor="full_name" required>
-        <Input id="full_name" name="full_name" defaultValue={fullName} required />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Voornaam" htmlFor="first_name" required>
+          <Input id="first_name" name="first_name" defaultValue={firstName} autoComplete="given-name" required />
+        </Field>
+        <Field label="Achternaam" htmlFor="last_name" required>
+          <Input id="last_name" name="last_name" defaultValue={lastName} autoComplete="family-name" required />
+        </Field>
+      </div>
 
       <Field
         label="E-mailadres"
         htmlFor="email"
         required
-        hint="Hiermee logt u in en hierop sturen wij bevestigingen, facturen en resultaten. Wilt u een ander adres gebruiken? Mail ons, dan regelen wij dat veilig."
+        hint="Hiermee logt u in. Bij wijzigen ontvangt u een bevestiging op het nieuwe adres."
       >
-        <Input id="email" name="email" type="email" defaultValue={email} disabled />
+        <Input id="email" name="email" type="email" defaultValue={email} autoComplete="email" required />
       </Field>
 
       <Field

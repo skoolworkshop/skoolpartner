@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Registreren" };
 
 export default function RegisterPage() {
   return (
-    <>
+    <div className="mx-auto max-w-lg">
       <LoginForm mode="register" next="/aanmelden" />
       <div className="mt-8 space-y-3 text-sm text-muted">
         <p>
@@ -25,6 +25,6 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
-    </>
+    </div>
   );
 }

@@ -30,6 +30,11 @@ export default async function JoinPage() {
     id: s.organization.id,
     name: s.organization.name,
     city: s.organization.city,
+    kind: s.organization.kind,
+    street: s.organization.street,
+    houseNumber: s.organization.house_number,
+    houseNumberAddition: s.organization.house_number_addition,
+    postalCode: s.organization.postal_code,
   }));
 
   // Wat wij al weten vullen wij vast in. Meestal is dat alleen de naam die

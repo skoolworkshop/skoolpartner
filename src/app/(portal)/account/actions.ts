@@ -25,10 +25,18 @@ export async function updateProfile(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
-  const fullName = String(formData.get("full_name") ?? "").trim();
+  const firstName = String(formData.get("first_name") ?? "").trim();
+  const lastName = String(formData.get("last_name") ?? "").trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const requestedEmail = String(formData.get("email") ?? "").trim().toLowerCase();
   const jobTitle = String(formData.get("job_title") ?? "").trim() || null;
 
-  if (fullName.length < 2) return { status: "error", message: "Vul uw naam in." };
+  if (firstName.length < 2 || lastName.length < 2) {
+    return { status: "error", message: "Vul uw voor- en achternaam in." };
+  }
+  if (!isValidEmail(requestedEmail)) {
+    return { status: "error", message: "Vul een geldig e-mailadres in." };
+  }
 
   // Telefoonnummer is verplicht: wij moeten een school op de dag zelf kunnen
   // bereiken als er iets misgaat met een workshop.
@@ -37,27 +45,42 @@ export async function updateProfile(
     return { status: "error", message: phoneResult.message ?? "Vul uw telefoonnummer in." };
   }
 
-  // Het e-mailadres is verplicht, maar niet iets wat de klant hier invult: het
-  // is zijn inlogadres. Wij controleren of het klopt en zetten het meteen goed
-  // in het profiel als daar iets is scheefgelopen. Wisselen van inlogadres
-  // loopt via ons, zodat niemand met een zelfgekozen adres bij de gegevens van
-  // een andere school kan komen.
-  if (!isValidEmail(session.email)) {
-    return {
-      status: "error",
-      message:
-        "Er is iets mis met het e-mailadres van uw account. Neem contact met ons op, dan zetten wij het goed.",
-    };
+  const emailChanged = requestedEmail !== session.email.toLowerCase();
+  const server = await createServerSupabase();
+  const service = createServiceSupabase();
+
+  if (emailChanged) {
+    const authResult = session.customerPreview
+      ? await service.auth.admin.updateUserById(session.userId, {
+          email: requestedEmail,
+          email_confirm: true,
+          user_metadata: { full_name: fullName, first_name: firstName, last_name: lastName },
+        })
+      : await server.auth.updateUser({
+          email: requestedEmail,
+          data: { full_name: fullName, first_name: firstName, last_name: lastName },
+        });
+    if (authResult.error) {
+      console.error("[account] e-mailadres wijzigen mislukt", authResult.error);
+      return { status: "error", message: "Het e-mailadres kon niet worden gewijzigd. Mogelijk is het al in gebruik." };
+    }
+  } else {
+    const authResult = session.customerPreview
+      ? await service.auth.admin.updateUserById(session.userId, { user_metadata: { full_name: fullName, first_name: firstName, last_name: lastName } })
+      : await server.auth.updateUser({ data: { full_name: fullName, first_name: firstName, last_name: lastName } });
+    if (authResult.error) console.error("[account] auth-metadata bijwerken mislukt", authResult.error);
   }
 
-  const supabase = await createServerSupabase();
-  const { error } = await supabase
+  const profileEmail = emailChanged && !session.customerPreview ? session.email : requestedEmail;
+  const { error } = await service
     .from("profiles")
     .update({
+      first_name: firstName,
+      last_name: lastName,
       full_name: fullName,
       phone: phoneResult.value,
       job_title: jobTitle,
-      email: session.email,
+      email: profileEmail,
     })
     .eq("id", session.userId);
 
@@ -71,13 +94,18 @@ export async function updateProfile(
     entityType: "profile",
     entityId: session.userId,
     organizationId: session.activeOrganizationId,
-    after: { full_name: fullName, phone: phoneResult.value, job_title: jobTitle },
+    after: { full_name: fullName, email: requestedEmail, phone: phoneResult.value, job_title: jobTitle },
     reason: session.customerPreview ? "Aangepast vanuit klantportaal door beheerder" : null,
   });
 
   revalidatePath("/account");
   revalidatePath("/", "layout");
-  return { status: "ok", message: "Uw gegevens zijn opgeslagen." };
+  return {
+    status: "ok",
+    message: emailChanged && !session.customerPreview
+      ? "Uw gegevens zijn opgeslagen. Bevestig het nieuwe e-mailadres via de e-mail die wij daarheen hebben gestuurd."
+      : "Uw gegevens zijn opgeslagen.",
+  };
 }
 
 /**

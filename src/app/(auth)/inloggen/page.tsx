@@ -14,7 +14,7 @@ export default async function LoginPage({
   const next = params.volgende?.startsWith("/") ? params.volgende : "/";
 
   return (
-    <>
+    <div className="mx-auto max-w-md">
       <LoginForm mode="login" next={next} />
       <p className="mt-8 text-sm text-muted">
         Nog geen account?{" "}
@@ -25,6 +25,6 @@ export default async function LoginPage({
           Account aanmaken
         </Link>
       </p>
-    </>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { CUSTOMER_PREVIEW_COOKIE, requireAdmin } from "@/lib/auth/session";
+import { isValidEmail } from "@/lib/account";
 import { recordAudit } from "@/lib/audit";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { createBookingFromSource } from "@/lib/bookings/ingest";
@@ -141,6 +142,57 @@ export async function rejectMembershipAction(
   return result.ok
     ? { status: "ok", message: "Aanvraag afgewezen." }
     : { status: "error", message: result.message };
+}
+
+export async function updateUserIdentityAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const userId = String(formData.get("user_id") ?? "");
+  const firstName = String(formData.get("first_name") ?? "").trim();
+  const lastName = String(formData.get("last_name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+  if (firstName.length < 2 || lastName.length < 2) {
+    return { status: "error", message: "Vul een geldige voor- en achternaam in." };
+  }
+  if (!isValidEmail(email)) return { status: "error", message: "Vul een geldig e-mailadres in." };
+
+  const service = createServiceSupabase();
+  const { data: before } = await service.from("profiles").select("email, full_name").eq("id", userId).maybeSingle();
+  if (!before) return { status: "error", message: "Gebruiker niet gevonden." };
+
+  const { error: authError } = await service.auth.admin.updateUserById(userId, {
+    email,
+    email_confirm: true,
+    user_metadata: { full_name: fullName, first_name: firstName, last_name: lastName },
+  });
+  if (authError) {
+    console.error("[beheer] accountnaam/e-mail wijzigen mislukt", authError);
+    return { status: "error", message: "Naam of e-mailadres kon niet worden gewijzigd. Mogelijk is het adres al in gebruik." };
+  }
+
+  const { error } = await service.from("profiles").update({
+    first_name: firstName,
+    last_name: lastName,
+    full_name: fullName,
+    email,
+  }).eq("id", userId);
+  if (error) return { status: "error", message: "Het profiel kon niet worden bijgewerkt." };
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "user.identity_updated",
+    entityType: "profile",
+    entityId: userId,
+    before: { email: before.email, full_name: before.full_name },
+    after: { email, full_name: fullName },
+  });
+  revalidatePath("/admin/gebruikers");
+  return { status: "ok", message: "Naam en e-mailadres zijn bijgewerkt." };
 }
 
 export async function setUserBlockedAction(

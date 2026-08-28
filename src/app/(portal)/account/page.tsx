@@ -48,8 +48,8 @@ export default async function AccountPage() {
       {!status.complete ? (
         <Alert tone="warning" title="Maak uw account compleet" className="mb-5">
           Wij missen nog {missingLabel(status.missing)}. Uw naam en telefoonnummer vult u hieronder
-          zelf aan. Klopt uw e-mailadres niet? Mail ons op {settings.support_email}, want dat adres
-          is ook uw inlogadres.
+          zelf aan. Ook uw inlogadres kunt u veilig hieronder wijzigen; het nieuwe adres moet eerst
+          via e-mail worden bevestigd.
         </Alert>
       ) : null}
 
@@ -100,7 +100,8 @@ export default async function AccountPage() {
           <CardHeader title="Uw gegevens" />
           <CardBody>
             <ProfileForm
-              fullName={session.profile?.full_name ?? ""}
+              firstName={session.profile?.first_name ?? (session.profile?.full_name?.split(" ")[0] ?? "")}
+              lastName={session.profile?.last_name ?? (session.profile?.full_name?.split(" ").slice(1).join(" ") ?? "")}
               phone={formatPhone(session.profile?.phone)}
               jobTitle={session.profile?.job_title ?? ""}
               email={session.email}

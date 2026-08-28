@@ -10,6 +10,10 @@ export interface AuthFormState {
   status: "idle" | "sent" | "error";
   message?: string;
   email?: string;
+  firstName?: string;
+  lastName?: string;
+  registration?: boolean;
+  channel?: string;
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -19,6 +23,11 @@ function sanitizeNext(value: FormDataEntryValue | null): string {
   // Alleen interne paden toestaan: voorkomt open redirects.
   if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
   return raw;
+}
+
+function sanitizeChannel(value: FormDataEntryValue | null): string {
+  const raw = typeof value === "string" ? value : "";
+  return /^[a-zA-Z0-9-]{8,80}$/.test(raw) ? raw : "";
 }
 
 /**
@@ -35,19 +44,21 @@ export async function sendLoginLink(
   const lastName = String(formData.get("last_name") ?? "").trim();
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
   const allowSignUp = String(formData.get("registreren") ?? "") === "1";
+  const channel = sanitizeChannel(formData.get("kanaal"));
+  const common = { email, firstName, lastName, registration: allowSignUp, channel };
 
   if (!EMAIL_PATTERN.test(email)) {
-    return { status: "error", message: "Vul een geldig e-mailadres in.", email };
+    return { status: "error", message: "Vul een geldig e-mailadres in.", ...common };
   }
   if (allowSignUp && (firstName.length < 2 || lastName.length < 2)) {
-    return { status: "error", message: "Vul uw voor- en achternaam in.", email };
+    return { status: "error", message: "Vul uw voor- en achternaam in.", ...common };
   }
   if (!isSupabaseConfigured()) {
     return {
       status: "error",
       message:
         "De verbinding met de database is nog niet ingesteld. Neem contact op met Skool Workshop.",
-      email,
+      ...common,
     };
   }
 
@@ -57,7 +68,7 @@ export async function sendLoginLink(
     email,
     options: {
       shouldCreateUser: allowSignUp,
-      emailRedirectTo: `${siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}`,
+      emailRedirectTo: `${siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}&kanaal=${encodeURIComponent(channel)}`,
       data: allowSignUp
         ? { full_name: fullName, first_name: firstName, last_name: lastName }
         : undefined,
@@ -71,14 +82,14 @@ export async function sendLoginLink(
         status: "error",
         message:
           "Dit e-mailadres is nog niet bekend in SkoolPartner. Maak een account aan of neem contact met ons op.",
-        email,
+        ...common,
       };
     }
     if (error.status === 429) {
       return {
         status: "error",
         message: "Er zijn te veel pogingen gedaan. Probeer het over een paar minuten opnieuw.",
-        email,
+        ...common,
       };
     }
     // De echte oorzaak hoort niet op een openbare inlogpagina thuis, maar wel
@@ -90,11 +101,11 @@ export async function sendLoginLink(
     return {
       status: "error",
       message: "Versturen is niet gelukt. Probeer het opnieuw.",
-      email,
+      ...common,
     };
   }
 
-  return { status: "sent", email };
+  return { status: "sent", ...common };
 }
 
 /** Controleert de 6-cijferige code als het klikken op de link niet lukt. */

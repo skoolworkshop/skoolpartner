@@ -2,26 +2,24 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Building2, Check, Search } from "lucide-react";
+import { Building2, Check, MapPin, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { Field, Input } from "@/components/ui/form";
 import {
   completeRegistrationAction,
+  lookupAddressAction,
   searchOrganizationsAction,
+  type AddressLookupState,
   type JoinState,
+  type OrganizationOption,
   type RegistrationState,
 } from "./actions";
 
 const initialJoin: JoinState = { status: "idle" };
 const initialRegistration: RegistrationState = { status: "idle", errors: {} };
-
-interface OrganizationOption {
-  id: string;
-  name: string;
-  city: string | null;
-}
+const initialAddress: AddressLookupState = { status: "idle" };
 
 function Submit({ children }: { children: React.ReactNode }) {
   const { pending } = useFormStatus();
@@ -78,11 +76,13 @@ export function RegistrationForm({
   };
 }) {
   const [searchState, searchAction] = useActionState(searchOrganizationsAction, initialJoin);
+  const [addressState, addressAction] = useActionState(lookupAddressAction, initialAddress);
   const [state, formAction] = useActionState(completeRegistrationAction, initialRegistration);
   const [gekozen, setGekozen] = useState<OrganizationOption | null>(null);
   const [cjp, setCjp] = useState<"ja" | "nee" | "onbekend">("onbekend");
 
   const fout = (veld: keyof RegistrationState["errors"]) => state.errors?.[veld] ?? null;
+  const addressKey = `${gekozen?.id ?? "nieuw"}-${addressState.message ?? "leeg"}`;
 
   return (
     <div className="space-y-8">
@@ -248,22 +248,46 @@ export function RegistrationForm({
           />
         </Field>
 
+        <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Field label="Postcode" htmlFor="postal_code" required error={fout("postalCode")}>
+            <Input
+              key={`postcode-${addressKey}`}
+              id="postal_code"
+              name="postal_code"
+              autoComplete="postal-code"
+              placeholder="2801 AB"
+              defaultValue={state.input?.postalCode ?? addressState.address?.postalCode ?? gekozen?.postalCode ?? ""}
+              required
+            />
+          </Field>
+          <Button type="submit" variant="secondary" formAction={addressAction} formNoValidate className="w-full sm:w-auto">
+            <MapPin aria-hidden className="size-4" />
+            Adres zoeken
+          </Button>
+        </div>
+
+        {addressState.message ? (
+          <Alert tone={addressState.status === "ok" ? "success" : "warning"}>{addressState.message}</Alert>
+        ) : null}
+
         <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <Field label="Straat" htmlFor="street" required error={fout("street")}>
             <Input
+              key={`straat-${addressKey}`}
               id="street"
               name="street"
               autoComplete="address-line1"
-              defaultValue={state.input?.street ?? ""}
+              defaultValue={state.input?.street ?? addressState.address?.street ?? gekozen?.street ?? ""}
               required
             />
           </Field>
           <Field label="Huisnummer" htmlFor="house_number" required error={fout("houseNumber")}>
             <Input
+              key={`nummer-${addressKey}`}
               id="house_number"
               name="house_number"
               inputMode="numeric"
-              defaultValue={state.input?.houseNumber ?? ""}
+              defaultValue={state.input?.houseNumber ?? addressState.address?.houseNumber ?? gekozen?.houseNumber ?? ""}
               required
             />
           </Field>
@@ -273,32 +297,24 @@ export function RegistrationForm({
             error={fout("houseNumberAddition")}
           >
             <Input
+              key={`toevoeging-${addressKey}`}
               id="house_number_addition"
               name="house_number_addition"
               placeholder="A"
-              defaultValue={state.input?.houseNumberAddition ?? ""}
+              defaultValue={state.input?.houseNumberAddition ?? addressState.address?.houseNumberAddition ?? gekozen?.houseNumberAddition ?? ""}
             />
           </Field>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-          <Field label="Postcode" htmlFor="postal_code" required error={fout("postalCode")}>
-            <Input
-              id="postal_code"
-              name="postal_code"
-              autoComplete="postal-code"
-              placeholder="2801 AB"
-              defaultValue={state.input?.postalCode ?? ""}
-              required
-            />
-          </Field>
+        <div className="grid gap-4">
           <Field label="Plaats" htmlFor="city" required error={fout("city")}>
             <Input
+              key={`plaats-${addressKey}`}
               id="city"
               name="city"
               autoComplete="address-level2"
               placeholder="Gouda"
-              defaultValue={state.input?.city ?? gekozen?.city ?? ""}
+              defaultValue={state.input?.city ?? addressState.address?.city ?? gekozen?.city ?? ""}
               required
             />
           </Field>

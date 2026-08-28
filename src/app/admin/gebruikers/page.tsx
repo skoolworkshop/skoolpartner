@@ -16,6 +16,7 @@ import {
   deleteUserAction,
   rejectMembershipAction,
   setUserBlockedAction,
+  updateUserIdentityAction,
   setUserRoleAction,
   startCustomerPreviewAction,
 } from "../actions";
@@ -143,22 +144,25 @@ export default async function AdminUsersPage({
           )}
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Alle gebruikers"
-            description="Er zijn twee rollen: beheerder en klant. Open vanuit een klant diens portaal om gegevens te bekijken en aan te passen."
-            action={
-              <form className="flex gap-2">
-                <label htmlFor="q" className="sr-only">
-                  Zoek op e-mailadres
-                </label>
-                <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Zoek op e-mail" />
-              </form>
-            }
-          />
-          <ul className="divide-y divide-line-soft">
-            {users.map((user) => (
-              <li key={user.id} className="space-y-4 px-4 py-5 sm:px-5">
+        <section className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-[24px]">Alle gebruikers</h2>
+              <p className="text-sm text-muted">{users.length} accounts gevonden. Open Beheren om naam, e-mail en rechten aan te passen.</p>
+            </div>
+            <form className="w-full sm:w-72">
+              <label htmlFor="q" className="sr-only">Zoek op naam of e-mailadres</label>
+              <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Zoek gebruiker" />
+            </form>
+          </div>
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            {users.map((user) => {
+              const nameParts = (user.full_name ?? "").trim().split(/\s+/).filter(Boolean);
+              const firstName = user.first_name ?? nameParts[0] ?? "";
+              const lastName = user.last_name ?? nameParts.slice(1).join(" ");
+              return (
+              <Card key={user.id} className="overflow-hidden">
+                <div className="space-y-4 p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="break-words font-semibold">{user.full_name ?? "Naam niet ingevuld"}</p>
@@ -177,8 +181,20 @@ export default async function AdminUsersPage({
                   </ActionForm>
                 ) : null}
 
-                {user.id !== session.userId ? (
-                  <div className="grid gap-4 border-t border-line-soft pt-4 lg:grid-cols-2">
+                <details className="group border-t border-line-soft pt-4">
+                  <summary className="cursor-pointer list-none font-semibold text-ink underline underline-offset-4">Account beheren</summary>
+                  <div className="mt-4 space-y-4">
+                    <ActionForm action={updateUserIdentityAction} submitLabel="Naam en e-mail opslaan" variant="secondary">
+                      <input type="hidden" name="user_id" value={user.id} />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Voornaam" htmlFor={`voornaam-${user.id}`}><Input id={`voornaam-${user.id}`} name="first_name" defaultValue={firstName} required /></Field>
+                        <Field label="Achternaam" htmlFor={`achternaam-${user.id}`}><Input id={`achternaam-${user.id}`} name="last_name" defaultValue={lastName} required /></Field>
+                      </div>
+                      <Field label="E-mailadres" htmlFor={`email-${user.id}`}><Input id={`email-${user.id}`} name="email" type="email" defaultValue={user.email} required /></Field>
+                    </ActionForm>
+
+                  {user.id !== session.userId ? (
+                  <div className="grid gap-4 border-t border-line-soft pt-4 sm:grid-cols-2">
                     <ActionForm action={setUserRoleAction} submitLabel="Rol opslaan" variant="secondary">
                       <input type="hidden" name="user_id" value={user.id} />
                       <Field label="Rol" htmlFor={`rol-${user.id}`}>
@@ -203,12 +219,15 @@ export default async function AdminUsersPage({
                       </ActionForm>
                     </div>
                   </div>
-                ) : <p className="text-sm text-muted">Dit is uw eigen account.</p>}
-              </li>
-            ))}
-            {users.length === 0 ? <li className="px-4 py-8 text-center text-muted">Geen gebruikers gevonden.</li> : null}
-          </ul>
-        </Card>
+                  ) : <p className="text-sm text-muted">Dit is uw eigen beheeraccount; rol, blokkering en verwijdering zijn daarom vergrendeld.</p>}
+                  </div>
+                </details>
+                </div>
+              </Card>
+            );})}
+            {users.length === 0 ? <Card><p className="px-4 py-8 text-center text-muted">Geen gebruikers gevonden.</p></Card> : null}
+          </div>
+        </section>
       </div>
     </>
   );
