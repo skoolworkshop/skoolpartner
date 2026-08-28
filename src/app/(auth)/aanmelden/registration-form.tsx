@@ -107,7 +107,8 @@ export function RegistrationForm({
           <>
             <p className="text-sm text-muted">
               Op basis van uw e-mailadres denken wij dat u hierbij hoort. Dit is een suggestie; wij
-              controleren uw aanvraag voordat u de gegevens van die organisatie kunt zien.
+              geven direct toegang als uw geverifieerde schooladres klopt. Alleen een onbekend
+              adres controleren wij eerst.
             </p>
             <ul className="space-y-2">
               {suggestions.map((org) => (
@@ -150,8 +151,8 @@ export function RegistrationForm({
         {gekozen ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent/35 bg-accent-soft/25 px-4 py-3">
             <p className="text-sm">
-              U meldt zich aan bij <strong>{gekozen.name}</strong>. Wij controleren dat voordat u de
-              gegevens van die organisatie ziet.
+              U meldt zich aan bij <strong>{gekozen.name}</strong>. Met een herkend schooladres gaat
+              u na afronden direct naar het klantportaal.
             </p>
             <button
               type="button"
@@ -295,6 +296,7 @@ export function RegistrationForm({
             label="Toevoeging"
             htmlFor="house_number_addition"
             error={fout("houseNumberAddition")}
+            showOptional={false}
           >
             <Input
               key={`toevoeging-${addressKey}`}
@@ -383,8 +385,9 @@ export function RegistrationForm({
         <Submit>Registratie afronden</Submit>
 
         <p className="text-sm text-muted">
-          Kiest u een bestaande organisatie, dan leggen wij uw gegevens voor aan Skool Workshop
-          voordat u de boekingen, facturen en punten van die organisatie kunt zien.
+          Na een complete registratie gaat u direct naar het klantportaal. Alleen wanneer een
+          e-mailadres niet bij een bestaande organisatie kan worden geverifieerd, controleren wij
+          de koppeling eerst om klantgegevens te beschermen.
         </p>
       </form>
     </div>

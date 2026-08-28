@@ -144,7 +144,7 @@ export function LoginForm({ mode = "login", next = "/dashboard" }: { mode?: "log
   return (
     <div className="space-y-6">
       <div>
-        <p className="eyebrow mb-2 text-accent-strong">{mode === "register" ? "Nieuw bij SkoolPartner" : "Welkom terug"}</p>
+        <p className="eyebrow mb-2 text-accent-strong">Welkom bij SkoolPartner</p>
         <h1 className="text-[30px]">{mode === "register" ? "Account aanmaken" : "Inloggen op SkoolPartner"}</h1>
         <p className="mt-2 text-[15px] text-muted">{mode === "register" ? "Vul uw naam en e-mailadres in. Daarna bevestigt u uw adres met een tijdelijke code en vult u de schoolgegevens aan." : "Vul uw e-mailadres in. U ontvangt een tijdelijke verificatiecode; een wachtwoord is niet nodig."}</p>
       </div>

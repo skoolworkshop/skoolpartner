@@ -273,7 +273,11 @@ export function OrganisatieGegevens({
                 required
               />
             </Field>
-            <Field label="Toevoeging" htmlFor="organization_house_number_addition">
+            <Field
+              label="Toevoeging"
+              htmlFor="organization_house_number_addition"
+              showOptional={false}
+            >
               <Input
                 key={`toevoeging-${addressKey}`}
                 id="organization_house_number_addition"
