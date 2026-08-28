@@ -12,6 +12,7 @@ import {
 } from "@/lib/organizations/logo";
 import { requireMember } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/phone";
+import { normalizePostalCode } from "@/lib/registration";
 import { recordAudit } from "@/lib/audit";
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
 
@@ -167,6 +168,72 @@ export async function updateCjpNumber(
       ? "Het CJP-schoolnummer is opgeslagen."
       : "Het CJP-schoolnummer is verwijderd.",
   };
+}
+
+/** Werkt de gedeelde school- en adresgegevens van de actieve organisatie bij. */
+export async function updateOrganizationDetails(
+  _prev: AccountState,
+  formData: FormData
+): Promise<AccountState> {
+  const session = await requireMember();
+  const name = String(formData.get("organization_name") ?? "").trim();
+  const street = String(formData.get("street") ?? "").trim();
+  const houseNumber = String(formData.get("house_number") ?? "").trim();
+  const houseNumberAddition = String(formData.get("house_number_addition") ?? "").trim();
+  const postalCode = normalizePostalCode(String(formData.get("postal_code") ?? ""));
+  const city = String(formData.get("city") ?? "").trim();
+  const phoneInput = String(formData.get("organization_phone") ?? "").trim();
+
+  if (name.length < 2) return { status: "error", message: "Vul de naam van de organisatie in." };
+  if (street.length < 2) return { status: "error", message: "Vul de straatnaam in." };
+  if (!/^[0-9]{1,5}$/.test(houseNumber)) return { status: "error", message: "Vul een geldig huisnummer in." };
+  if (houseNumberAddition.length > 10) return { status: "error", message: "De huisnummertoevoeging is te lang." };
+  if (!postalCode) return { status: "error", message: "Vul een geldige Nederlandse postcode in." };
+  if (city.length < 2) return { status: "error", message: "Vul de woonplaats in." };
+
+  const phoneResult = phoneInput ? normalizePhone(phoneInput) : { ok: true as const, value: null };
+  if (!phoneResult.ok) return { status: "error", message: phoneResult.message ?? "Controleer het telefoonnummer." };
+
+  const service = createServiceSupabase();
+  const { data: before } = await service
+    .from("organizations")
+    .select("name, street, house_number, house_number_addition, postal_code, city, phone")
+    .eq("id", session.activeOrganizationId)
+    .maybeSingle();
+
+  const after = {
+    name,
+    street,
+    house_number: houseNumber,
+    house_number_addition: houseNumberAddition || null,
+    postal_code: postalCode,
+    city,
+    phone: phoneResult.value ?? null,
+    address_line: `${street} ${houseNumber}${houseNumberAddition ? ` ${houseNumberAddition}` : ""}, ${postalCode} ${city}`,
+  };
+  const { error } = await service.from("organizations").update(after).eq("id", session.activeOrganizationId);
+  if (error) {
+    console.error("[account] organisatiegegevens opslaan mislukt", error);
+    return { status: "error", message: "De organisatiegegevens konden niet worden opgeslagen." };
+  }
+
+  await recordAudit({
+    actorId: session.customerPreview?.administratorId ?? session.userId,
+    actorEmail: session.customerPreview?.administratorEmail ?? session.email,
+    actorRole: session.customerPreview ? "admin" : "klant",
+    action: "organization.details_updated",
+    entityType: "organization",
+    entityId: session.activeOrganizationId,
+    organizationId: session.activeOrganizationId,
+    before: before ?? null,
+    after,
+    reason: session.customerPreview ? "Aangepast vanuit klantportaal door beheerder" : null,
+  });
+
+  revalidatePath("/account");
+  revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
+  return { status: "ok", message: "De organisatie- en adresgegevens zijn opgeslagen." };
 }
 
 /**

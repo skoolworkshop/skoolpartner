@@ -118,6 +118,12 @@ export default async function AccountPage() {
             <CardBody>
               <OrganisatieGegevens
                 organizationName={organisatie.name}
+                street={organisatie.street}
+                houseNumber={organisatie.house_number}
+                houseNumberAddition={organisatie.house_number_addition}
+                postalCode={organisatie.postal_code}
+                city={organisatie.city}
+                organizationPhone={formatPhone(organisatie.phone)}
                 logoUrl={organisatie.logo_url}
                 logoSource={organisatie.logo_source}
                 website={organisatie.website}

@@ -12,6 +12,7 @@ import {
   fetchOwnLogo,
   removeOwnLogo,
   updateCjpNumber,
+  updateOrganizationDetails,
   updateOrganizationWebsite,
   uploadOwnLogo,
   type AccountState,
@@ -52,6 +53,12 @@ function Melding({ state }: { state: AccountState }) {
  */
 export function OrganisatieGegevens({
   organizationName,
+  street,
+  houseNumber,
+  houseNumberAddition,
+  postalCode,
+  city,
+  organizationPhone,
   logoUrl,
   logoSource,
   website,
@@ -59,6 +66,12 @@ export function OrganisatieGegevens({
   hasCjp,
 }: {
   organizationName: string;
+  street: string | null;
+  houseNumber: string | null;
+  houseNumberAddition: string | null;
+  postalCode: string | null;
+  city: string | null;
+  organizationPhone: string;
   logoUrl: string | null;
   logoSource: string | null;
   website: string | null;
@@ -66,6 +79,7 @@ export function OrganisatieGegevens({
   hasCjp: boolean | null;
 }) {
   const [cjpState, cjpAction] = useActionState(updateCjpNumber, initial);
+  const [detailsState, detailsAction] = useActionState(updateOrganizationDetails, initial);
   const [siteState, siteAction] = useActionState(updateOrganizationWebsite, initial);
   const [uploadState, uploadAction] = useActionState(uploadOwnLogo, initial);
   const [haalState, haalAction] = useActionState(async () => fetchOwnLogo(), initial);
@@ -175,6 +189,50 @@ export function OrganisatieGegevens({
             <Melding state={wisState} />
           </div>
         ) : null}
+      </div>
+
+      {/* Gedeelde school- en adresgegevens */}
+      <div className="border-t border-line-soft pt-5">
+        <form action={detailsAction} className="space-y-4">
+          <div>
+            <h3 className="font-display text-base">School- en adresgegevens</h3>
+            <p className="mt-1 text-sm text-muted">
+              Deze gegevens zijn bij de registratie ingevuld en worden gedeeld met alle gebruikers van deze organisatie.
+            </p>
+          </div>
+
+          <Field label="Naam school of organisatie" htmlFor="organization_name" required>
+            <Input id="organization_name" name="organization_name" defaultValue={organizationName} autoComplete="organization" required />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <Field label="Straat" htmlFor="organization_street" required>
+              <Input id="organization_street" name="street" defaultValue={street ?? ""} autoComplete="address-line1" required />
+            </Field>
+            <Field label="Huisnummer" htmlFor="organization_house_number" required>
+              <Input id="organization_house_number" name="house_number" defaultValue={houseNumber ?? ""} inputMode="numeric" required />
+            </Field>
+            <Field label="Toevoeging" htmlFor="organization_house_number_addition">
+              <Input id="organization_house_number_addition" name="house_number_addition" defaultValue={houseNumberAddition ?? ""} placeholder="A" />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Postcode" htmlFor="organization_postal_code" required>
+              <Input id="organization_postal_code" name="postal_code" defaultValue={postalCode ?? ""} autoComplete="postal-code" placeholder="2801 AB" required />
+            </Field>
+            <Field label="Woonplaats" htmlFor="organization_city" required>
+              <Input id="organization_city" name="city" defaultValue={city ?? ""} autoComplete="address-level2" required />
+            </Field>
+          </div>
+
+          <Field label="Algemeen telefoonnummer organisatie" htmlFor="organization_phone" hint="Optioneel; uw persoonlijke telefoonnummer staat bij Uw gegevens.">
+            <Input id="organization_phone" name="organization_phone" type="tel" defaultValue={organizationPhone} autoComplete="tel" />
+          </Field>
+
+          <Knop variant="primary">Organisatiegegevens opslaan</Knop>
+          <Melding state={detailsState} />
+        </form>
       </div>
 
       {/* CJP */}
