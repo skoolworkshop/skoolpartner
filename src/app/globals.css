@@ -136,6 +136,44 @@
   max-width: 100% !important;
 }
 
+@keyframes booking-confetti-fall {
+  0% {
+    opacity: 0;
+    translate: 0 -40px;
+    transform: rotate(0deg) scale(0.7);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 18px 520px;
+    transform: rotate(620deg) scale(1);
+  }
+}
+
+.booking-confetti-piece {
+  position: absolute;
+  top: -24px;
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  opacity: 0;
+  animation-name: booking-confetti-fall;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation-iteration-count: 2;
+}
+
+.booking-confetti-piece:nth-child(3n) {
+  width: 15px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.booking-confetti-piece:nth-child(4n) {
+  animation-direction: alternate;
+}
+
 /* Sla-over-link voor schermlezers en toetsenbordnavigatie. */
 .skip-link {
   position: absolute;

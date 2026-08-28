@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { requireMember } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { createParkingRequest } from "@/lib/tegoed/mutations";
+import { notifyNewParkingRequest } from "@/lib/tegoed/notify";
 import { validateParkingInput, type ParkingInput } from "@/lib/tegoed/regels";
 
 export interface ParkingFormState {
@@ -67,6 +69,15 @@ export async function submitParkingRequest(
     return { status: "error", message: resultaat.message };
   }
 
+  if (resultaat.request && resultaat.organizationName) {
+    // De aanvraag staat al veilig in de database. De interne Gmail-melding
+    // gebeurt na het antwoord, zodat een trage koppeling de klant niet laat
+    // wachten of de indruk geeft dat de aanvraag niet is opgeslagen.
+    after(async () => {
+      await notifyNewParkingRequest(resultaat.request!, resultaat.organizationName!);
+    });
+  }
+
   revalidatePath("/skoolpartner/cjp-tegoed");
   revalidatePath("/skoolpartner");
   revalidatePath("/account");
@@ -75,6 +86,5 @@ export async function submitParkingRequest(
     status: "ok",
     message:
       "Uw aanvraag is bij ons binnen. Wij nemen hem in behandeling en laten u weten zodra het tegoed klaarstaat.",
-    notice: resultaat.notice,
   };
 }

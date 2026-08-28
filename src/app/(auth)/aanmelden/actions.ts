@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { requireUser } from "@/lib/auth/session";
 import { completeRegistration } from "@/lib/organizations/registration";
 import { lookupOrganizationAddress } from "@/lib/organizations/address-lookup";
+import { fetchOrganizationLogo } from "@/lib/organizations/logo";
 import { searchOrganizations } from "@/lib/organizations/service";
 import { validateRegistration, type FieldName, type RegistrationInput } from "@/lib/registration";
 
@@ -145,6 +147,22 @@ export async function completeRegistrationAction(
         ? ` (technische melding: ${result.technicalReason})`
         : "";
     return { status: "error", message: `${result.message}${extra}`, errors: {}, input };
+  }
+
+  if (result.state === "active") {
+    // Een externe schoolwebsite kan traag of onbereikbaar zijn. Het logo wordt
+    // daarom pas na het antwoord opgehaald en houdt de registratie nooit tegen.
+    after(async () => {
+      try {
+        await fetchOrganizationLogo({
+          organizationId: result.organizationId,
+          actorId: session.userId,
+          actorEmail: session.email,
+        });
+      } catch (error) {
+        console.error("[registratie] logo ophalen na afronden mislukt", error);
+      }
+    });
   }
 
   redirect(result.state === "active" ? "/dashboard" : "/wachten");

@@ -297,7 +297,12 @@ export function OrganisatieGegevens({
             </Field>
           </div>
 
-          <Field label="Algemeen telefoonnummer organisatie" htmlFor="organization_phone" hint="Optioneel; uw persoonlijke telefoonnummer staat bij Uw gegevens.">
+          <Field
+            label="Algemeen telefoonnummer organisatie"
+            htmlFor="organization_phone"
+            hint="Uw persoonlijke telefoonnummer staat afzonderlijk bij Uw gegevens."
+            showOptional={false}
+          >
             <Input id="organization_phone" name="organization_phone" type="tel" defaultValue={organizationPhone} autoComplete="tel" />
           </Field>
 
