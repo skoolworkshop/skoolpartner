@@ -270,7 +270,7 @@ export function RegistrationForm({
           <Alert tone={addressState.status === "ok" ? "success" : "warning"}>{addressState.message}</Alert>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <Field label="Straat" htmlFor="street" required error={fout("street")}>
             <Input
               key={`straat-${addressKey}`}

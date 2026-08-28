@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { RefreshCw, Trash2, Upload } from "lucide-react";
+import { MapPin, RefreshCw, Trash2, Upload } from "lucide-react";
 
 import { OrgLogo } from "@/components/portal/org-logo";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,18 @@ import { Alert } from "@/components/ui/feedback";
 import { Field, Input } from "@/components/ui/form";
 import {
   fetchOwnLogo,
+  lookupOwnOrganizationAddress,
   removeOwnLogo,
   updateCjpNumber,
   updateOrganizationDetails,
   updateOrganizationWebsite,
   uploadOwnLogo,
   type AccountState,
+  type OrganizationAddressLookupState,
 } from "./actions";
 
 const initial: AccountState = { status: "idle" };
+const initialAddress: OrganizationAddressLookupState = { status: "idle" };
 
 function Knop({
   children,
@@ -80,6 +83,10 @@ export function OrganisatieGegevens({
 }) {
   const [cjpState, cjpAction] = useActionState(updateCjpNumber, initial);
   const [detailsState, detailsAction] = useActionState(updateOrganizationDetails, initial);
+  const [addressState, addressAction, addressPending] = useActionState(
+    lookupOwnOrganizationAddress,
+    initialAddress
+  );
   const [siteState, siteAction] = useActionState(updateOrganizationWebsite, initial);
   const [uploadState, uploadAction] = useActionState(uploadOwnLogo, initial);
   const [haalState, haalAction] = useActionState(async () => fetchOwnLogo(), initial);
@@ -87,6 +94,15 @@ export function OrganisatieGegevens({
 
   const [cjpOpen, setCjpOpen] = useState(false);
   const [logoOpen, setLogoOpen] = useState(false);
+  const addressKey = addressState.address
+    ? [
+        addressState.address.street,
+        addressState.address.houseNumber,
+        addressState.address.houseNumberAddition,
+        addressState.address.postalCode,
+        addressState.address.city,
+      ].join("-")
+    : "bestaand";
 
   const cjpWeergave = cjpNumber
     ? cjpNumber
@@ -205,24 +221,79 @@ export function OrganisatieGegevens({
             <Input id="organization_name" name="organization_name" defaultValue={organizationName} autoComplete="organization" required />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <Field label="Postcode" htmlFor="organization_postal_code" required>
+              <Input
+                key={`postcode-${addressKey}`}
+                id="organization_postal_code"
+                name="postal_code"
+                defaultValue={addressState.address?.postalCode ?? postalCode ?? ""}
+                autoComplete="postal-code"
+                placeholder="2801 AB"
+                required
+              />
+            </Field>
+            <Button
+              type="submit"
+              variant="secondary"
+              formAction={addressAction}
+              formNoValidate
+              disabled={addressPending}
+              className="w-full sm:w-auto"
+            >
+              <MapPin aria-hidden className="size-4" />
+              {addressPending ? "Zoeken…" : "Adres automatisch invullen"}
+            </Button>
+          </div>
+
+          {addressState.message ? (
+            <Alert tone={addressState.status === "ok" ? "success" : "warning"}>
+              {addressState.message}
+            </Alert>
+          ) : null}
+
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <Field label="Straat" htmlFor="organization_street" required>
-              <Input id="organization_street" name="street" defaultValue={street ?? ""} autoComplete="address-line1" required />
+              <Input
+                key={`straat-${addressKey}`}
+                id="organization_street"
+                name="street"
+                defaultValue={addressState.address?.street ?? street ?? ""}
+                autoComplete="address-line1"
+                required
+              />
             </Field>
             <Field label="Huisnummer" htmlFor="organization_house_number" required>
-              <Input id="organization_house_number" name="house_number" defaultValue={houseNumber ?? ""} inputMode="numeric" required />
+              <Input
+                key={`huisnummer-${addressKey}`}
+                id="organization_house_number"
+                name="house_number"
+                defaultValue={addressState.address?.houseNumber ?? houseNumber ?? ""}
+                inputMode="numeric"
+                required
+              />
             </Field>
             <Field label="Toevoeging" htmlFor="organization_house_number_addition">
-              <Input id="organization_house_number_addition" name="house_number_addition" defaultValue={houseNumberAddition ?? ""} placeholder="A" />
+              <Input
+                key={`toevoeging-${addressKey}`}
+                id="organization_house_number_addition"
+                name="house_number_addition"
+                defaultValue={addressState.address?.houseNumberAddition ?? houseNumberAddition ?? ""}
+                placeholder="A"
+              />
             </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Postcode" htmlFor="organization_postal_code" required>
-              <Input id="organization_postal_code" name="postal_code" defaultValue={postalCode ?? ""} autoComplete="postal-code" placeholder="2801 AB" required />
-            </Field>
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
             <Field label="Woonplaats" htmlFor="organization_city" required>
-              <Input id="organization_city" name="city" defaultValue={city ?? ""} autoComplete="address-level2" required />
+              <Input
+                key={`woonplaats-${addressKey}`}
+                id="organization_city"
+                name="city"
+                defaultValue={addressState.address?.city ?? city ?? ""}
+                autoComplete="address-level2"
+                required
+              />
             </Field>
           </div>
 

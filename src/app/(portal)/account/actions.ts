@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isValidEmail } from "@/lib/account";
 import { normalizeCjpNumber } from "@/lib/cjp";
 import { domeinNaarUrl } from "@/lib/organizations/logo-parse";
+import { lookupOrganizationAddress } from "@/lib/organizations/address-lookup";
 import {
   clearOrganizationLogo,
   fetchOrganizationLogo,
@@ -19,6 +20,29 @@ import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/serv
 export interface AccountState {
   status: "idle" | "ok" | "error";
   message?: string;
+}
+
+export interface OrganizationAddressLookupState extends AccountState {
+  address?: {
+    street: string;
+    houseNumber: string;
+    houseNumberAddition: string;
+    postalCode: string;
+    city: string;
+  };
+}
+
+/** Vult een vestigingsadres aan op postcode of organisatienaam. */
+export async function lookupOwnOrganizationAddress(
+  _prev: OrganizationAddressLookupState,
+  formData: FormData
+): Promise<OrganizationAddressLookupState> {
+  await requireMember();
+  return lookupOrganizationAddress({
+    organizationName: String(formData.get("organization_name") ?? ""),
+    postalCode: String(formData.get("postal_code") ?? ""),
+    houseNumber: String(formData.get("house_number") ?? ""),
+  });
 }
 
 export async function updateProfile(

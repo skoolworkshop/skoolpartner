@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/session";
 import { completeRegistration } from "@/lib/organizations/registration";
+import { lookupOrganizationAddress } from "@/lib/organizations/address-lookup";
 import { searchOrganizations } from "@/lib/organizations/service";
-import { createServiceSupabase } from "@/lib/supabase/server";
-import { normalizePostalCode, validateRegistration, type FieldName, type RegistrationInput } from "@/lib/registration";
+import { validateRegistration, type FieldName, type RegistrationInput } from "@/lib/registration";
 
 export interface OrganizationOption {
   id: string;
@@ -70,74 +70,17 @@ export async function searchOrganizationsAction(
   return { status: "ok", results };
 }
 
-/** Zoekt eerst in SkoolPartner en gebruikt voor een nieuw adres de openbare BAG/PDOK-service. */
+/** Zoekt op postcode of naam; bij meerdere vestigingen is de postcode leidend. */
 export async function lookupAddressAction(
   _prev: AddressLookupState,
   formData: FormData
 ): Promise<AddressLookupState> {
   await requireUser();
-  const organizationName = String(formData.get("organization_name") ?? "").trim();
-  const postalCode = normalizePostalCode(String(formData.get("postal_code") ?? ""));
-  const enteredHouseNumber = String(formData.get("house_number") ?? "").replace(/\D/g, "");
-
-  if (organizationName.length < 2 || !postalCode) {
-    return { status: "error", message: "Vul eerst de schoolnaam en een geldige postcode in." };
-  }
-
-  const service = createServiceSupabase();
-  const { data: existing } = await service
-    .from("organizations")
-    .select("street, house_number, house_number_addition, postal_code, city")
-    .ilike("name", `%${organizationName}%`)
-    .eq("postal_code", postalCode)
-    .limit(1)
-    .maybeSingle();
-
-  if (existing?.street && existing.city) {
-    return {
-      status: "ok",
-      message: "Adres overgenomen van de bestaande school.",
-      address: {
-        street: existing.street,
-        houseNumber: existing.house_number ?? enteredHouseNumber,
-        houseNumberAddition: existing.house_number_addition ?? "",
-        postalCode: existing.postal_code ?? postalCode,
-        city: existing.city,
-      },
-    };
-  }
-
-  const query = [postalCode, enteredHouseNumber].filter(Boolean).join(" ");
-  const url = new URL("https://api.pdok.nl/bzk/locatieserver/search/v3_1/free");
-  url.searchParams.set("q", query);
-  url.searchParams.set("fq", "type:adres");
-  url.searchParams.set("rows", "1");
-
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(6000), cache: "no-store" });
-    if (!response.ok) throw new Error(`PDOK gaf status ${response.status}`);
-    const payload = (await response.json()) as {
-      response?: { docs?: Array<{ straatnaam?: string; huisnummer?: number; huisletter?: string; huisnummertoevoeging?: string; postcode?: string; woonplaatsnaam?: string }> };
-    };
-    const found = payload.response?.docs?.[0];
-    if (!found?.straatnaam || !found.woonplaatsnaam) {
-      return { status: "error", message: "Bij deze postcode is geen adres gevonden. Vul het adres handmatig in." };
-    }
-    return {
-      status: "ok",
-      message: "Straat en plaats zijn gevonden. Controleer het huisnummer nog even.",
-      address: {
-        street: found.straatnaam,
-        houseNumber: enteredHouseNumber || "",
-        houseNumberAddition: enteredHouseNumber ? [found.huisletter, found.huisnummertoevoeging].filter(Boolean).join("") : "",
-        postalCode: found.postcode ?? postalCode,
-        city: found.woonplaatsnaam,
-      },
-    };
-  } catch (error) {
-    console.error("[registratie] adres opzoeken mislukt", error);
-    return { status: "error", message: "Automatisch zoeken lukte nu niet. U kunt het adres wel handmatig invullen." };
-  }
+  return lookupOrganizationAddress({
+    organizationName: String(formData.get("organization_name") ?? ""),
+    postalCode: String(formData.get("postal_code") ?? ""),
+    houseNumber: String(formData.get("house_number") ?? ""),
+  });
 }
 
 /**
