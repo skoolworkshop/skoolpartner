@@ -110,7 +110,10 @@ export default async function ResultsPage() {
                             className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                           >
                             <span className="min-w-0">
-                              <span className="block truncate font-medium">{file.file_name}</span>
+                              <span className="block break-words font-medium">{file.file_name}</span>
+                              {file.description ? (
+                                <span className="block break-words text-sm text-muted">{file.description}</span>
+                              ) : null}
                               <span className="block text-sm text-muted">
                                 {file.kind === "link"
                                   ? "Externe link"
@@ -128,7 +131,7 @@ export default async function ResultsPage() {
                               ) : (
                                 <Download aria-hidden className="size-4" />
                               )}
-                              {file.kind === "link" ? "Openen" : "Downloaden"}
+                              Download bestand
                             </a>
                           </li>
                         ))}

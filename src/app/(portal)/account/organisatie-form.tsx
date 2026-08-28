@@ -93,7 +93,7 @@ export function OrganisatieGegevens({
             size={48}
             className="border border-line-soft"
           />
-          <div className="min-w-[12rem] flex-1">
+          <div className="min-w-0 flex-1 basis-48">
             <p className="font-semibold">{organizationName}</p>
             <p className="text-sm text-muted">
               {logoUrl

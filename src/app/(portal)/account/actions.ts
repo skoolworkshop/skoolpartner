@@ -10,7 +10,7 @@ import {
   fetchOrganizationLogo,
   setOrganizationLogo,
 } from "@/lib/organizations/logo";
-import { requireMember, requireUser } from "@/lib/auth/session";
+import { requireMember } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/phone";
 import { recordAudit } from "@/lib/audit";
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
@@ -24,7 +24,8 @@ export async function updateProfile(
   _prev: AccountState,
   formData: FormData
 ): Promise<AccountState> {
-  const session = await requireUser();
+  const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const fullName = String(formData.get("full_name") ?? "").trim();
   const jobTitle = String(formData.get("job_title") ?? "").trim() || null;
 
@@ -69,10 +70,8 @@ export async function updateProfile(
 }
 
 /**
- * Het CJP-schoolnummer van de organisatie bijwerken.
- *
- * Iedereen die bij deze organisatie hoort mag dit. Het nummer hoort bij de
- * school en niet bij een persoon, dus een collega ziet dezelfde wijziging. Het
+ * Het persoonlijke CJP-schoolnummer van de ingelogde contactpersoon bijwerken.
+ * Een school kan meerdere gebruikers met verschillende nummers hebben. Het
  * invullen van een nummer verandert nooit iets aan een prijs, korting of
  * factuur; het wordt alleen vastgelegd.
  *
@@ -85,6 +84,7 @@ export async function updateCjpNumber(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
 
   const resultaat = normalizeCjpNumber(String(formData.get("cjp_school_number") ?? ""));
   if (!resultaat.ok) {
@@ -93,20 +93,20 @@ export async function updateCjpNumber(
 
   const supabase = createServiceSupabase();
   const { data: vorige } = await supabase
-    .from("organizations")
+    .from("profiles")
     .select("cjp_school_number, has_cjp")
-    .eq("id", session.activeOrganizationId)
+    .eq("id", session.userId)
     .maybeSingle();
 
   const { error } = await supabase
-    .from("organizations")
+    .from("profiles")
     .update({
       cjp_school_number: resultaat.value,
       // Een ingevuld nummer betekent dat de school er een heeft. Wordt het
       // leeggemaakt, dan weten wij het weer niet zeker.
       has_cjp: resultaat.value ? true : (vorige?.has_cjp ?? null),
     })
-    .eq("id", session.activeOrganizationId);
+    .eq("id", session.userId);
 
   if (error) return { status: "error", message: "Opslaan is niet gelukt." };
 
@@ -114,9 +114,9 @@ export async function updateCjpNumber(
     actorId: session.userId,
     actorEmail: session.email,
     actorRole: "klant",
-    action: "organization.cjp_updated",
-    entityType: "organization",
-    entityId: session.activeOrganizationId,
+    action: "profile.cjp_updated",
+    entityType: "profile",
+    entityId: session.userId,
     organizationId: session.activeOrganizationId,
     before: { cjp_school_number: vorige?.cjp_school_number ?? null },
     after: { cjp_school_number: resultaat.value ?? null },
@@ -142,6 +142,7 @@ export async function updateOrganizationWebsite(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const ingevuld = String(formData.get("website") ?? "").trim();
 
   if (ingevuld === "") {
@@ -195,6 +196,7 @@ export async function updateOrganizationWebsite(
 /** Het logo laten ophalen van de eigen website. */
 export async function fetchOwnLogo(): Promise<AccountState> {
   const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
 
   const result = await fetchOrganizationLogo({
     organizationId: session.activeOrganizationId,
@@ -218,6 +220,7 @@ export async function uploadOwnLogo(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const bestand = formData.get("logo");
 
   if (!(bestand instanceof File) || bestand.size === 0) {
@@ -247,6 +250,7 @@ export async function uploadOwnLogo(
 /** Terug naar het standaardicoon. */
 export async function removeOwnLogo(): Promise<AccountState> {
   const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
 
   await clearOrganizationLogo({
     organizationId: session.activeOrganizationId,
@@ -269,6 +273,7 @@ export async function leaveOrganization(
   formData: FormData
 ): Promise<AccountState> {
   const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const organizationId = String(formData.get("organization_id") ?? "");
 
   if (!session.memberships.some((m) => m.organization.id === organizationId)) {
@@ -308,7 +313,8 @@ export async function leaveOrganization(
  * persoon.
  */
 export async function deactivateAccount(): Promise<AccountState> {
-  const session = await requireUser();
+  const session = await requireMember();
+  if (session.customerPreview) return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
   const supabase = createServiceSupabase();
 
   await supabase

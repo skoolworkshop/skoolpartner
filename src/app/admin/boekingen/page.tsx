@@ -66,7 +66,41 @@ export default async function AdminBookingsPage({
             </div>
           }
         />
-        <div className="overflow-x-auto">
+        <ul className="divide-y divide-line-soft xl:hidden">
+          {bookings.map((booking) => {
+            const points = calculateBookingPoints(
+              { workshopCount: booking.workshop_count, minutesPerWorkshop: booking.minutes_per_workshop },
+              rates
+            );
+            return (
+              <li key={booking.id} className="space-y-3 px-4 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold">{booking.workshop_name}</p>
+                    <Link
+                      href={`/admin/organisaties/${booking.organization_id}`}
+                      className="block break-words text-sm text-muted underline underline-offset-4"
+                    >
+                      {booking.organizations?.name ?? "—"}
+                    </Link>
+                  </div>
+                  <span className="shrink-0 text-sm text-muted">{formatShortDate(booking.scheduled_date)}</span>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div><dt className="text-muted">Omvang</dt><dd>{booking.workshop_count} × {booking.minutes_per_workshop} min</dd></div>
+                  <div><dt className="text-muted">Punten</dt><dd>{points.points}{booking.points_awarded ? "" : " (nog niet toegekend)"}</dd></div>
+                </dl>
+                <div className="flex flex-wrap gap-1">
+                  <BookingStatusBadge status={booking.status} />
+                  {booking.needs_review ? <Badge tone="warning">Controle</Badge> : null}
+                </div>
+              </li>
+            );
+          })}
+          {bookings.length === 0 ? <li className="px-4 py-8 text-center text-muted">Geen boekingen gevonden.</li> : null}
+        </ul>
+
+        <div className="hidden xl:block">
           <table className="w-full min-w-3xl text-left text-sm">
             <thead className="border-b border-line-soft text-muted">
               <tr>

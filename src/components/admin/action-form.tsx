@@ -52,7 +52,13 @@ export function ActionForm({
   const [state, formAction] = useActionState(action, initial);
 
   return (
-    <form action={formAction} className={cn(inline ? "flex flex-wrap items-end gap-2" : "space-y-3", className)}>
+    <form
+      action={formAction}
+      className={cn(
+        inline ? "flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end" : "space-y-3",
+        className
+      )}
+    >
       {children}
       <SubmitButton label={submitLabel} variant={variant} size={size} />
       {state.status === "ok" ? (

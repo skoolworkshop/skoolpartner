@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LogOut, ShieldCheck } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
@@ -6,14 +7,17 @@ import { MobileNav, SidebarNav } from "@/components/portal/portal-nav";
 import { OrgSwitcher } from "@/components/portal/org-switcher";
 import { ProfileReminder } from "@/components/portal/profile-reminder";
 import { ChatFloatingButton } from "@/components/portal/chat-cta";
-import { ExternalButtonLink } from "@/components/ui/button";
+import { Button, ExternalButtonLink } from "@/components/ui/button";
+import { Alert } from "@/components/ui/feedback";
 import { requireMember } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { firstName } from "@/lib/format";
 import { checkProfile } from "@/lib/account";
+import { stopCustomerPreview } from "./preview-actions";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await requireMember();
+  if (session.isAdmin && !session.customerPreview) redirect("/admin");
   const settings = await getSettings();
 
   const organizations = session.memberships.map((m) => ({
@@ -110,6 +114,21 @@ export default async function PortalLayout({ children }: { children: React.React
           <span className="sr-only">
             Ingelogd als {firstName(session.profile?.full_name, session.email)}
           </span>
+
+          {session.customerPreview ? (
+            <Alert tone="warning" title={`Je bekijkt momenteel het klantportaal van ${session.customerPreview.userName}`} className="mb-5">
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="min-w-0 break-all text-sm">
+                  {session.customerPreview.userEmail} · alleen-lezen voor beheer
+                </span>
+                <form action={stopCustomerPreview}>
+                  <Button type="submit" variant="secondary" size="sm" className="w-full sm:w-auto">
+                    Terug naar beheer
+                  </Button>
+                </form>
+              </div>
+            </Alert>
+          ) : null}
 
           <ProfileReminder
             status={checkProfile({

@@ -109,7 +109,8 @@ export default async function CjpTegoedPage() {
               <ParkingForm
                 prefill={{
                   schoolName: organisatie.name,
-                  cjpSchoolNumber: organisatie.cjp_school_number ?? "",
+                  cjpSchoolNumber:
+                    session.profile?.cjp_school_number ?? organisatie.cjp_school_number ?? "",
                   holderName: naam || (session.profile?.full_name ?? ""),
                   holderEmail: session.email,
                   holderPhone: session.profile?.phone ?? "",

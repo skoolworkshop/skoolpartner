@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { requireAdmin } from "@/lib/auth/session";
+import { CUSTOMER_PREVIEW_COOKIE, requireAdmin } from "@/lib/auth/session";
 import { recordAudit } from "@/lib/audit";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { createBookingFromSource } from "@/lib/bookings/ingest";
@@ -48,6 +50,49 @@ export interface AdminState {
   message?: string;
   inviteUrl?: string;
   resultId?: string;
+}
+
+/** Start een read-only klantvoorvertoning voor een gewone klant. */
+export async function startCustomerPreviewAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const userId = String(formData.get("user_id") ?? "");
+  const supabase = createServiceSupabase();
+
+  const [{ data: profile }, { count }] = await Promise.all([
+    supabase.from("profiles").select("id, email, full_name, is_admin, is_blocked").eq("id", userId).maybeSingle(),
+    supabase
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "active"),
+  ]);
+
+  if (!profile || profile.is_admin || profile.is_blocked || !count) {
+    return { status: "error", message: "Dit klantportaal kan niet worden geopend." };
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(CUSTOMER_PREVIEW_COOKIE, userId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60,
+  });
+
+  await recordAudit({
+    actorId: session.userId,
+    actorEmail: session.email,
+    action: "customer_portal.preview_started",
+    entityType: "profile",
+    entityId: userId,
+    after: { klant: profile.email },
+  });
+
+  redirect("/dashboard");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -104,11 +149,11 @@ export async function setUserBlockedAction(
   formData: FormData
 ): Promise<AdminState> {
   const session = await requireAdmin();
-  if (!session.profile?.is_super_admin) {
-    return { status: "error", message: "Alleen een hoofdbeheerder kan accounts blokkeren." };
-  }
 
   const userId = String(formData.get("user_id") ?? "");
+  if (userId === session.userId) {
+    return { status: "error", message: "U kunt uw eigen account niet blokkeren." };
+  }
   const blocked = String(formData.get("blocked") ?? "") === "1";
   const reason = String(formData.get("reason") ?? "").trim() || null;
 
@@ -815,12 +860,14 @@ export async function manualAdjustmentAction(
 ): Promise<AdminState> {
   const session = await requireAdmin();
   const organizationId = String(formData.get("organization_id") ?? "");
+  const userId = String(formData.get("user_id") ?? "");
   const points = Number.parseInt(String(formData.get("points") ?? ""), 10);
   const reason = String(formData.get("reason") ?? "");
   const description = String(formData.get("description") ?? "").trim() || undefined;
 
   const result = await manualAdjustment({
     organizationId,
+    userId,
     points,
     reason,
     description,
@@ -1165,9 +1212,16 @@ export async function addResultLinkAction(
   const session = await requireAdmin();
   const resultId = String(formData.get("result_id") ?? "");
   const url = String(formData.get("url") ?? "");
-  const label = String(formData.get("label") ?? "");
+  const fileName = String(formData.get("file_name") ?? "");
+  const description = String(formData.get("description") ?? "");
 
-  const result = await addExternalLink({ resultId, url, label, userId: session.userId });
+  const result = await addExternalLink({
+    resultId,
+    url,
+    fileName,
+    description,
+    userId: session.userId,
+  });
 
   revalidatePath("/admin/resultaten");
   return result.ok
@@ -1257,7 +1311,7 @@ export async function deleteResultFileAction(
 
 /**
  * Beide acties zijn onomkeerbaar. Daarom drie sloten:
- *  1. alleen een super admin mag ze uitvoeren
+ *  1. alleen een ingelogde beheerder mag ze uitvoeren
  *  2. de beheerder moet het e-mailadres of de organisatienaam letterlijk
  *     overtypen, zodat een misklik nooit genoeg is
  *  3. er gaat altijd eerst een regel in het auditlogboek
@@ -1268,10 +1322,6 @@ export async function deleteUserAction(
   formData: FormData
 ): Promise<AdminState> {
   const session = await requireAdmin();
-
-  if (!session.profile?.is_super_admin) {
-    return { status: "error", message: "Alleen een super admin mag accounts verwijderen." };
-  }
 
   const userId = String(formData.get("user_id") ?? "");
   const typed = String(formData.get("bevestiging") ?? "").trim().toLowerCase();
@@ -1303,10 +1353,6 @@ export async function deleteOrganizationAction(
 ): Promise<AdminState> {
   const session = await requireAdmin();
 
-  if (!session.profile?.is_super_admin) {
-    return { status: "error", message: "Alleen een super admin mag organisaties verwijderen." };
-  }
-
   const organizationId = String(formData.get("organization_id") ?? "");
   const typed = String(formData.get("bevestiging") ?? "").trim().toLowerCase();
   const expected = String(formData.get("verwacht") ?? "").trim().toLowerCase();
@@ -1335,16 +1381,12 @@ export async function deleteOrganizationAction(
 /* Rechten en lidmaatschappen, zonder SQL                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Maakt van een account een klant, een beheerder of een hoofdbeheerder. */
+/** Wisselt uitsluitend tussen de twee rollen van SkoolPartner: klant en beheerder. */
 export async function setUserRoleAction(
   _prev: AdminState,
   formData: FormData
 ): Promise<AdminState> {
   const session = await requireAdmin();
-
-  if (!session.profile?.is_super_admin) {
-    return { status: "error", message: "Alleen een hoofdbeheerder kan rechten wijzigen." };
-  }
 
   const userId = String(formData.get("user_id") ?? "");
   const role = String(formData.get("rol") ?? "klant");
@@ -1352,16 +1394,18 @@ export async function setUserRoleAction(
   if (userId === session.userId) {
     return {
       status: "error",
-      message: "U kunt uw eigen rechten niet wijzigen. Vraag een andere hoofdbeheerder.",
+      message: "U kunt uw eigen beheerdersrechten niet wijzigen. Vraag een andere beheerder.",
     };
   }
 
+  if (role !== "klant" && role !== "beheerder") {
+    return { status: "error", message: "Onbekende rol." };
+  }
+
   const rechten =
-    role === "hoofdbeheerder"
-      ? { is_admin: true, is_super_admin: true }
-      : role === "beheerder"
-        ? { is_admin: true, is_super_admin: false }
-        : { is_admin: false, is_super_admin: false };
+    role === "beheerder"
+      ? { is_admin: true, is_super_admin: false }
+      : { is_admin: false, is_super_admin: false };
 
   const supabase = createServiceSupabase();
   const { error } = await supabase.from("profiles").update(rechten).eq("id", userId);

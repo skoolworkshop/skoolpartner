@@ -17,6 +17,7 @@ import {
   rejectMembershipAction,
   setUserBlockedAction,
   setUserRoleAction,
+  startCustomerPreviewAction,
 } from "../actions";
 
 export const metadata: Metadata = { title: "Gebruikers" };
@@ -145,7 +146,7 @@ export default async function AdminUsersPage({
         <Card>
           <CardHeader
             title="Alle gebruikers"
-            description="Blokkeren is omkeerbaar. Definitief verwijderen niet: het account en het lidmaatschap verdwijnen uit de database. Boekingen, facturen en SkoolPoints blijven staan, want die horen bij de organisatie."
+            description="Er zijn twee rollen: beheerder en klant. Vanuit een klant opent u veilig een alleen-lezen voorvertoning van diens portaal."
             action={
               <form className="flex gap-2">
                 <label htmlFor="q" className="sr-only">
@@ -155,109 +156,58 @@ export default async function AdminUsersPage({
               </form>
             }
           />
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-2xl text-left text-sm">
-              <thead className="border-b border-line-soft text-muted">
-                <tr>
-                  <th scope="col" className="px-5 py-2.5 font-semibold">E-mail</th>
-                  <th scope="col" className="px-5 py-2.5 font-semibold">Naam</th>
-                  <th scope="col" className="px-5 py-2.5 font-semibold">Rechten</th>
-                  <th scope="col" className="px-5 py-2.5 font-semibold">Sinds</th>
-                  <th scope="col" className="px-5 py-2.5 font-semibold">Actie</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-soft">
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td className="px-5 py-2.5">{user.email}</td>
-                    <td className="px-5 py-2.5">{user.full_name ?? "—"}</td>
-                    <td className="px-5 py-2.5">
-                      {session.profile?.is_super_admin && user.id !== session.userId ? (
-                        <ActionForm
-                          action={setUserRoleAction}
-                          submitLabel="Opslaan"
-                          variant="secondary"
-                          inline
-                        >
-                          <input type="hidden" name="user_id" value={user.id} />
-                          <Field label="Rol" htmlFor={`rol-${user.id}`} className="w-44">
-                            <Select
-                              id={`rol-${user.id}`}
-                              name="rol"
-                              defaultValue={
-                                user.is_super_admin
-                                  ? "hoofdbeheerder"
-                                  : user.is_admin
-                                    ? "beheerder"
-                                    : "klant"
-                              }
-                            >
-                              <option value="klant">Klant</option>
-                              <option value="beheerder">Beheerder</option>
-                              <option value="hoofdbeheerder">Hoofdbeheerder</option>
-                            </Select>
-                          </Field>
-                        </ActionForm>
-                      ) : user.is_super_admin ? (
-                        <Badge tone="accent">Hoofdbeheerder</Badge>
-                      ) : user.is_admin ? (
-                        <Badge tone="info">Beheerder</Badge>
-                      ) : (
-                        <Badge>Klant</Badge>
-                      )}
-                      {user.is_blocked ? <Badge tone="danger" className="ml-1">Geblokkeerd</Badge> : null}
-                    </td>
-                    <td className="px-5 py-2.5 text-muted">{formatShortDate(user.created_at)}</td>
-                    <td className="px-5 py-2.5">
-                      {session.profile?.is_super_admin && user.id !== session.userId ? (
-                        <div className="flex flex-wrap items-end gap-3">
-                          <ActionForm
-                            action={setUserBlockedAction}
-                            submitLabel={user.is_blocked ? "Deblokkeren" : "Blokkeren"}
-                            variant="secondary"
-                            inline
-                          >
-                            <input type="hidden" name="user_id" value={user.id} />
-                            <input
-                              type="hidden"
-                              name="blocked"
-                              value={user.is_blocked ? "0" : "1"}
-                            />
-                          </ActionForm>
+          <ul className="divide-y divide-line-soft">
+            {users.map((user) => (
+              <li key={user.id} className="space-y-4 px-4 py-5 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold">{user.full_name ?? "Naam niet ingevuld"}</p>
+                    <p className="break-all text-sm text-muted">{user.email}</p>
+                    <p className="mt-1 text-xs text-muted">Sinds {formatShortDate(user.created_at)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge tone={user.is_admin ? "info" : "neutral"}>{user.is_admin ? "Beheerder" : "Klant"}</Badge>
+                    {user.is_blocked ? <Badge tone="danger">Geblokkeerd</Badge> : null}
+                  </div>
+                </div>
 
-                          {user.is_super_admin ? null : (
-                            <ActionForm
-                              action={deleteUserAction}
-                              submitLabel="Definitief verwijderen"
-                              variant="danger"
-                              inline
-                            >
-                              <input type="hidden" name="user_id" value={user.id} />
-                              <input type="hidden" name="verwacht" value={user.email} />
-                              <Field
-                                label="Bevestig met het e-mailadres"
-                                htmlFor={`bevestig-${user.id}`}
-                                className="min-w-64"
-                              >
-                                <Input
-                                  id={`bevestig-${user.id}`}
-                                  name="bevestiging"
-                                  autoComplete="off"
-                                  placeholder={user.email}
-                                />
-                              </Field>
-                            </ActionForm>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                {!user.is_admin && !user.is_blocked ? (
+                  <ActionForm action={startCustomerPreviewAction} submitLabel="Ga naar klantportaal" variant="ink">
+                    <input type="hidden" name="user_id" value={user.id} />
+                  </ActionForm>
+                ) : null}
+
+                {user.id !== session.userId ? (
+                  <div className="grid gap-4 border-t border-line-soft pt-4 lg:grid-cols-2">
+                    <ActionForm action={setUserRoleAction} submitLabel="Rol opslaan" variant="secondary">
+                      <input type="hidden" name="user_id" value={user.id} />
+                      <Field label="Rol" htmlFor={`rol-${user.id}`}>
+                        <Select id={`rol-${user.id}`} name="rol" defaultValue={user.is_admin ? "beheerder" : "klant"}>
+                          <option value="klant">Klant</option>
+                          <option value="beheerder">Beheerder</option>
+                        </Select>
+                      </Field>
+                    </ActionForm>
+
+                    <div className="space-y-3">
+                      <ActionForm action={setUserBlockedAction} submitLabel={user.is_blocked ? "Deblokkeren" : "Blokkeren"} variant="secondary">
+                        <input type="hidden" name="user_id" value={user.id} />
+                        <input type="hidden" name="blocked" value={user.is_blocked ? "0" : "1"} />
+                      </ActionForm>
+                      <ActionForm action={deleteUserAction} submitLabel="Definitief verwijderen" variant="danger">
+                        <input type="hidden" name="user_id" value={user.id} />
+                        <input type="hidden" name="verwacht" value={user.email} />
+                        <Field label="Bevestig met het e-mailadres" htmlFor={`bevestig-${user.id}`}>
+                          <Input id={`bevestig-${user.id}`} name="bevestiging" autoComplete="off" placeholder={user.email} />
+                        </Field>
+                      </ActionForm>
+                    </div>
+                  </div>
+                ) : <p className="text-sm text-muted">Dit is uw eigen account.</p>}
+              </li>
+            ))}
+            {users.length === 0 ? <li className="px-4 py-8 text-center text-muted">Geen gebruikers gevonden.</li> : null}
+          </ul>
         </Card>
       </div>
     </>

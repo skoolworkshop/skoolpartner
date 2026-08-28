@@ -18,6 +18,9 @@ export async function replyToThread(
   formData: FormData
 ): Promise<ReplyState> {
   const session = await requireMember();
+  if (session.customerPreview) {
+    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+  }
   const threadId = String(formData.get("thread_id") ?? "");
   const body = String(formData.get("body") ?? "");
   const idempotencyKey = String(formData.get("idempotency_key") ?? "");

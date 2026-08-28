@@ -112,7 +112,7 @@ export default async function AccountPage() {
           <Card>
             <CardHeader
               title="Organisatiegegevens"
-              description="Deze gegevens horen bij uw school. Iedereen van uw school kan ze aanpassen, en uw collega's zien dezelfde wijziging."
+              description="De schoolgegevens zijn gedeeld. Uw CJP-nummer hieronder is persoonlijk en wordt niet met collega's samengevoegd."
             />
             <CardBody>
               <OrganisatieGegevens
@@ -120,8 +120,8 @@ export default async function AccountPage() {
                 logoUrl={organisatie.logo_url}
                 logoSource={organisatie.logo_source}
                 website={organisatie.website}
-                cjpNumber={organisatie.cjp_school_number}
-                hasCjp={organisatie.has_cjp}
+                cjpNumber={session.profile?.cjp_school_number ?? organisatie.cjp_school_number}
+                hasCjp={session.profile?.has_cjp ?? organisatie.has_cjp}
               />
             </CardBody>
           </Card>

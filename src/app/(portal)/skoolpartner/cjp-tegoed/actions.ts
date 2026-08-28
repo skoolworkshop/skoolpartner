@@ -26,6 +26,9 @@ export async function submitParkingRequest(
   formData: FormData
 ): Promise<ParkingFormState> {
   const session = await requireMember();
+  if (session.customerPreview) {
+    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+  }
   const settings = await getSettings();
 
   if (!settings.cjp_parking_enabled) {

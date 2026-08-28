@@ -68,15 +68,25 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
+    max-width: 100%;
+    overflow-x: clip;
     background-color: var(--color-surface-2);
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: 16px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+  }
+
+  img,
+  video,
+  iframe {
+    max-width: 100%;
   }
 
   h1,

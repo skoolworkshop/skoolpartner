@@ -15,8 +15,8 @@ export default async function HomePage() {
   const session = await getSessionContext();
   if (!session) redirect("/inloggen");
 
-  if (session.memberships.length > 0) redirect("/dashboard");
   if (session.isAdmin) redirect("/admin");
+  if (session.memberships.length > 0) redirect("/dashboard");
   if (session.pendingMemberships.length > 0) redirect("/wachten");
   redirect("/aanmelden");
 }

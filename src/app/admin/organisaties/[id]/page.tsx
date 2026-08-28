@@ -37,6 +37,7 @@ export const metadata: Metadata = { title: "Organisatie" };
 
 interface MemberRow {
   id: string;
+  user_id: string;
   role: string;
   status: string;
   profiles: { email: string; full_name: string | null } | null;
@@ -47,7 +48,7 @@ export default async function OrganizationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireAdmin();
+  await requireAdmin();
   const { id } = await params;
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
@@ -62,7 +63,7 @@ export default async function OrganizationDetailPage({
     external_id: string;
     external_label: string | null;
   }[];
-  const balance = detail.balance;
+  const balances = detail.balances;
 
   return (
     <>
@@ -201,38 +202,26 @@ export default async function OrganizationDetailPage({
         <Card>
           <CardHeader title="SkoolPoints" />
           <CardBody>
-            {balance ? (
-              <dl className="grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-sm text-muted">Beschikbaar</dt>
-                  <dd className="font-display text-2xl">
-                    {formatPoints(balance.available_points)}
-                  </dd>
-                  <dd className="text-sm text-muted">
-                    {formatEuroCents(
-                      pointsToCents(balance.available_points, settings.point_value_cents_per_100)
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted">In behandeling</dt>
-                  <dd className="font-display text-2xl text-muted">
-                    {formatPoints(balance.pending_points)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted">Gereserveerd</dt>
-                  <dd className="font-display text-xl text-muted">
-                    {formatPoints(balance.reserved_points)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted">Totaal gespaard</dt>
-                  <dd className="font-display text-xl text-muted">
-                    {formatPoints(balance.lifetime_earned_points)}
-                  </dd>
-                </div>
-              </dl>
+            {balances.length > 0 ? (
+              <div className="space-y-3">
+                {balances.map((balance) => {
+                  const member = members.find((item) => item.user_id === balance.user_id);
+                  return (
+                    <div key={balance.account_id} className="rounded-card border border-line-soft p-4">
+                      <p className="break-words font-semibold">
+                        {member?.profiles?.full_name ?? member?.profiles?.email ?? "Historisch account"}
+                      </p>
+                      <p className="break-all text-sm text-muted">{member?.profiles?.email}</p>
+                      <dl className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+                        <div><dt className="text-sm text-muted">Beschikbaar</dt><dd className="font-display text-2xl">{formatPoints(balance.available_points)}</dd><dd className="text-sm text-muted">{formatEuroCents(pointsToCents(balance.available_points, settings.point_value_cents_per_100))}</dd></div>
+                        <div><dt className="text-sm text-muted">In behandeling</dt><dd className="font-display text-xl text-muted">{formatPoints(balance.pending_points)}</dd></div>
+                        <div><dt className="text-sm text-muted">Gereserveerd</dt><dd className="font-display text-xl text-muted">{formatPoints(balance.reserved_points)}</dd></div>
+                        <div><dt className="text-sm text-muted">Totaal gespaard</dt><dd className="font-display text-xl text-muted">{formatPoints(balance.lifetime_earned_points)}</dd></div>
+                      </dl>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <p className="text-sm text-muted">
                 Deze organisatie heeft nog geen SkoolPartner-account. Dat wordt automatisch
@@ -244,6 +233,16 @@ export default async function OrganizationDetailPage({
               <p className="mb-3 text-sm font-semibold">Handmatige correctie</p>
               <ActionForm action={manualAdjustmentAction} submitLabel="Correctie vastleggen">
                 <input type="hidden" name="organization_id" value={detail.organization.id} />
+                <Field label="Gebruiker" htmlFor="user_id" required>
+                  <Select id="user_id" name="user_id" required defaultValue="">
+                    <option value="" disabled>Kies een gebruiker</option>
+                    {members.filter((member) => member.status === "active").map((member) => (
+                      <option key={member.user_id} value={member.user_id}>
+                        {member.profiles?.full_name ?? member.profiles?.email}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Punten (mag negatief)" htmlFor="points" required>
                     <Input id="points" name="points" type="number" step={1} required />
@@ -276,7 +275,7 @@ export default async function OrganizationDetailPage({
             }
           />
           <CardBody>
-            <dl className="grid grid-cols-3 gap-4">
+            <dl className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-3">
               <div>
                 <dt className="text-sm text-muted">Beschikbaar</dt>
                 <dd className="font-display text-2xl">{formatEuroCents(tegoed.available_cents)}</dd>
@@ -511,8 +510,7 @@ export default async function OrganizationDetailPage({
         </Card>
 
 
-        {session.profile?.is_super_admin ? (
-          <Card className="lg:col-span-2 border-danger/40">
+        <Card className="lg:col-span-2 border-danger/40">
             <CardHeader
               title="Organisatie definitief verwijderen"
               description="Onomkeerbaar. Alles van deze organisatie verdwijnt uit de database: boekingen, facturen, factuurregels, SkoolPoints, inwisselverzoeken, reviews, berichten en resultaten, inclusief de bestanden in de opslag. De accounts van de medewerkers blijven bestaan, alleen hun lidmaatschap verdwijnt."
@@ -543,8 +541,7 @@ export default async function OrganizationDetailPage({
                 </Field>
               </ActionForm>
             </CardBody>
-          </Card>
-        ) : null}
+        </Card>
       </div>
     </>
   );

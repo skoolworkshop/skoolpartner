@@ -281,11 +281,17 @@ export function NewResultForm({
             kun je een rechtstreekse downloadlink, WeTransfer-link of Drive-link toevoegen.
           </Alert>
 
-          <ResultUploader resultId={state.resultId} maxMb={maxMb} />
-
           <ActionForm action={addResultLinkAction} submitLabel="Downloadlink toevoegen">
             <input type="hidden" name="result_id" value={state.resultId} />
             <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Bestandsnaam" htmlFor={`new-file-name-${state.resultId}`}>
+                <Input
+                  id={`new-file-name-${state.resultId}`}
+                  name="file_name"
+                  required
+                  placeholder="Bijvoorbeeld: Foto's cultuurdag"
+                />
+              </Field>
               <Field label="Downloadlink" htmlFor={`new-url-${state.resultId}`}>
                 <Input
                   id={`new-url-${state.resultId}`}
@@ -295,15 +301,23 @@ export function NewResultForm({
                   placeholder="https://we.tl/..."
                 />
               </Field>
-              <Field label="Omschrijving" htmlFor={`new-label-${state.resultId}`}>
+              <Field label="Omschrijving" htmlFor={`new-description-${state.resultId}`}>
                 <Input
-                  id={`new-label-${state.resultId}`}
-                  name="label"
-                  placeholder="Bijvoorbeeld: aftermovie downloaden"
+                  id={`new-description-${state.resultId}`}
+                  name="description"
+                  placeholder="Bijvoorbeeld: foto's in hoge resolutie"
                 />
               </Field>
             </div>
           </ActionForm>
+
+          <details className="rounded-card border border-line-soft bg-surface-1 p-4">
+            <summary className="cursor-pointer font-semibold">Toch een bestand uploaden</summary>
+            <p className="mb-3 mt-2 text-sm text-muted">
+              Gebruik dit alleen als er geen veilige externe downloadlink beschikbaar is.
+            </p>
+            <ResultUploader resultId={state.resultId} maxMb={maxMb} />
+          </details>
 
           <p className="text-sm text-muted">
             De conceptset staat ook direct in de lijst hieronder. Daar kun je controleren,

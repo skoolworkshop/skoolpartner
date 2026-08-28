@@ -83,7 +83,48 @@ export default async function AdminInvoicesPage({
           />
         </form>
 
-        <div className="overflow-x-auto">
+        <ul className="divide-y divide-line-soft xl:hidden">
+          {rows.map((invoice) => (
+            <li key={invoice.id} className="space-y-3 px-4 py-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="break-all font-semibold">
+                    {administrationId ? (
+                      <a
+                        href={`https://moneybird.com/${encodeURIComponent(administrationId)}/sales_invoices/${encodeURIComponent(invoice.moneybird_invoice_id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-4"
+                      >
+                        {invoice.invoice_number ?? "Open in Moneybird"}
+                      </a>
+                    ) : invoice.invoice_number ?? "—"}
+                  </p>
+                  <p className="break-words text-sm text-muted">{invoice.reference ?? "Geen referentie"}</p>
+                </div>
+                <span className="shrink-0 text-sm text-muted">{formatShortDate(invoice.invoice_date)}</span>
+              </div>
+              <div className="min-w-0 text-sm">
+                {invoice.organization_id ? (
+                  <Link href={`/admin/organisaties/${invoice.organization_id}`} className="break-words underline underline-offset-4">
+                    {invoice.organizations?.name ?? "Onbekend"}
+                  </Link>
+                ) : <span className="text-muted">Nog niet gekoppeld</span>}
+              </div>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <div><dt className="text-muted">Bedrag</dt><dd>{formatEuroCents(invoice.total_incl_cents)}</dd></div>
+                <div><dt className="text-muted">Openstaand</dt><dd>{invoice.fully_paid ? "—" : formatEuroCents(invoice.total_unpaid_cents)}</dd></div>
+              </dl>
+              <div className="flex flex-wrap gap-1">
+                <InvoiceStatusBadge state={invoice.state} />
+                {invoice.needs_review ? <Badge tone="warning">Controle</Badge> : null}
+              </div>
+            </li>
+          ))}
+          {rows.length === 0 ? <li className="px-4 py-8 text-center text-muted">Geen facturen gevonden.</li> : null}
+        </ul>
+
+        <div className="hidden xl:block">
           <table className="w-full min-w-3xl text-left text-sm">
             <thead className="border-b border-line-soft text-muted">
               <tr>

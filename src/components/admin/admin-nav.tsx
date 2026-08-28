@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
@@ -22,10 +22,31 @@ const items = [
 
 export function AdminNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const current =
+    items.find((item) =>
+      item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`)
+    )?.href ?? "/admin";
 
   return (
-    <nav aria-label="Beheernavigatie" className="-mb-px overflow-x-auto">
-      <ul className="flex min-w-max gap-1">
+    <nav aria-label="Beheernavigatie" className="-mb-px">
+      <label htmlFor="admin-mobile-nav" className="sr-only">
+        Kies een beheeronderdeel
+      </label>
+      <select
+        id="admin-mobile-nav"
+        value={current}
+        onChange={(event) => router.push(event.target.value)}
+        className="mb-3 h-11 w-full rounded-card border border-white/25 bg-white px-3 text-base font-semibold text-ink md:hidden"
+      >
+        {items.map((item) => (
+          <option key={item.href} value={item.href}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+
+      <ul className="hidden flex-wrap gap-1 md:flex">
         {items.map((item) => {
           const active = item.exact
             ? pathname === item.href

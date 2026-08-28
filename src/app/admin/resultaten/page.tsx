@@ -121,8 +121,11 @@ export default async function AdminResultsPage() {
                           className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                         >
                           <span className="min-w-0">
-                            <span className="block truncate font-medium">{file.file_name}</span>
-                            <span className="block text-sm text-muted">
+                            <span className="block break-words font-medium">{file.file_name}</span>
+                            {file.description ? (
+                              <span className="block break-words text-sm text-muted">{file.description}</span>
+                            ) : null}
+                            <span className="block break-all text-sm text-muted">
                               {file.kind === "link"
                                 ? file.external_url
                                 : file.removed_at
@@ -149,14 +152,12 @@ export default async function AdminResultsPage() {
 
                   {concept ? (
                     <div className="space-y-4 rounded-card bg-surface-2 p-4">
-                      <ResultUploader
-                        resultId={result.id}
-                        maxMb={settings.results_max_upload_mb}
-                      />
-
-                      <ActionForm action={addResultLinkAction} submitLabel="Link toevoegen" inline>
+                      <ActionForm action={addResultLinkAction} submitLabel="Downloadlink toevoegen">
                         <input type="hidden" name="result_id" value={result.id} />
-                        <Field label="Externe link" htmlFor={`url-${result.id}`}>
+                        <Field label="Bestandsnaam" htmlFor={`file-name-${result.id}`}>
+                          <Input id={`file-name-${result.id}`} name="file_name" required placeholder="Foto's workshop" />
+                        </Field>
+                        <Field label="Downloadlink" htmlFor={`url-${result.id}`}>
                           <Input
                             id={`url-${result.id}`}
                             name="url"
@@ -164,14 +165,21 @@ export default async function AdminResultsPage() {
                             placeholder="https://we.tl/..."
                           />
                         </Field>
-                        <Field label="Omschrijving" htmlFor={`label-${result.id}`}>
+                        <Field label="Omschrijving" htmlFor={`description-${result.id}`}>
                           <Input
-                            id={`label-${result.id}`}
-                            name="label"
-                            placeholder="Videoclip via WeTransfer"
+                            id={`description-${result.id}`}
+                            name="description"
+                            placeholder="Bijvoorbeeld: aftermovie in hoge resolutie"
                           />
                         </Field>
                       </ActionForm>
+
+                      <details className="rounded-card border border-line-soft bg-surface-1 p-4">
+                        <summary className="cursor-pointer font-semibold">Toch een bestand uploaden</summary>
+                        <div className="mt-3">
+                          <ResultUploader resultId={result.id} maxMb={settings.results_max_upload_mb} />
+                        </div>
+                      </details>
 
                       <div className="flex flex-wrap gap-3">
                         <ActionForm

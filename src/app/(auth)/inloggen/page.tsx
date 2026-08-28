@@ -11,7 +11,7 @@ export default async function LoginPage({
   searchParams: Promise<{ volgende?: string }>;
 }) {
   const params = await searchParams;
-  const next = params.volgende?.startsWith("/") ? params.volgende : "/dashboard";
+  const next = params.volgende?.startsWith("/") ? params.volgende : "/";
 
   return (
     <>

@@ -27,6 +27,9 @@ export async function requestRedemption(
   formData: FormData
 ): Promise<RedemptionState> {
   const session = await requireMember();
+  if (session.customerPreview) {
+    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+  }
   const points = Number.parseInt(String(formData.get("points") ?? ""), 10);
   const bookingId = String(formData.get("booking_id") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
@@ -112,6 +115,9 @@ export async function cancelRedemption(
   formData: FormData
 ): Promise<RedemptionState> {
   const session = await requireMember();
+  if (session.customerPreview) {
+    return { status: "error", message: "De klantvoorvertoning is alleen-lezen." };
+  }
   const id = String(formData.get("request_id") ?? "");
   if (!id) return { status: "error", message: "Onbekend verzoek." };
 

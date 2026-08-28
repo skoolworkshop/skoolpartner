@@ -34,7 +34,7 @@ export function CardHeader({
         {title ? <h2 className="text-lg leading-tight">{title}</h2> : null}
         {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="min-w-0 w-full sm:w-auto sm:shrink-0">{action}</div> : null}
     </div>
   );
 }
