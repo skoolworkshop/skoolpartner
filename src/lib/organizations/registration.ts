@@ -48,6 +48,56 @@ function detailsFrom(values: RegistrationValues): RegistrationDetails {
   };
 }
 
+/**
+ * Laat een succesvolle registratie pas door wanneer de gegevens die de
+ * route-guard direct daarna nodig heeft ook echt terug te lezen zijn.
+ * Hiervoor wordt bewust een nieuwe service-client gebruikt: nooit de aan het
+ * begin van de Server Action gecachete sessiecontext.
+ */
+async function verifyActiveRegistration(params: {
+  userId: string;
+  organizationId: string;
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const supabase = createServiceSupabase();
+  const [profileResult, membershipResult, organizationResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, phone")
+      .eq("id", params.userId)
+      .maybeSingle(),
+    supabase
+      .from("organization_members")
+      .select("id, status")
+      .eq("organization_id", params.organizationId)
+      .eq("user_id", params.userId)
+      .maybeSingle(),
+    supabase
+      .from("organizations")
+      .select("id, status")
+      .eq("id", params.organizationId)
+      .maybeSingle(),
+  ]);
+
+  const technicalError =
+    profileResult.error?.message ??
+    membershipResult.error?.message ??
+    organizationResult.error?.message;
+  if (technicalError) return { ok: false, reason: technicalError };
+
+  const profile = profileResult.data;
+  if (!profile?.full_name?.trim() || !profile.email?.trim() || !profile.phone?.trim()) {
+    return { ok: false, reason: "Het opgeslagen profiel is nog niet compleet." };
+  }
+  if (membershipResult.data?.status !== "active") {
+    return { ok: false, reason: "Het organisatielidmaatschap is nog niet actief." };
+  }
+  if (organizationResult.data?.status !== "active") {
+    return { ok: false, reason: "De organisatie is nog niet actief." };
+  }
+
+  return { ok: true };
+}
+
 export async function completeRegistration(params: {
   userId: string;
   userEmail: string;
@@ -84,9 +134,9 @@ export async function completeRegistration(params: {
     };
   }
 
-  // Nieuwere, aanvullende profielvelden mogen een registratie nooit volledig
-  // blokkeren wanneer een deployment en database-update enkele seconden uit
-  // elkaar lopen. Ze worden na de kerngegevens apart opgeslagen.
+  // De aanvullende profielvelden worden apart opgeslagen, maar moeten nu wel
+  // slagen voordat onboarding als afgerond geldt. Zo kan de route-guard nooit
+  // een half opgeslagen profiel aantreffen.
   const { error: extraProfileError } = await supabase
     .from("profiles")
     .update({
@@ -102,6 +152,11 @@ export async function completeRegistration(params: {
       code: extraProfileError.code,
       message: extraProfileError.message,
     });
+    return {
+      ok: false,
+      message: "Het afronden van je registratie is niet gelukt. Probeer het opnieuw.",
+      technicalReason: extraProfileError.message,
+    };
   }
 
   // 2. Welke organisatie wordt het?
@@ -256,10 +311,28 @@ export async function completeRegistration(params: {
       after: { status: "active", organisatie: values.organizationName, nieuw: true },
     });
 
+    const verification = await verifyActiveRegistration({
+      userId: params.userId,
+      organizationId,
+    });
+    if (!verification.ok) {
+      console.error("[registratie] controle na opslaan mislukt", {
+        userId: params.userId,
+        organizationId,
+        reason: verification.reason,
+      });
+      return {
+        ok: false,
+        message: "Het afronden van je registratie is niet gelukt. Probeer het opnieuw.",
+        technicalReason: verification.reason,
+      };
+    }
+
     return { ok: true, state: "active", organizationId };
   }
 
-  // Bestaande organisatie: altijd in de wachtrij.
+  // Bestaande organisatie: een geverifieerd adres/domein kan direct door;
+  // alleen een onbekende koppeling komt in de wachtrij.
   const { data: bestaandLid } = await supabase
     .from("organization_members")
     .select("id, status")
@@ -335,6 +408,23 @@ export async function completeRegistration(params: {
         directe_toegang: verifiedContact ? "contact" : verifiedDomain ? "domein" : "bestaand_lid",
       },
     });
+
+    const verification = await verifyActiveRegistration({
+      userId: params.userId,
+      organizationId,
+    });
+    if (!verification.ok) {
+      console.error("[registratie] controle na directe koppeling mislukt", {
+        userId: params.userId,
+        organizationId,
+        reason: verification.reason,
+      });
+      return {
+        ok: false,
+        message: "Het afronden van je registratie is niet gelukt. Probeer het opnieuw.",
+        technicalReason: verification.reason,
+      };
+    }
 
     return { ok: true, state: "active", organizationId };
   }
