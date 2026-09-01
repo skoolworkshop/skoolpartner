@@ -48,6 +48,8 @@ export const SETTING_DEFAULTS = {
   results_notice_days: 7,
   results_max_upload_mb: 45,
   results_email_subject: "De resultaten van uw workshop staan klaar",
+  /** Welk merk het beheerportaal toont als je nog niets hebt gekozen. */
+  crm_default_brand: "skool_workshop",
   workshop_images: {
       "3d printerpen": "https://skoolworkshop.nl/wp-content/uploads/2024/07/MDC05556-scaled-e1781612569521-1024x382.jpg",
       "bodypercussie": "https://skoolworkshop.nl/wp-content/uploads/2020/07/Workshop-Ghetto-Drums-10-1024x683.jpg",

@@ -50,6 +50,19 @@ export type WebhookStatus = "received" | "processed" | "failed" | "ignored";
 export type ResultStatus = "concept" | "published" | "expired";
 export type ResultItemKind = "file" | "link";
 
+/**
+ * De twee merken. Zie src/lib/crm/merk.ts voor wat ze betekenen en waarom het
+ * merk aan de deal hangt en niet aan de organisatie.
+ */
+export type CrmBrand = "skool_workshop" | "suri_impact";
+/**
+ * De commerciele relatie met een organisatie.
+ *
+ * Bewust iets anders dan OrganizationStatus. Die stuurt toegang aan
+ * (actief, geblokkeerd, gearchiveerd) en mag hier nooit voor gebruikt worden.
+ */
+export type CrmLifecycle = "prospect" | "lead" | "klant" | "oud_klant";
+
 export type ProfileRow = {
   id: string;
   email: string;
@@ -552,6 +565,55 @@ export type CjpCreditTransactionRow = {
   updated_at: string;
 };
 
+export type CrmPipelineStageRow = {
+  id: string;
+  brand: CrmBrand;
+  key: string;
+  label: string;
+  description: string | null;
+  position: number;
+  is_won: boolean;
+  is_lost: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Een persoon die je kent.
+ *
+ * organization_id mag leeg zijn: een deelnemer aan het Suri Impact Breekjaar
+ * hoort bij geen enkele school. Deze tabel staat bewust naast
+ * organization_contacts en verandert nooit iets aan wat een klant mag zien.
+ */
+export type CrmContactRow = {
+  id: string;
+  organization_id: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  job_title: string | null;
+  note: string | null;
+  is_unsubscribed: boolean;
+  owner_id: string | null;
+  linked_contact_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Interne gegevens over een organisatie. Nooit zichtbaar voor de klant zelf. */
+export type CrmOrganizationProfileRow = {
+  organization_id: string;
+  lifecycle: CrmLifecycle;
+  owner_id: string | null;
+  source: string | null;
+  last_contact_at: string | null;
+  next_action_at: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Altijd berekend uit het grootboek, nooit uit een losse kolom. */
 export type CjpCreditBalanceRow = {
   organization_id: string;
@@ -671,6 +733,9 @@ export type Database = {
       workshop_result_files: TableDef<WorkshopResultFileRow>;
       cjp_parking_requests: TableDef<CjpParkingRequestRow>;
       cjp_credit_transactions: TableDef<CjpCreditTransactionRow>;
+      crm_pipeline_stages: TableDef<CrmPipelineStageRow>;
+      crm_contacts: TableDef<CrmContactRow>;
+      crm_organization_profiles: TableDef<CrmOrganizationProfileRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;

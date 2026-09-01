@@ -30,6 +30,14 @@
   --color-accent-wash: #fff5e6;
   --color-gold: #ffd700;
 
+  /* Suri Impact Breekjaar. Een eigen kleur zodat de twee merken in een
+     gemengde lijst nooit door elkaar lopen. Voorlopige keuze: er is nog geen
+     vastgelegde huisstijl voor dit merk, dus deze drie waarden zijn het enige
+     wat je hoeft te wijzigen zodra die er wel is. */
+  --color-suri: #0e6b63;
+  --color-suri-strong: #0a534d;
+  --color-suri-wash: #e8f3f1;
+
   --color-muted: #606060;
   --color-muted-soft: #8a8a8a;
   --color-line: #dadada;

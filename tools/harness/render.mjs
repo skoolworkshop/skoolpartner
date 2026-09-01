@@ -10,6 +10,9 @@ import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 
 const root = process.cwd();
+// Welke harness: `node tools/harness/render.mjs crm`. Bewust een argument en
+// geen omgevingsvariabele, want dat werkt ook in de Windows-opdrachtprompt.
+const keuze = process.argv[2] ?? "diagnose";
 const out = path.join(root, ".harness");
 mkdirSync(out, { recursive: true });
 
@@ -27,23 +30,23 @@ await build({
   conditions: ["import", "module", "default"],
   loader: { ".css": "empty" },
   alias: {
-    "@/app/(portal)/skoolpartner/cjp-tegoed/actions": path.join(root, "tools/harness/stub-actions.ts"),
+    "@/app/admin/crm/actions": path.join(root, "tools/harness/stub-actions.ts"),
     "server-only": path.join(root, "tools/harness/empty.ts"),
     "next/link": path.join(root, "tools/harness/link.tsx"),
-    "next/navigation": path.join(root, "tools/harness/empty.ts"),
+    "next/navigation": path.join(root, "tools/harness/navigation.ts"),
   },
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: { "process.env.NODE_ENV": '"production"', "process.env.HARNESS": JSON.stringify(keuze) },
   // Alles uit next dat niet met de opmaak te maken heeft, vervangen wij door
   // een lege module. De harness draait immers zonder server.
   plugins: [
     {
       name: "next-stub",
       setup(build) {
-        build.onResolve({ filter: /^next\// }, (args) =>
-          args.path === "next/link"
-            ? { path: path.join(root, "tools/harness/link.tsx") }
-            : { path: path.join(root, "tools/harness/empty.ts") }
-        );
+        build.onResolve({ filter: /^next\// }, (args) => {
+          if (args.path === "next/link") return { path: path.join(root, "tools/harness/link.tsx") };
+          if (args.path === "next/navigation") return { path: path.join(root, "tools/harness/navigation.ts") };
+          return { path: path.join(root, "tools/harness/empty.ts") };
+        });
       },
     },
   ],
