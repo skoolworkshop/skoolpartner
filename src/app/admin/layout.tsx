@@ -50,7 +50,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div className="px-4 pb-3"><AdminNav variant="mobile" /></div>
         </header>
 
-        <main id="hoofdinhoud" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {/*
+          Breder dan het was (max-w-7xl, 1280 pixels). Op een normaal
+          beheerscherm bleef daardoor rechts een strook leeg terwijl de pijplijn
+          en de drie kolommen van een contactpagina juist ruimte nodig hebben.
+          Een bovengrens blijft er wel: leesbare tekstregels worden anders te
+          lang op een breed scherm.
+        */}
+        <main id="hoofdinhoud" className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>

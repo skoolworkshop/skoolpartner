@@ -68,51 +68,32 @@ export function RelatieProfiel({
             ) : null}
           </div>
 
-          <ActionForm action={setRelatieProfielAction} submitLabel="Opslaan">
-            <input type="hidden" name="organizationId" value={organizationId} />
-            {/*
-              Een kolom, geen twee. Deze blokken staan sinds de nieuwe indeling
-              in een kolom van ongeveer 320 pixels breed. Twee velden naast
-              elkaar betekent daar een datumveld dat wordt afgekapt en labels
-              die over drie regels breken. Op een smalle plek is onder elkaar
-              rustiger en beter leesbaar.
-            */}
-            <div className="grid gap-4">
-              <Field label="Levensfase" htmlFor="lifecycle" required showOptional={false}>
-                <Select id="lifecycle" name="lifecycle" defaultValue={lifecycle}>
-                  {Object.entries(LIFECYCLE_LABELS).map(([waarde, label]) => (
-                    <option key={waarde} value={waarde}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Eigenaar" htmlFor="ownerId" hint="Wie deze relatie beheert.">
-                <Select id="ownerId" name="ownerId" defaultValue={profiel?.owner_id ?? ""}>
-                  <option value="">Niemand</option>
-                  {beheerders.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.naam}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Hoe binnengekomen" htmlFor="source" hint="Bijvoorbeeld: formulier, beurs, doorverwijzing.">
-                <Input id="source" name="source" defaultValue={profiel?.source ?? ""} autoComplete="off" />
-              </Field>
-              <Field label="Volgende actie op" htmlFor="nextActionAt">
-                <Input
-                  id="nextActionAt"
-                  name="nextActionAt"
-                  type="date"
-                  defaultValue={profiel?.next_action_at?.slice(0, 10) ?? ""}
-                />
-              </Field>
-            </div>
-            <Field label="Interne notitie" htmlFor="relatie-note">
-              <Textarea id="relatie-note" name="note" rows={3} defaultValue={profiel?.note ?? ""} />
-            </Field>
-          </ActionForm>
+          {/*
+            LEZEN STAAT VOOROP, WIJZIGEN ZIT ERACHTER
+
+            Dit was een formulier dat altijd openstond. Als je een school opent
+            wil je eerst zien hoe het ervoor staat, niet meteen vier keuzelijsten
+            en een tekstvak. De gegevens staan er nu als tekst; het formulier zit
+            achter een knop en bevat precies dezelfde velden.
+          */}
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted">Eigenaar</dt>
+            <dd className="font-medium">
+              {beheerders.find((b) => b.id === profiel?.owner_id)?.naam ?? "niemand"}
+            </dd>
+            <dt className="text-muted">Binnengekomen via</dt>
+            <dd className="font-medium">{profiel?.source || "niet ingevuld"}</dd>
+            <dt className="text-muted">Laatste contact</dt>
+            <dd className="font-medium">
+              {profiel?.last_contact_at ? formatShortDate(profiel.last_contact_at) : "niet vastgelegd"}
+            </dd>
+          </dl>
+
+          {profiel?.note ? (
+            <p className="whitespace-pre-line rounded-card bg-surface-2 px-3 py-2 text-sm text-muted">
+              {profiel.note}
+            </p>
+          ) : null}
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line-soft pt-4 text-sm">
             <dt className="text-muted">Omzet tot nu toe</dt>
@@ -134,6 +115,56 @@ export function RelatieProfiel({
             </ActionForm>
           </div>
         </CardBody>
+
+        <details className="border-t border-line-soft">
+          <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+            Gegevens aanpassen
+          </summary>
+          <CardBody className="pt-0">
+            <ActionForm action={setRelatieProfielAction} submitLabel="Opslaan">
+              <input type="hidden" name="organizationId" value={organizationId} />
+              <div className="grid gap-4">
+                <Field label="Levensfase" htmlFor="lifecycle" required showOptional={false}>
+                  <Select id="lifecycle" name="lifecycle" defaultValue={lifecycle}>
+                    {Object.entries(LIFECYCLE_LABELS).map(([waarde, label]) => (
+                      <option key={waarde} value={waarde}>
+                        {label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Eigenaar" htmlFor="ownerId" hint="Wie deze relatie beheert.">
+                  <Select id="ownerId" name="ownerId" defaultValue={profiel?.owner_id ?? ""}>
+                    <option value="">Niemand</option>
+                    {beheerders.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.naam}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field
+                  label="Hoe binnengekomen"
+                  htmlFor="source"
+                  hint="Bijvoorbeeld: formulier, beurs, doorverwijzing."
+                >
+                  <Input id="source" name="source" defaultValue={profiel?.source ?? ""} autoComplete="off" />
+                </Field>
+                <Field label="Volgende actie op" htmlFor="nextActionAt">
+                  <Input
+                    id="nextActionAt"
+                    name="nextActionAt"
+                    type="date"
+                    defaultValue={profiel?.next_action_at?.slice(0, 10) ?? ""}
+                  />
+                </Field>
+                <Field label="Interne notitie" htmlFor="relatie-note">
+                  <Textarea id="relatie-note" name="note" rows={3} defaultValue={profiel?.note ?? ""} />
+                </Field>
+              </div>
+            </ActionForm>
+          </CardBody>
+        </details>
       </Card>
     </>
   );

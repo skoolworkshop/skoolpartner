@@ -173,7 +173,13 @@ export function TakenBlok({
         </div>
       ) : null}
 
-      <CardBody className="border-t border-line-soft">
+      {/*
+        Ingeklapt, net als de andere invoerformulieren in de rechterkolom. Wat
+        er openstaat wil je zien; een nieuwe taak maak je af en toe.
+      */}
+      <details className="border-t border-line-soft">
+        <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">Taak toevoegen</summary>
+        <CardBody className="pt-0">
         <ActionForm action={maakTaakAction} submitLabel="Taak toevoegen" variant="secondary">
           <VerborgenOnderwerp onderwerp={onderwerp} />
           <Field label="Wat moet er gebeuren" htmlFor="taak-title" required showOptional={false}>
@@ -195,7 +201,8 @@ export function TakenBlok({
             </Field>
           </div>
         </ActionForm>
-      </CardBody>
+        </CardBody>
+      </details>
     </Card>
   );
 }

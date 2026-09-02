@@ -1,4 +1,7 @@
+import { Video } from "lucide-react";
+
 import { ActionForm } from "@/components/admin/action-form";
+import { kortAf, leesAfspraakTekst } from "@/lib/crm/afspraak-tekst";
 import { ZoneOffsetVeld } from "@/components/admin/zone-offset-veld";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
@@ -64,6 +67,59 @@ function VerborgenOnderwerp({ onderwerp }: { onderwerp: OnderwerpVelden }) {
   );
 }
 
+/**
+ * De omschrijving van een afspraak.
+ *
+ * Wat er uit HubSpot is meegekomen, is HTML met een videolink en twee
+ * HubSpot-links erin. Rauw tonen levert een half scherm techniek op. Hier komt
+ * er een gewone zin uit, met de videolink als knop ernaast.
+ *
+ * De opgeslagen tekst blijft ongemoeid; dit is alleen wat je ziet.
+ */
+function Omschrijving({ note }: { note: string | null }) {
+  if (!note) return null;
+  const { tekst, gesprek, weggelaten } = leesAfspraakTekst(note);
+  const { kort, ingekort } = kortAf(tekst);
+  if (!tekst && !gesprek) return null;
+
+  return (
+    <div className="mt-1.5 space-y-2">
+      {tekst ? (
+        ingekort ? (
+          <details>
+            <summary className="cursor-pointer list-none whitespace-pre-line text-sm text-muted">
+              {kort} <span className="font-semibold text-ink">meer</span>
+            </summary>
+            <p className="mt-1 whitespace-pre-line text-sm text-muted">{tekst}</p>
+          </details>
+        ) : (
+          <p className="whitespace-pre-line text-sm text-muted">{tekst}</p>
+        )
+      ) : null}
+
+      {gesprek ? (
+        <a
+          href={gesprek.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-pill border border-line bg-white px-3.5 text-sm font-semibold text-ink hover:bg-surface-2"
+        >
+          <Video aria-hidden className="size-4 text-muted" />
+          Deelnemen aan gesprek
+          <span className="text-xs font-normal text-muted">{gesprek.dienst}</span>
+        </a>
+      ) : null}
+
+      {weggelaten > 0 ? (
+        <p className="text-xs text-muted-soft">
+          {weggelaten} {weggelaten === 1 ? "link" : "links"} naar HubSpot weggelaten. Verzetten en
+          afzeggen doe je hier.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function AfspraakRegel({
   afspraak,
   onderwerp,
@@ -99,9 +155,7 @@ export function AfspraakRegel({
         {toonRelatie && bijWie ? ` · ${bijWie}` : ""}
       </p>
 
-      {afspraak.note ? (
-        <p className="mt-1 whitespace-pre-line text-sm text-muted">{afspraak.note}</p>
-      ) : null}
+      <Omschrijving note={afspraak.note} />
 
       {afspraak.outcome ? (
         <p className="mt-1.5 rounded-card bg-surface-2 px-3 py-2 text-sm">
@@ -232,7 +286,16 @@ export function AfsprakenBlok({
         </>
       )}
 
-      <CardBody className="border-t border-line-soft">
+      {/*
+        Het inplanformulier is ingeklapt. Het stond permanent open en was
+        daarmee het langste stuk van elke contact- en organisatiepagina, terwijl
+        je een afspraak zelden vanaf hier inplant.
+      */}
+      <details className="border-t border-line-soft">
+        <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+          Afspraak inplannen
+        </summary>
+        <CardBody className="pt-0">
         <ActionForm action={bewaarAfspraakAction} submitLabel="Afspraak inplannen" variant="secondary">
           <VerborgenOnderwerp onderwerp={onderwerp} />
           <ZoneOffsetVeld />
@@ -292,7 +355,8 @@ export function AfsprakenBlok({
             <Textarea id="afspraak-notitie" name="note" rows={2} />
           </Field>
         </ActionForm>
-      </CardBody>
+        </CardBody>
+      </details>
     </Card>
   );
 }

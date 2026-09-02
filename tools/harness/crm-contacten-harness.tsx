@@ -1,6 +1,5 @@
 import { Card, CardHeader } from "@/components/ui/card";
 import { ContactTypeBadge, PortalBadge, PortalUitleg } from "@/components/admin/contact-badges";
-import { DealKaart, type DealKaartGegevens } from "@/components/admin/deal-kaart";
 import { LifecycleBadge } from "@/components/admin/crm-badges";
 import type { PortalStatus } from "@/lib/crm/contacten";
 import type { CrmContactType } from "@/lib/types/database";
@@ -103,44 +102,6 @@ const CONTACTEN: Rij[] = [
   },
 ];
 
-const DEALS: DealKaartGegevens[] = [
-  {
-    id: "1",
-    titel: "Cultuurdag 2026",
-    organisatie: "Markenhage College",
-    contact: "Nora Bakker",
-    waardeCents: 145000,
-    datum: "2027-03-12",
-    eigenaar: "Clinten",
-    dagenInFase: 3,
-    volgendeTaak: null,
-    href: "#",
-  },
-  {
-    id: "2",
-    titel: "Introductiedag 2027",
-    organisatie: "Markenhage College",
-    contact: "Nora Bakker",
-    waardeCents: 387176,
-    datum: "2027-08-19",
-    eigenaar: "Collega",
-    dagenInFase: 21,
-    volgendeTaak: { titel: "Offerte nabellen", dueOn: "2026-09-08", teLaat: false },
-    href: "#",
-  },
-  {
-    id: "3",
-    titel: "Workshopreeks met een omschrijving die veel te lang is voor deze kaart",
-    organisatie: "Openbare Scholengemeenschap Noord-West",
-    contact: null,
-    waardeCents: 78000,
-    datum: null,
-    eigenaar: null,
-    dagenInFase: 118,
-    volgendeTaak: { titel: "Terugbellen na de zomervakantie", dueOn: "2026-08-20", teLaat: true },
-    href: "#",
-  },
-];
 
 function Scherm({ titel, children }: { titel: string; children: React.ReactNode }) {
   return (
@@ -243,17 +204,6 @@ export function Harness() {
         </div>
       </Scherm>
 
-      <Scherm titel="Dealkaarten: organisatie, contactpersoon, taak en tijd in de fase">
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {DEALS.map((deal) => (
-            <div key={deal.id} className="w-[260px] shrink-0">
-              <ul>
-                <DealKaart deal={deal} />
-              </ul>
-            </div>
-          ))}
-        </div>
-      </Scherm>
     </div>
   );
 }

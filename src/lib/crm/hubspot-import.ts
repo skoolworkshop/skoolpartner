@@ -538,7 +538,10 @@ export function leesAfspraak(bron: HubSpotMeeting, nu: Date): Uitkomst<AfspraakR
       ends_at: eind,
       status,
       location: schoon(bron.hs_meeting_location) || null,
-      note: schoon(bron.hs_meeting_body) || null,
+      // Platte tekst, geen HTML. Bij de eerste import ging dit mis en belandde
+      // de opmaak van HubSpot letterlijk in de database; scripts/herstel-
+      // afspraakteksten.mjs ruimt op wat er toen is binnengekomen.
+      note: naarPlatteTekst(bron.hs_meeting_body) || null,
       outcome: uitkomst ? `Uit HubSpot: ${uitkomst}` : null,
       contact_hubspot_ids: contactIds,
     },

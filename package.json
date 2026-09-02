@@ -43,6 +43,7 @@
     "import:hubspot": "node scripts/importeer-hubspot.mjs",
     "import:hubspot:schrijf": "node scripts/importeer-hubspot.mjs --schrijf",
     "import:controle": "node scripts/controleer-import.mjs",
+    "import:herstel-teksten": "node scripts/herstel-afspraakteksten.mjs",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"
   },

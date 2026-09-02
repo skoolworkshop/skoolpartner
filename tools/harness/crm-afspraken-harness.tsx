@@ -27,7 +27,14 @@ function afspraak(waarden: Partial<Afspraak> & { id: string; title: string }): A
     location: null,
     status: "gepland",
     outcome: null,
-    note: null,
+    note:
+      'Join link for Google Meet : https://meet.google.com/hov-grgh-qup<br><b>Wil je wijzigingen ' +
+      'aanbrengen?</b><br><ul><li>Opnieuw plannen:&nbsp;<a href="https://app-eu1.hubspot.com/meetings/' +
+      'skool-workshop/suri-impact?rescheduleId=918810da4aae2af8b9bbd8f1cd2f56f3&amp;ms=1">https://app-eu1' +
+      '.hubspot.com/meetings/skool-workshop/suri-impact?rescheduleId=918810da4aae2af8b9bbd8f1cd2f56f3' +
+      '&amp;ms=1</a></li><li>Annuleren:&nbsp;<a href="https://app-eu1.hubspot.com/meetings/skool-workshop/' +
+      'suri-impact?cancelId=918810da4aae2af8b9bbd8f1cd2f56f3&amp;ms=1">https://app-eu1.hubspot.com/' +
+      'meetings/skool-workshop/suri-impact?cancelId=918810da4aae2af8b9bbd8f1cd2f56f3&amp;ms=1</a></li></ul>',
     organizationId: "org-1",
     contactId: null,
     dealId: null,

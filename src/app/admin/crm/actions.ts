@@ -773,3 +773,43 @@ export async function zetBoekingsLinkAanAction(
     };
   });
 }
+
+/**
+ * Een deal naar een andere fase slepen.
+ *
+ * ============================================================================
+ * WAAROM DIT GEEN FORMULIERACTIE IS
+ * ============================================================================
+ *
+ * Alle andere acties hier horen bij een formulier en geven een AdminState
+ * terug, met een melding die onder het formulier komt te staan. Bij slepen is
+ * er geen formulier: de gebruiker heeft een kaart losgelaten en verwacht dat
+ * hij daar blijft liggen.
+ *
+ * Daarom geeft deze actie een kaal antwoord terug. Het scherm verplaatst de
+ * kaart meteen en wacht niet; komt hier een fout uit, dan legt het scherm de
+ * kaart terug op zijn oude plek en zegt waarom. Dat is de enige eerlijke manier
+ * om optimistisch te werken: je moet net zo makkelijk terug kunnen als vooruit.
+ *
+ * Het echte werk zit in zetFase, dat er al was. Die schrijft de faseovergang
+ * naar crm_deal_events en het audit log, en zet stage_since en closed_at goed.
+ * Er is dus geen tweede plek waar een fasewissel wordt bijgehouden.
+ */
+export async function verplaatsDealAction(
+  dealId: string,
+  stageId: string
+): Promise<{ ok: true } | { ok: false; fout: string }> {
+  try {
+    const wie = await actor();
+    await zetFase(dealId, stageId, wie, null);
+
+    revalidatePath("/admin/crm/pijplijn");
+    revalidatePath(`/admin/crm/deal/${dealId}`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      fout: error instanceof Error ? error.message : "De fase kon niet worden bijgewerkt.",
+    };
+  }
+}

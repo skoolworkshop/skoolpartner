@@ -32,3 +32,7 @@ export const bewaarAfspraakAction = niets;
 export const zetAfspraakStandAction = niets;
 export const bewaarBoekingsLinkAction = niets;
 export const zetBoekingsLinkAanAction = niets;
+
+// Slepen in de pijplijn. In de visuele controle draait er geen server, dus dit
+// zegt altijd dat het goed ging; de kaart blijft liggen waar je hem laat vallen.
+export const verplaatsDealAction = async () => ({ ok: true as const });
