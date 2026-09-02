@@ -36,6 +36,9 @@
     "visueel:afspraken": "node tools/harness/render.mjs afspraken && node tools/harness/shoot.mjs afspraken",
     "visueel:boeking": "node tools/harness/render.mjs boeking && node tools/harness/shoot.mjs boeking",
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
+    "db:verify-crm-hubspot": "node scripts/verify-crm-hubspot.mjs",
+    "import:hubspot": "node scripts/importeer-hubspot.mjs",
+    "import:hubspot:schrijf": "node scripts/importeer-hubspot.mjs --schrijf",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"
   },

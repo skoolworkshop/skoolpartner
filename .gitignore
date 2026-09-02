@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Visuele controle (tools/harness), wordt opnieuw opgebouwd
 /.harness
+
+# Proefdraaien van de HubSpot-import
+.hubspot-import/
