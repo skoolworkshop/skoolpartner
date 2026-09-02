@@ -8,8 +8,11 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select } from "@/components/ui/form";
 import { BetaalBadge, LeeftijdBadge } from "@/components/admin/crm-badges";
+import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { requireAdmin } from "@/lib/auth/session";
 import { getDeelnemer, getPeriodes } from "@/lib/crm/suri";
+import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
+import { createServiceSupabase } from "@/lib/supabase/server";
 import { BETALING_LABELS } from "@/lib/crm/regels";
 import { formatEuroCents, formatShortDate } from "@/lib/format";
 import {
@@ -28,7 +31,14 @@ export default async function DeelnemerPagina({ params }: { params: Promise<{ id
   const deelnemer = await getDeelnemer(id);
   if (!deelnemer) notFound();
 
-  const periodes = await getPeriodes();
+  const supabase = createServiceSupabase();
+  const [periodes, tijdlijn, taken, { data: beheerders }] = await Promise.all([
+    getPeriodes(),
+    getTijdlijn({ dealId: id, contactId: deelnemer.contact.id }),
+    getTakenVoor({ dealId: id }),
+    supabase.from("profiles").select("id, full_name, email").eq("is_admin", true).order("full_name"),
+  ]);
+  const beheerderLijst = (beheerders ?? []).map((b) => ({ id: b.id, naam: b.full_name ?? b.email }));
   const { contact, deal, fase, profiel, periode, betalingen, stand, leeftijd } = deelnemer;
   const alleFases = [...deelnemer.fases.lopend, deelnemer.fases.gewonnen, deelnemer.fases.verloren]
     .filter((f) => f !== null)
@@ -230,6 +240,17 @@ export default async function DeelnemerPagina({ params }: { params: Promise<{ id
             ) : null}
           </CardBody>
         </Card>
+
+        <TijdlijnBlok
+          onderwerp={{ dealId: deal.id, contactId: contact.id }}
+          regels={tijdlijn}
+        />
+
+        <TakenBlok
+          onderwerp={{ dealId: deal.id, contactId: contact.id }}
+          taken={taken}
+          beheerders={beheerderLijst}
+        />
 
         <Card className="lg:col-span-2">
           <CardHeader

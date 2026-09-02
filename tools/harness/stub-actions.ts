@@ -18,3 +18,10 @@ export const meldDeelnemerAanAction = niets;
 export const zetFaseAction = niets;
 export const bewaarBetalingAction = niets;
 export const verplaatsNaarPeriodeAction = niets;
+
+export const legActiviteitVastAction = niets;
+export const maakTaakAction = niets;
+export const zetTaakAfAction = niets;
+export const maakDealAction = niets;
+export const werkDealBijAction = niets;
+export const maakBoekingVanDealAction = niets;

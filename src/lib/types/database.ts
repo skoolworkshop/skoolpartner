@@ -683,6 +683,46 @@ export type CrmSuriPaymentRow = {
   created_at: string;
 };
 
+export type CrmActivityKind = "notitie" | "gesprek" | "telefoon" | "email" | "afspraak" | "systeem";
+
+/**
+ * Een gebeurtenis op de tijdlijn.
+ *
+ * Mag aan meerdere dingen tegelijk hangen: een gesprek met een contactpersoon
+ * over een lopende deal hoort bij de relatie, de persoon en de deal.
+ */
+export type CrmActivityRow = {
+  id: string;
+  kind: CrmActivityKind;
+  summary: string;
+  body: string | null;
+  occurred_at: string;
+  organization_id: string | null;
+  contact_id: string | null;
+  deal_id: string | null;
+  actor_id: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Een opvolgactie. Mag los staan van een relatie. */
+export type CrmTaskRow = {
+  id: string;
+  title: string;
+  note: string | null;
+  due_on: string | null;
+  owner_id: string | null;
+  organization_id: string | null;
+  contact_id: string | null;
+  deal_id: string | null;
+  done_at: string | null;
+  done_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Altijd berekend uit de deals en de betalingen, nooit uit een losse kolom. */
 export type CrmSuriEditionCapacityRow = {
   edition_id: string;
@@ -839,6 +879,8 @@ export type Database = {
       crm_suri_editions: TableDef<CrmSuriEditionRow>;
       crm_suri_profiles: TableDef<CrmSuriProfileRow>;
       crm_suri_payments: TableDef<CrmSuriPaymentRow>;
+      crm_activities: TableDef<CrmActivityRow>;
+      crm_tasks: TableDef<CrmTaskRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;

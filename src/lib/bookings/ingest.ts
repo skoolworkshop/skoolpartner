@@ -276,6 +276,16 @@ export async function createBookingFromSource(params: {
    * de klant valt.
    */
   bookedAt?: string | null;
+  /**
+   * De status waarmee de boeking begint. Standaard 'confirmed', want dat is
+   * wat een ingelezen bevestigingsmail is.
+   *
+   * Het CRM gebruikt bewust 'concept' als het een boeking maakt van een
+   * gewonnen aanvraag: die staat dan wel in de beheeromgeving, maar telt niet
+   * als aankomende workshop in het klantportaal en levert geen punten op.
+   * Bevestigen blijft daarmee een aparte, bewuste handeling.
+   */
+  status?: "concept" | "confirmed";
 }): Promise<string> {
   const supabase = createServiceSupabase();
   const workshopCount = params.extracted.workshopCount ?? 1;
@@ -295,7 +305,7 @@ export async function createBookingFromSource(params: {
       end_time: params.extracted.endTime,
       location: params.extracted.location,
       participants: params.extracted.participants,
-      status: "confirmed",
+      status: params.status ?? "confirmed",
       origin: params.origin,
       booking_source_id: params.sourceId,
       contact_email: params.extracted.contactEmail,

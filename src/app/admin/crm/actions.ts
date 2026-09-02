@@ -23,6 +23,18 @@ import {
   zetFase,
   type Actor,
 } from "@/lib/crm/mutations";
+import {
+  getDeal,
+  maakBoekingVanDeal,
+  maakDeal,
+  werkDealBij,
+} from "@/lib/crm/pijplijn";
+import {
+  isActiviteitSoort,
+  legActiviteitVast,
+  maakTaak,
+  zetTaakAf,
+} from "@/lib/crm/tijdlijn";
 import type { AdminState } from "@/app/admin/actions";
 
 /**
@@ -301,5 +313,202 @@ export async function verplaatsNaarPeriodeAction(
     revalidatePath("/admin/crm/suri");
     revalidatePath(`/admin/crm/suri/deelnemer/${dealId}`);
     return { status: "ok", message: "De deelnemer staat nu in de andere reisperiode." };
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Tijdlijn en taken
+// -----------------------------------------------------------------------------
+
+/** De drie mogelijke onderwerpen uit een formulier halen. */
+function onderwerpUit(formData: FormData) {
+  return {
+    organizationId: optioneel(formData, "organizationId"),
+    contactId: optioneel(formData, "contactId"),
+    dealId: optioneel(formData, "dealId"),
+  };
+}
+
+/** Alles vernieuwen wat dit onderwerp kan tonen. */
+function vernieuw(onderwerp: ReturnType<typeof onderwerpUit>) {
+  if (onderwerp.organizationId) revalidatePath(`/admin/organisaties/${onderwerp.organizationId}`);
+  if (onderwerp.dealId) {
+    revalidatePath(`/admin/crm/deal/${onderwerp.dealId}`);
+    revalidatePath(`/admin/crm/suri/deelnemer/${onderwerp.dealId}`);
+  }
+  revalidatePath("/admin/crm");
+  revalidatePath("/admin/crm/pijplijn");
+}
+
+export async function legActiviteitVastAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const onderwerp = onderwerpUit(formData);
+    const soort = tekst(formData, "kind");
+
+    if (!isActiviteitSoort(soort) || soort === "systeem") {
+      return { status: "error", message: "Kies een geldige soort." };
+    }
+
+    await legActiviteitVast(
+      {
+        ...onderwerp,
+        kind: soort,
+        summary: tekst(formData, "summary"),
+        body: optioneel(formData, "body"),
+        occurredAt: optioneel(formData, "occurredAt"),
+      },
+      wie
+    );
+
+    vernieuw(onderwerp);
+    return { status: "ok", message: "Vastgelegd op de tijdlijn." };
+  });
+}
+
+export async function maakTaakAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const onderwerp = onderwerpUit(formData);
+
+    await maakTaak(
+      {
+        ...onderwerp,
+        title: tekst(formData, "title"),
+        note: optioneel(formData, "note"),
+        dueOn: optioneel(formData, "dueOn"),
+        ownerId: optioneel(formData, "ownerId"),
+      },
+      wie
+    );
+
+    vernieuw(onderwerp);
+    revalidatePath("/admin/crm/taken");
+    return { status: "ok", message: "De taak staat erin." };
+  });
+}
+
+export async function zetTaakAfAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const af = tekst(formData, "af") !== "nee";
+
+    await zetTaakAf(tekst(formData, "taskId"), af, wie);
+
+    vernieuw(onderwerpUit(formData));
+    revalidatePath("/admin/crm/taken");
+    return { status: "ok", message: af ? "Afgevinkt." : "Weer opengezet." };
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Pijplijn Skool Workshop
+// -----------------------------------------------------------------------------
+
+export async function maakDealAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+
+    const waarde = bedragNaarCenten(tekst(formData, "value") || "0");
+    if (waarde === null || waarde < 0) {
+      return { status: "error", message: "Vul een geldig bedrag in, bijvoorbeeld 1450 of 1.450,00." };
+    }
+
+    await maakDeal(
+      {
+        organizationId: tekst(formData, "organizationId"),
+        title: tekst(formData, "title"),
+        valueCents: waarde,
+        expectedDate: optioneel(formData, "expectedDate"),
+        source: optioneel(formData, "source"),
+        note: optioneel(formData, "note"),
+      },
+      wie
+    );
+
+    revalidatePath("/admin/crm/pijplijn");
+    return { status: "ok", message: "De aanvraag staat in de pijplijn." };
+  });
+}
+
+export async function werkDealBijAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const dealId = tekst(formData, "dealId");
+
+    const waarde = bedragNaarCenten(tekst(formData, "value") || "0");
+    if (waarde === null || waarde < 0) {
+      return { status: "error", message: "Vul een geldig bedrag in." };
+    }
+
+    const eigenaar = tekst(formData, "ownerId");
+
+    await werkDealBij(
+      dealId,
+      {
+        title: tekst(formData, "title"),
+        valueCents: waarde,
+        expectedDate: optioneel(formData, "expectedDate"),
+        ownerId: eigenaar === "" ? null : eigenaar,
+        source: optioneel(formData, "source"),
+        note: optioneel(formData, "note"),
+      },
+      wie
+    );
+
+    revalidatePath(`/admin/crm/deal/${dealId}`);
+    revalidatePath("/admin/crm/pijplijn");
+    return { status: "ok", message: "De aanvraag is bijgewerkt." };
+  });
+}
+
+/**
+ * Van een gewonnen aanvraag een boeking maken.
+ *
+ * De boeking wordt bewust als concept aangemaakt. Die telt niet mee als
+ * aankomende workshop bij de klant en levert geen punten op, zodat bevestigen
+ * een aparte handeling blijft.
+ */
+export async function maakBoekingVanDealAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const dealId = tekst(formData, "dealId");
+
+    const aantal = Number(tekst(formData, "workshopCount"));
+    const minuten = Number(tekst(formData, "minutesPerWorkshop"));
+
+    const bookingId = await maakBoekingVanDeal(
+      dealId,
+      {
+        workshopName: tekst(formData, "workshopName"),
+        workshopCount: aantal,
+        minutesPerWorkshop: minuten,
+        scheduledDate: optioneel(formData, "scheduledDate"),
+        location: optioneel(formData, "location"),
+        reference: optioneel(formData, "reference"),
+      },
+      wie
+    );
+
+    const detail = await getDeal(dealId);
+    if (detail?.deal.organization_id) {
+      revalidatePath(`/admin/organisaties/${detail.deal.organization_id}`);
+    }
+    revalidatePath(`/admin/crm/deal/${dealId}`);
+    revalidatePath("/admin/boekingen");
+
+    return {
+      status: "ok",
+      message:
+        `De boeking staat klaar als concept (${bookingId.slice(0, 8)}). ` +
+        "Hij telt nog niet mee voor de klant en levert nog geen punten op. " +
+        "Bevestig hem in Admin > Boekingen zodra de afspraak vaststaat.",
+    };
   });
 }

@@ -21,6 +21,8 @@ import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import { OrgLogo } from "@/components/portal/org-logo";
 import { RelatieBlok } from "@/components/admin/relatie-blok";
+import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
+import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { getRelatieProfiel } from "@/lib/crm/relaties";
 import {
   clearOrganizationLogoAction,
@@ -60,6 +62,10 @@ export default async function OrganizationDetailPage({
     getCreditBalanceForAdmin(id),
     getCreditTransactionsForAdmin(id, 25),
     getRelatieProfiel(id),
+  ]);
+  const [tijdlijn, taken] = await Promise.all([
+    getTijdlijn({ organizationId: id }),
+    getTakenVoor({ organizationId: id }),
   ]);
   const members = detail.members as unknown as MemberRow[];
   const mbContacten = detail.moneybirdContacts as unknown as {
@@ -407,6 +413,14 @@ export default async function OrganizationDetailPage({
           contacten={relatie.contacten}
           beheerders={relatie.beheerders}
           vandaag={new Date().toISOString().slice(0, 10)}
+        />
+
+        <TijdlijnBlok onderwerp={{ organizationId: id }} regels={tijdlijn} />
+
+        <TakenBlok
+          onderwerp={{ organizationId: id }}
+          taken={taken}
+          beheerders={relatie.beheerders}
         />
 
         <Card>

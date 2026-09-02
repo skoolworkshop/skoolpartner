@@ -33,6 +33,8 @@ const groepen: Groep[] = [
       { href: "/admin", label: "Overzicht", exact: true },
       { href: "/admin/crm", label: "CRM", exact: true },
       { href: "/admin/crm/relaties", label: "Relaties" },
+      { href: "/admin/crm/pijplijn", label: "Pijplijn" },
+      { href: "/admin/crm/taken", label: "Taken" },
       { href: "/admin/crm/suri", label: "Reisperiodes" },
       { href: "/admin/boekingen", label: "Boekingen" },
       { href: "/admin/facturen", label: "Facturen" },

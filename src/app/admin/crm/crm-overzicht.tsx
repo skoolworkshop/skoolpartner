@@ -115,6 +115,12 @@ export function CrmOverzicht({
                   Relaties
                 </Link>
                 <Link
+                  href="/admin/crm/pijplijn"
+                  className="inline-flex min-h-11 items-center rounded-pill bg-surface-3 px-5 text-sm font-semibold text-ink"
+                >
+                  Pijplijn
+                </Link>
+                <Link
                   href="/admin/organisaties"
                   className="inline-flex min-h-11 items-center rounded-pill bg-surface-3 px-5 text-sm font-semibold text-ink"
                 >
@@ -129,6 +135,12 @@ export function CrmOverzicht({
                 Reisperiodes en deelnemers
               </Link>
             )}
+            <Link
+              href="/admin/crm/taken"
+              className="inline-flex min-h-11 items-center rounded-pill bg-surface-3 px-5 text-sm font-semibold text-ink"
+            >
+              Taken
+            </Link>
           </div>
         </CardBody>
       </Card>
@@ -136,18 +148,10 @@ export function CrmOverzicht({
       <Card className="mt-6">
         <CardHeader
           title="Wat hier nog niet staat"
-          description="Wat er nu is, dekt relaties en deelnemers. Deze onderdelen komen daarna."
+          description="Wat er nu is, dekt relaties, deelnemers, de pijplijn en de taken. Dit staat nog open."
         />
         <CardBody>
           <ul className="space-y-2 text-sm text-muted">
-            <li>
-              <strong className="text-ink">Activiteiten, notities en taken.</strong> Wie heeft wat
-              besproken, en wie pakt het op.
-            </li>
-            <li>
-              <strong className="text-ink">De pijplijn van Skool Workshop.</strong> Aanvragen als
-              kaarten in de fases hierboven, en een gewonnen deal die een boeking wordt.
-            </li>
             <li>
               <strong className="text-ink">Eigen formulieren.</strong> Nu komen nieuwe aanvragen nog
               bij HubSpot binnen en niet in dit systeem.
