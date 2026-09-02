@@ -89,6 +89,58 @@ function Tegel({
   );
 }
 
+/**
+ * Een getal in de rustige strip onder de vier hoofdtegels.
+ *
+ * WAAROM DIT NAAST DE TEGEL BESTAAT EN HEM NIET VERVANGT
+ *
+ *   Twaalf even grote tegels naast elkaar zeggen dat twaalf dingen even
+ *   belangrijk zijn. Dat is niet zo. Vier cijfers sturen je dag: wat is er
+ *   binnengekomen, wat staat er open, wat is er nieuw en wat win je. De rest
+ *   is naslag: waar of niet waar, maar je begint er je ochtend niet mee.
+ *
+ *   Die naslag verdwijnt dus niet, hij wordt kleiner. Alles wat er stond staat
+ *   er nog, in een strip die je in een oogopslag afleest in plaats van hem
+ *   scherm voor scherm door te scrollen.
+ */
+function Cijfer({
+  label,
+  waarde,
+  toelichting,
+  href,
+  toon = "gewoon",
+}: {
+  label: string;
+  waarde: string;
+  toelichting?: string;
+  href?: string;
+  toon?: "gewoon" | "aandacht" | "goed";
+}) {
+  const inhoud = (
+    <>
+      <p className="truncate text-xs text-muted">{label}</p>
+      <p
+        className={cn(
+          "mt-0.5 font-display text-lg leading-none tabular-nums",
+          toon === "aandacht" && "text-danger",
+          toon === "goed" && "text-success"
+        )}
+      >
+        {waarde}
+      </p>
+      {toelichting ? <p className="mt-0.5 truncate text-xs text-muted-soft">{toelichting}</p> : null}
+    </>
+  );
+
+  return href ? (
+    <Link href={href} className="block min-w-0 rounded-card px-3 py-2 hover:bg-surface-2">
+      {inhoud}
+    </Link>
+  ) : (
+    <div className="min-w-0 px-3 py-2">{inhoud}</div>
+  );
+}
+
 function Balkje({ deel, geheel, kleur }: { deel: number; geheel: number; kleur: string }) {
   const breedte = geheel > 0 ? Math.max((deel / geheel) * 100, deel > 0 ? 2 : 0) : 0;
   return (
@@ -432,63 +484,68 @@ export function DashboardScherm({
           toelichting={`${kpis.gewonnenDeals} gewonnen, ${kpis.verlorenDeals} verloren`}
           toon={kpis.conversiePercentage !== null && kpis.conversiePercentage >= 50 ? "goed" : "gewoon"}
         />
-        <Tegel
-          label="Gewonnen deals"
-          waarde={String(kpis.gewonnenDeals)}
-          toelichting="afgesloten in deze periode"
-        />
-        <Tegel
-          label="Verloren deals"
-          waarde={String(kpis.verlorenDeals)}
-          toelichting="afgesloten in deze periode"
-        />
-        <Tegel
-          label="Gemiddelde dealwaarde"
-          waarde={
-            kpis.gemiddeldeDealwaardeCents === null
-              ? "—"
-              : formatEuroCents(kpis.gemiddeldeDealwaardeCents)
-          }
-          toelichting="van de gewonnen deals"
-        />
-        {/* Bij te weinig metingen staat er een streepje en geen getal. De
-            uitleg staat eronder, want "onvoldoende data" in koptekst leest als
-            een storing terwijl het gewoon een eerlijk antwoord is. */}
-        <Tegel
-          label="Doorlooptijd"
-          waarde={kpis.doorlooptijd.voldoendeData ? formatDagen(kpis.doorlooptijd) : "—"}
-          toelichting={
-            kpis.doorlooptijd.voldoendeData
-              ? `aanvraag tot gewonnen, ${kpis.doorlooptijd.aantal} metingen`
-              : `onvoldoende data: ${kpis.doorlooptijd.aantal} gewonnen deal${kpis.doorlooptijd.aantal === 1 ? "" : "s"} in deze periode`
-          }
-        />
-        <Tegel
-          label="Openstaande taken"
-          waarde={String(kpis.openstaandeTaken)}
-          toelichting="op dit moment"
-          href="/admin/crm/taken"
-        />
-        <Tegel
-          label="Achterstallige taken"
-          waarde={String(kpis.achterstalligeTaken)}
-          toon={kpis.achterstalligeTaken > 0 ? "aandacht" : "gewoon"}
-          toelichting="datum verstreken"
-          href="/admin/crm/taken"
-        />
-        <Tegel
-          label="Deals die stilstaan"
-          waarde={String(pijplijn.teLangTotaal)}
-          toon={pijplijn.teLangTotaal > 0 ? "aandacht" : "gewoon"}
-          toelichting={`langer dan ${pijplijn.drempelDagen} dagen in dezelfde fase`}
-          href="/admin/crm/pijplijn"
-        />
-        <Tegel
-          label="Oudste lopende deal"
-          waarde={pijplijn.oudste ? `${pijplijn.oudste.dagen} dgn` : "—"}
-          toelichting={pijplijn.oudste?.title}
-          href={pijplijn.oudste ? `/admin/crm/deal/${pijplijn.oudste.id}` : undefined}
-        />
+      </div>
+
+      {/* -------------------------------------------------------------------
+          De naslag: alles wat waar is, maar je dag niet stuurt
+          ------------------------------------------------------------------- */}
+      <div className="mt-3 rounded-card border border-line-soft bg-white shadow-card">
+        <div className="grid grid-cols-2 gap-y-1 py-1 sm:grid-cols-4">
+          <Cijfer
+            label="Gewonnen"
+            waarde={String(kpis.gewonnenDeals)}
+            toelichting="deals in deze periode"
+          />
+          <Cijfer
+            label="Verloren"
+            waarde={String(kpis.verlorenDeals)}
+            toelichting="deals in deze periode"
+          />
+          <Cijfer
+            label="Gemiddelde deal"
+            waarde={
+              kpis.gemiddeldeDealwaardeCents === null
+                ? "\u2014"
+                : formatEuroCents(kpis.gemiddeldeDealwaardeCents)
+            }
+            toelichting="van de gewonnen deals"
+          />
+          <Cijfer
+            label="Doorlooptijd"
+            waarde={kpis.doorlooptijd.voldoendeData ? formatDagen(kpis.doorlooptijd) : "\u2014"}
+            toelichting={
+              kpis.doorlooptijd.voldoendeData
+                ? `${kpis.doorlooptijd.aantal} metingen`
+                : "te weinig metingen"
+            }
+          />
+          <Cijfer
+            label="Open taken"
+            waarde={String(kpis.openstaandeTaken)}
+            toelichting="op dit moment"
+            href="/admin/crm/taken"
+          />
+          <Cijfer
+            label="Achterstallig"
+            waarde={String(kpis.achterstalligeTaken)}
+            toon={kpis.achterstalligeTaken > 0 ? "aandacht" : "gewoon"}
+            toelichting="datum verstreken"
+            href="/admin/crm/taken"
+          />
+          <Cijfer
+            label="Staat stil"
+            waarde={String(pijplijn.teLangTotaal)}
+            toon={pijplijn.teLangTotaal > 0 ? "aandacht" : "gewoon"}
+            toelichting={`langer dan ${pijplijn.drempelDagen} dagen`}
+            href="/admin/crm/pijplijn"
+          />
+          <Cijfer
+            label="Oudste lopende deal"
+            waarde={pijplijn.oudste ? `${pijplijn.oudste.dagen} dgn` : "\u2014"}
+            toelichting={pijplijn.oudste?.title}
+            href={pijplijn.oudste ? `/admin/crm/deal/${pijplijn.oudste.id}` : undefined}
+          />
+        </div>
       </div>
 
       {kpis.omzet.zonderDatumCents > 0 ? (
@@ -976,9 +1033,19 @@ export function DashboardScherm({
         </div>
       )}
 
-      <Card className="mt-6">
-        <CardHeader title="Waar deze getallen vandaan komen" />
-        <CardBody>
+      {/*
+        Ingeklapt, niet weggehaald.
+
+        De verantwoording hoort erbij: zonder die uitleg is niet te zien dat de
+        omzet uit facturen komt en niet uit dealwaardes. Maar je leest hem een
+        keer en daarna nooit meer, en tot die tijd kostte hij elke dag een halve
+        pagina onder aan het scherm.
+      */}
+      <details className="mt-6 rounded-card border border-line-soft bg-white shadow-card">
+        <summary className="cursor-pointer px-5 py-4 font-display text-base font-semibold">
+          Waar deze getallen vandaan komen
+        </summary>
+        <div className="px-5 pb-5">
           <ul className="space-y-2 text-sm text-muted">
             <li>
               <strong className="text-ink">Omzet</strong> is voor Skool Workshop het betaalde bedrag
@@ -998,8 +1065,8 @@ export function DashboardScherm({
               {formatShortDate(periode.tot)}, beide dagen meegerekend.
             </li>
           </ul>
-        </CardBody>
-      </Card>
+        </div>
+      </details>
     </>
   );
 }

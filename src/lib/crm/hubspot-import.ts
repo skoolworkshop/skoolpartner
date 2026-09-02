@@ -181,6 +181,7 @@ export interface HubSpotContact {
 export interface ContactRij {
   hubspot_id: string;
   full_name: string;
+  contact_type: string | null;
   email: string | null;
   phone: string | null;
   job_title: string | null;
@@ -192,31 +193,74 @@ export interface ContactRij {
 
 export type Uitkomst<T> = { ok: true; rij: T } | { ok: false; reden: string };
 
-export function leesContact(bron: HubSpotContact): Uitkomst<ContactRij> {
+/** Bij een contact wil je er ook bij weten waar de naam vandaan komt. */
+export type ContactUitkomst =
+  | { ok: true; rij: ContactRij; naamUitEmail: boolean }
+  | { ok: false; reden: string };
+
+export interface ContactOpties {
+  /**
+   * Wat er met de ZZP-ers gebeurt.
+   *
+   *   "leverancier" - ze komen mee als leverancier, met een lege levensfase.
+   *                   Ze staan dan in het CRM, maar buiten de verkooppijplijn,
+   *                   en hun afspraken kunnen aan hen blijven hangen.
+   *   "overslaan"   - ze blijven in HubSpot achter, met hun afspraken.
+   *
+   * De eerste is de standaard. In de eerste proefdraai bleek namelijk dat 38
+   * van de 73 afspraken aan deze mensen hangen: stagegesprekken en
+   * kennismakingen met docenten. Ze overslaan betekent dus meer dan de helft
+   * van de afsprakenhistorie weggooien, en dat is een te grote prijs voor het
+   * netjes houden van een pijplijn waar ze toch al buiten vallen.
+   */
+  zzp?: "leverancier" | "overslaan";
+}
+
+export function leesContact(bron: HubSpotContact, opties: ContactOpties = {}): ContactUitkomst {
   const hubspotId = schoon(bron.id);
   if (!hubspotId) return { ok: false, reden: "geen recordnummer" };
 
   const naam = leesNaam(bron.firstname, bron.lastname);
   const email = leesEmail(bron.email);
 
-  // Zonder naam en zonder adres is er niets om mee te werken. Zo'n rij is in
-  // HubSpot ook nooit iets geworden.
+  /*
+    EEN CONTACT ZONDER NAAM IS NOG GEEN ONBRUIKBAAR CONTACT
+
+    In HubSpot staan honderden mensen met alleen een e-mailadres: aanvragen via
+    het formulier waar de naam niet is ingevuld, adressen uit een doorgestuurde
+    mail, oude imports. Aan een deel van die adressen hangt wel een offerte, een
+    afspraak of een notitie.
+
+    Ze overslaan omdat de naam ontbreekt betekent dat je die historie kwijt
+    bent. Er een naam bij verzinnen mag niet en is ook nergens voor nodig: het
+    adres is de naam die je hebt. HubSpot doet zelf precies hetzelfde; een
+    contact zonder naam staat daar in de lijst met zijn e-mailadres.
+
+    Alleen als er ook geen adres is, blijft er niets over om mee te werken. Dan
+    gaat de rij niet mee, en het rapport laat zien of er iets aan hing.
+  */
   if (!naam && !email) return { ok: false, reden: "geen naam en geen e-mailadres" };
-  if (!naam) return { ok: false, reden: "geen naam" };
 
   const fase = schoon(bron.lifecyclestage);
-  if (fase === ZZP_LIFECYCLE) return { ok: false, reden: "ZZP-er, hoort niet in de verkooppijplijn" };
+  const isZzp = fase === ZZP_LIFECYCLE;
+  if (isZzp && opties.zzp === "overslaan") {
+    return { ok: false, reden: "ZZP-er, op verzoek overgeslagen" };
+  }
 
   return {
     ok: true,
+    naamUitEmail: naam === null,
     rij: {
       hubspot_id: hubspotId,
-      full_name: naam,
+      full_name: naam ?? (email as string),
+      // Een ZZP-er is een leverancier en geen prospect. Zo staat hij in het
+      // CRM zonder ooit in een verkoopcijfer mee te tellen.
+      contact_type: isZzp ? "leverancier" : null,
       email,
       phone: leesTelefoon(bron.phone) ?? leesTelefoon(bron.mobilephone),
       job_title: schoon(bron.jobtitle) || null,
       city: schoon(bron.city) || null,
-      lifecycle: LIFECYCLE_MAP[fase] ?? null,
+      lifecycle: isZzp ? null : (LIFECYCLE_MAP[fase] ?? null),
       // Afgemeld blijft afgemeld. Dit is het enige veld waarbij twijfel altijd
       // de kant van niet mailen op valt.
       is_unsubscribed: schoon(bron.hs_email_optout).toLowerCase() === "true",
@@ -284,7 +328,13 @@ export interface DealRij {
   note: string | null;
   created_at: string | null;
   stage_since: string | null;
-  contact_hubspot_id: string | null;
+  /**
+   * Alle contacten die HubSpot aan deze deal koppelt, in de volgorde waarin
+   * HubSpot ze teruggeeft. Bewust een lijst en geen enkel nummer: bij een
+   * school hangt een offerte vaak aan de conciërge en aan de directeur, en de
+   * eerste in de lijst is niet per definitie degene die ook meekomt.
+   */
+  contact_hubspot_ids: string[];
 }
 
 export interface DealOpties {
@@ -357,8 +407,8 @@ export function leesDeal(bron: HubSpotDeal, opties: DealOpties): Uitkomst<DealRi
   // Een deal zonder contact heeft in SkoolPartner niets om aan te hangen: de
   // database eist een organisatie of een contact, en organisaties gaan nu niet
   // mee. Zo'n deal overslaan is beter dan hem los in de lucht zetten.
-  const contactId = bron.contactIds?.find((waarde) => schoon(waarde).length > 0) ?? null;
-  if (!contactId) return { ok: false, reden: "geen gekoppeld contact" };
+  const contactIds = (bron.contactIds ?? []).map(schoon).filter((waarde) => waarde.length > 0);
+  if (contactIds.length === 0) return { ok: false, reden: "geen gekoppeld contact" };
 
   const { stage_key, closed_at } = bepaalFase(bron, opties);
   const aangemaakt = leesMoment(bron.createdate);
@@ -379,9 +429,22 @@ export function leesDeal(bron: HubSpotDeal, opties: DealOpties): Uitkomst<DealRi
       // de waarheid dat HubSpot geeft; de echte faseovergang staat alleen in
       // de tijdlijn en die gaat niet mee.
       stage_since: leesMoment(bron.hs_lastmodifieddate) ?? aangemaakt,
-      contact_hubspot_id: schoon(contactId),
+      contact_hubspot_ids: contactIds,
     },
   };
+}
+
+/**
+ * Welk contact wordt het.
+ *
+ * Niet zomaar de eerste uit de lijst, maar de eerste die ook echt meekomt.
+ * Anders zou een deal die aan twee mensen hangt afketsen op het contact dat
+ * toevallig vooraan staat en niet wordt overgenomen, terwijl de tweede prima
+ * bruikbaar is. Dit is precies het verschil tussen 634 en 654 deals in de
+ * eerste proefdraai.
+ */
+export function kiesContact(ids: string[], bekend: ReadonlySet<string>): string | null {
+  return ids.find((id) => bekend.has(id)) ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -408,7 +471,7 @@ export interface AfspraakRij {
   location: string | null;
   note: string | null;
   outcome: string | null;
-  contact_hubspot_id: string;
+  contact_hubspot_ids: string[];
 }
 
 /**
@@ -443,8 +506,8 @@ export function leesAfspraak(bron: HubSpotMeeting, nu: Date): Uitkomst<AfspraakR
   // is in HubSpot bijna altijd een blokkade in de agenda en geen gesprek.
   if (eindMs - beginMs > 24 * 60 * 60 * 1000) return { ok: false, reden: "duurt langer dan een dag" };
 
-  const contactId = bron.contactIds?.find((waarde) => schoon(waarde).length > 0) ?? null;
-  if (!contactId) return { ok: false, reden: "geen gekoppeld contact" };
+  const contactIds = (bron.contactIds ?? []).map(schoon).filter((waarde) => waarde.length > 0);
+  if (contactIds.length === 0) return { ok: false, reden: "geen gekoppeld contact" };
 
   const uitkomst = schoon(bron.hs_meeting_outcome).toUpperCase();
   const gemeld = AFSPRAAK_STANDEN[uitkomst] ?? null;
@@ -471,7 +534,7 @@ export function leesAfspraak(bron: HubSpotMeeting, nu: Date): Uitkomst<AfspraakR
       location: schoon(bron.hs_meeting_location) || null,
       note: schoon(bron.hs_meeting_body) || null,
       outcome: uitkomst ? `Uit HubSpot: ${uitkomst}` : null,
-      contact_hubspot_id: schoon(contactId),
+      contact_hubspot_ids: contactIds,
     },
   };
 }
@@ -519,7 +582,7 @@ export interface NotitieRij {
   summary: string;
   body: string | null;
   occurred_at: string;
-  contact_hubspot_id: string;
+  contact_hubspot_ids: string[];
 }
 
 /** De eerste zin, kort genoeg om in een lijst te passen. */
@@ -543,8 +606,8 @@ export function leesNotitie(bron: HubSpotNotitie): Uitkomst<NotitieRij> {
   const moment = leesMoment(bron.hs_timestamp);
   if (!moment) return { ok: false, reden: "geen datum" };
 
-  const contactId = bron.contactIds?.find((waarde) => schoon(waarde).length > 0) ?? null;
-  if (!contactId) return { ok: false, reden: "geen gekoppeld contact" };
+  const contactIds = (bron.contactIds ?? []).map(schoon).filter((waarde) => waarde.length > 0);
+  if (contactIds.length === 0) return { ok: false, reden: "geen gekoppeld contact" };
 
   return {
     ok: true,
@@ -554,7 +617,7 @@ export function leesNotitie(bron: HubSpotNotitie): Uitkomst<NotitieRij> {
       summary: samenvatting(tekst),
       body: tekst,
       occurred_at: moment,
-      contact_hubspot_id: schoon(contactId),
+      contact_hubspot_ids: contactIds,
     },
   };
 }
@@ -568,10 +631,51 @@ export function leesNotitie(bron: HubSpotNotitie): Uitkomst<NotitieRij> {
  * van de import dat je echt moet lezen: een reden die vaker voorkomt dan je
  * verwacht, betekent dat er iets niet klopt aan de export en niet aan de data.
  */
-export function tellRedenen(uitkomsten: Uitkomst<unknown>[]): { reden: string; aantal: number }[] {
+export interface Telling {
+  soort: string;
+  inHubSpot: number;
+  geimporteerd: number;
+  uitgesloten: number;
+  redenen: { reden: string; aantal: number }[];
+  klopt: boolean;
+}
+
+/**
+ * De sluitende telling per soort.
+ *
+ * WAAROM DIT EEN EIGEN FUNCTIE IS
+ *
+ *   In de eerste proefdraai stond bij deals 634 overgenomen, terwijl de fases
+ *   optelden tot 654. Beide getallen waren op zichzelf juist, maar ze telden
+ *   iets anders: het ene was voor en het andere na de controle op het contact.
+ *   Zulke verschillen kosten vertrouwen, en terecht.
+ *
+ *   Daarom rekent alleen deze functie nog. Zij eist dat geimporteerd plus alle
+ *   uitsluitredenen samen precies het aantal in HubSpot oplevert, en zet
+ *   `klopt` op onwaar als dat niet zo is. Een rapport dat niet sluit, mag geen
+ *   groen licht geven.
+ */
+export function maakTelling(
+  soort: string,
+  inHubSpot: number,
+  geimporteerd: number,
+  redenen: { reden: string; aantal: number }[]
+): Telling {
+  const uitgesloten = redenen.reduce((som, r) => som + r.aantal, 0);
+  return {
+    soort,
+    inHubSpot,
+    geimporteerd,
+    uitgesloten,
+    redenen: [...redenen].sort((a, b) => b.aantal - a.aantal),
+    klopt: geimporteerd + uitgesloten === inHubSpot,
+  };
+}
+
+export function tellRedenen(uitkomsten: { ok: boolean; reden?: string }[]): { reden: string; aantal: number }[] {
   const teller = new Map<string, number>();
   for (const uitkomst of uitkomsten) {
-    if (uitkomst.ok) continue;
+    if (uitkomst.ok || !uitkomst.reden) continue;
     teller.set(uitkomst.reden, (teller.get(uitkomst.reden) ?? 0) + 1);
   }
   return [...teller.entries()]

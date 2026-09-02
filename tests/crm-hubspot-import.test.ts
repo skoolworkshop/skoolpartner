@@ -10,12 +10,14 @@ import {
   leesBedrag,
   leesContact,
   leesDeal,
+  kiesContact,
   leesEmail,
   leesMoment,
   leesNaam,
   leesNotitie,
   leesTelefoon,
   naarPlatteTekst,
+  maakTelling,
   ontdubbelContacten,
   samenvatting,
   tellRedenen,
@@ -101,24 +103,41 @@ describe("contacten", () => {
     });
   });
 
-  it("slaat een contact zonder naam over in plaats van er een te verzinnen", () => {
+  it("gebruikt het e-mailadres als naam wanneer de naam ontbreekt, en verzint niets", () => {
     const uitkomst = leesContact({ id: "102", email: "info@school.nl" });
-    expect(uitkomst.ok).toBe(false);
-    if (uitkomst.ok) return;
-    expect(uitkomst.reden).toBe("geen naam");
+    expect(uitkomst.ok).toBe(true);
+    if (!uitkomst.ok) return;
+    expect(uitkomst.rij.full_name).toBe("info@school.nl");
+    expect(uitkomst.naamUitEmail).toBe(true);
+    expect(uitkomst.rij.email).toBe("info@school.nl");
   });
 
-  it("laat ZZP-ers buiten de verkooppijplijn", () => {
-    const uitkomst = leesContact({
+  it("slaat alleen over wat geen naam en geen adres heeft", () => {
+    const uitkomst = leesContact({ id: "106", phone: "0612345678" });
+    expect(uitkomst.ok).toBe(false);
+    if (uitkomst.ok) return;
+    expect(uitkomst.reden).toBe("geen naam en geen e-mailadres");
+  });
+
+  it("neemt een ZZP-er over als leverancier, buiten de verkooppijplijn", () => {
+    const bron = {
       id: "103",
       firstname: "Joris",
       lastname: "Bakker",
       email: "joris@example.nl",
       lifecyclestage: ZZP_LIFECYCLE,
-    });
-    expect(uitkomst.ok).toBe(false);
-    if (uitkomst.ok) return;
-    expect(uitkomst.reden).toContain("ZZP");
+    };
+
+    const uitkomst = leesContact(bron);
+    expect(uitkomst.ok).toBe(true);
+    if (!uitkomst.ok) return;
+    expect(uitkomst.rij.contact_type).toBe("leverancier");
+    expect(uitkomst.rij.lifecycle).toBeNull();
+
+    const overgeslagen = leesContact(bron, { zzp: "overslaan" });
+    expect(overgeslagen.ok).toBe(false);
+    if (overgeslagen.ok) return;
+    expect(overgeslagen.reden).toContain("ZZP");
   });
 
   it("houdt een afmelding voor commerciele mail overeind", () => {
@@ -245,7 +264,7 @@ describe("deals", () => {
       value_cents: 145000,
       expected_date: "2026-11-01",
       closed_at: null,
-      contact_hubspot_id: "101",
+      contact_hubspot_ids: ["101"],
       stage_since: "2026-08-01T00:00:00.000Z",
     });
   });
@@ -296,6 +315,7 @@ describe("afspraken", () => {
     if (!uitkomst.ok) return;
     expect(uitkomst.rij.status).toBe("gepland");
     expect(uitkomst.rij.title).toBe("Kennismaking");
+    expect(uitkomst.rij.contact_hubspot_ids).toEqual(["101"]);
   });
 
   it("zet een verzette afspraak op geannuleerd en bewaart de oorspronkelijke uitkomst", () => {
@@ -445,11 +465,57 @@ describe("notities", () => {
   });
 });
 
+describe("koppelen aan het juiste contact", () => {
+  it("kiest het eerste contact dat ook echt meekomt", () => {
+    const bekend = new Set(["102", "103"]);
+    expect(kiesContact(["101", "102"], bekend)).toBe("102");
+    expect(kiesContact(["102", "103"], bekend)).toBe("102");
+    expect(kiesContact(["101"], bekend)).toBeNull();
+    expect(kiesContact([], bekend)).toBeNull();
+  });
+
+  it("bewaart alle gekoppelde contacten van een deal, niet alleen de eerste", () => {
+    const uitkomst = leesDeal(
+      {
+        id: "204",
+        dealname: "Twee contactpersonen",
+        dealstage: "729498081",
+        contactIds: ["101", "102"],
+      },
+      OPTIES
+    );
+    expect(uitkomst.ok).toBe(true);
+    if (!uitkomst.ok) return;
+    expect(uitkomst.rij.contact_hubspot_ids).toEqual(["101", "102"]);
+  });
+});
+
+describe("de telling", () => {
+  it("sluit als alles is verantwoord", () => {
+    const telling = maakTelling("deals", 665, 654, [{ reden: "geen gekoppeld contact", aantal: 11 }]);
+    expect(telling).toMatchObject({ inHubSpot: 665, geimporteerd: 654, uitgesloten: 11, klopt: true });
+  });
+
+  it("valt door de mand als de getallen niet optellen", () => {
+    const telling = maakTelling("deals", 665, 634, [{ reden: "geen gekoppeld contact", aantal: 11 }]);
+    expect(telling.klopt).toBe(false);
+  });
+
+  it("zet de grootste reden bovenaan", () => {
+    const telling = maakTelling("contacten", 10, 4, [
+      { reden: "klein", aantal: 1 },
+      { reden: "groot", aantal: 5 },
+    ]);
+    expect(telling.redenen[0].reden).toBe("groot");
+    expect(telling.klopt).toBe(true);
+  });
+});
+
 describe("verslag", () => {
   it("telt de redenen van overslaan, meeste eerst", () => {
     const redenen = tellRedenen([
       { ok: false, reden: "geen naam" },
-      { ok: true, rij: 1 },
+      { ok: true },
       { ok: false, reden: "geen gekoppeld contact" },
       { ok: false, reden: "geen naam" },
     ]);
@@ -473,6 +539,7 @@ function maakContact(id: string, naam: string, email: string | null): ContactRij
   return {
     hubspot_id: id,
     full_name: naam,
+    contact_type: null,
     email,
     phone: null,
     job_title: null,

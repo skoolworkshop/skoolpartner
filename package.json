@@ -35,6 +35,7 @@
     "visueel:fragmenten": "node tools/harness/render.mjs fragmenten && node tools/harness/shoot.mjs fragmenten",
     "visueel:afspraken": "node tools/harness/render.mjs afspraken && node tools/harness/shoot.mjs afspraken",
     "visueel:boeking": "node tools/harness/render.mjs boeking && node tools/harness/shoot.mjs boeking",
+    "visueel:contact": "node tools/harness/render.mjs contact && node tools/harness/shoot.mjs contact",
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
     "db:verify-crm-hubspot": "node scripts/verify-crm-hubspot.mjs",
     "import:hubspot": "node scripts/importeer-hubspot.mjs",

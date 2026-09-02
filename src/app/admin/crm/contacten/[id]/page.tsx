@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Mail, Phone } from "lucide-react";
 
 import { ActionForm } from "@/components/admin/action-form";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { ContactTypeBadge, PortalUitleg } from "@/components/admin/contact-badge
 import { LifecycleBadge, StilteBadge } from "@/components/admin/crm-badges";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
+import { DetailIndeling } from "@/components/admin/detail-indeling";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
 import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
@@ -65,7 +66,7 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
         {contact.lifecycle ? <LifecycleBadge waarde={contact.lifecycle} /> : null}
         <StilteBadge stilte={stilte} />
       </div>
-      <p className="mb-6 text-[15px] text-muted">
+      <p className="mb-4 text-[15px] text-muted">
         {contact.job_title ? `${contact.job_title} · ` : ""}
         {organisatieNaam ? (
           <Link href={`/admin/organisaties/${contact.organization_id}`} className="underline">
@@ -77,200 +78,244 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
         {contact.city ? ` · ${contact.city}` : ""}
       </p>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Contactgegevens" />
-          <CardBody className="space-y-4">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <dt className="text-muted">E-mail</dt>
-              <dd className="break-words font-medium">{contact.email ?? "niet ingevuld"}</dd>
-              <dt className="text-muted">Telefoon</dt>
-              <dd className="font-medium">{contact.phone ?? "niet ingevuld"}</dd>
-              <dt className="text-muted">Laatste contact</dt>
-              <dd className="font-medium">
-                {contact.last_contact_at ? formatShortDate(contact.last_contact_at) : "niet vastgelegd"}
-              </dd>
-              <dt className="text-muted">Toegevoegd</dt>
-              <dd className="font-medium">{formatShortDate(contact.created_at)}</dd>
-            </dl>
+      {/*
+        De twee handelingen die je vanaf dit scherm het vaakst doet, mailen en
+        bellen, staan hier als gewone link. Ze staan er alleen als er ook echt
+        een adres of nummer is: een knop die niets doet is erger dan geen knop.
+        Bewust rustig vormgegeven, want het gaat om snelheid en niet om nadruk.
+      */}
+      {contact.email || contact.phone ? (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {contact.email ? (
+            <a
+              href={`mailto:${contact.email}`}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-pill border border-line bg-white px-3.5 text-sm font-semibold text-ink hover:bg-surface-2"
+            >
+              <Mail aria-hidden className="size-4 text-muted" />
+              Mailen
+            </a>
+          ) : null}
+          {contact.phone ? (
+            <a
+              href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-pill border border-line bg-white px-3.5 text-sm font-semibold text-ink hover:bg-surface-2"
+            >
+              <Phone aria-hidden className="size-4 text-muted" />
+              Bellen
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
-            <PortalUitleg portal={portal} organizationId={contact.organization_id} />
+      <DetailIndeling
+        links={
+          <>
+            <Card>
+              <CardHeader title="Contactgegevens" />
+              <CardBody className="space-y-4">
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                  <dt className="text-muted">E-mail</dt>
+                  <dd className="break-words font-medium">{contact.email ?? "niet ingevuld"}</dd>
+                  <dt className="text-muted">Telefoon</dt>
+                  <dd className="font-medium">{contact.phone ?? "niet ingevuld"}</dd>
+                  <dt className="text-muted">Laatste contact</dt>
+                  <dd className="font-medium">
+                    {contact.last_contact_at ? formatShortDate(contact.last_contact_at) : "niet vastgelegd"}
+                  </dd>
+                  <dt className="text-muted">Toegevoegd</dt>
+                  <dd className="font-medium">{formatShortDate(contact.created_at)}</dd>
+                </dl>
 
-            {portal.stand === "gevonden" ? (
-              <ActionForm
-                action={koppelPortalAccountAction}
-                submitLabel="Ja, dit is dezelfde persoon"
-                variant="secondary"
-                inline
-              >
-                <input type="hidden" name="contactId" value={contact.id} />
-                <input type="hidden" name="userId" value={portal.userId} />
-              </ActionForm>
-            ) : null}
+                <PortalUitleg portal={portal} organizationId={contact.organization_id} />
 
-            {portal.stand === "gekoppeld" ? (
-              <ActionForm
-                action={koppelPortalAccountAction}
-                submitLabel="Koppeling weghalen"
-                variant="ghost"
-                inline
-              >
-                <input type="hidden" name="contactId" value={contact.id} />
-                <input type="hidden" name="userId" value="" />
-              </ActionForm>
-            ) : null}
-
-            {geverifieerdeMail ? (
-              <p className="text-sm text-muted">
-                Dit contact is ook een geverifieerde e-mailcontactpersoon van de organisatie. Daardoor
-                kan er e-mailverkeer met dit adres zichtbaar zijn in het klantportaal.
-              </p>
-            ) : null}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="Gegevens aanpassen" />
-          <CardBody>
-            <ActionForm action={bewaarContactAction} submitLabel="Opslaan" variant="secondary">
-              <input type="hidden" name="contactId" value={contact.id} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Naam" htmlFor="naam" required showOptional={false}>
-                  <Input id="naam" name="fullName" defaultValue={contact.full_name} required />
-                </Field>
-                <Field label="Organisatie" htmlFor="org">
-                  <Select id="org" name="organizationId" defaultValue={contact.organization_id ?? ""}>
-                    <option value="">Geen organisatie</option>
-                    {(organisaties ?? []).map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Soort contact" htmlFor="type">
-                  <Select id="type" name="contactType" defaultValue={contact.contact_type ?? ""}>
-                    <option value="">Onbekend</option>
-                    {Object.entries(CONTACT_TYPE_LABELS).map(([waarde, label]) => (
-                      <option key={waarde} value={waarde}>
-                        {label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Levensfase" htmlFor="fase">
-                  <Select id="fase" name="lifecycle" defaultValue={contact.lifecycle ?? ""}>
-                    <option value="">Onbekend</option>
-                    {Object.entries(LIFECYCLE_LABELS).map(([waarde, label]) => (
-                      <option key={waarde} value={waarde}>
-                        {label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Functie" htmlFor="functie">
-                  <Input id="functie" name="jobTitle" defaultValue={contact.job_title ?? ""} />
-                </Field>
-                <Field label="Plaats" htmlFor="plaats">
-                  <Input id="plaats" name="city" defaultValue={contact.city ?? ""} />
-                </Field>
-                <Field label="E-mailadres" htmlFor="email">
-                  <Input id="email" name="email" type="email" defaultValue={contact.email ?? ""} />
-                </Field>
-                <Field label="Telefoonnummer" htmlFor="telefoon">
-                  <Input id="telefoon" name="phone" type="tel" defaultValue={contact.phone ?? ""} />
-                </Field>
-              </div>
-              <Field label="Notitie" htmlFor="notitie">
-                <Textarea id="notitie" name="note" rows={3} defaultValue={contact.note ?? ""} />
-              </Field>
-            </ActionForm>
-          </CardBody>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title={`Deals (${deals.length})`}
-            description="Verkoopkansen waar deze persoon bij betrokken is."
-          />
-          {deals.length > 0 ? (
-            <ul>
-              {deals.map((deal) => (
-                <li key={deal.id} className="border-b border-line-soft last:border-b-0">
-                  <Link
-                    href={
-                      deal.brand === "suri_impact"
-                        ? `/admin/crm/suri/deelnemer/${deal.id}`
-                        : `/admin/crm/deal/${deal.id}`
-                    }
-                    className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-surface-2"
+                {portal.stand === "gevonden" ? (
+                  <ActionForm
+                    action={koppelPortalAccountAction}
+                    submitLabel="Ja, dit is dezelfde persoon"
+                    variant="secondary"
+                    inline
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold">{deal.title}</span>
-                      <span className="block text-sm text-muted">
-                        {deal.faseLabel ?? "onbekende fase"}
-                        {deal.expected_date ? ` · ${formatShortDate(deal.expected_date)}` : ""}
-                      </span>
-                    </span>
-                    <span className="shrink-0 font-semibold tabular-nums">
-                      {formatEuroCents(deal.value_cents)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <CardBody>
-              <p className="text-sm text-muted">
-                Nog geen deals. Een verkoopkans maak je aan in de pijplijn, en die kun je daarna aan
-                deze persoon hangen.
-              </p>
-            </CardBody>
-          )}
-        </Card>
+                    <input type="hidden" name="contactId" value={contact.id} />
+                    <input type="hidden" name="userId" value={portal.userId} />
+                  </ActionForm>
+                ) : null}
 
-        <TijdlijnBlok
-          onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
-          regels={tijdlijn}
-          fragmenten={fragmentHulp.fragmenten}
-          fragmentContext={fragmentHulp.context}
-        />
+                {portal.stand === "gekoppeld" ? (
+                  <ActionForm
+                    action={koppelPortalAccountAction}
+                    submitLabel="Koppeling weghalen"
+                    variant="ghost"
+                    inline
+                  >
+                    <input type="hidden" name="contactId" value={contact.id} />
+                    <input type="hidden" name="userId" value="" />
+                  </ActionForm>
+                ) : null}
 
-        <TakenBlok
-          onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
-          taken={taken}
-          beheerders={beheerderLijst}
-        />
+                {geverifieerdeMail ? (
+                  <p className="text-sm text-muted">
+                    Dit contact is ook een geverifieerde e-mailcontactpersoon van de organisatie. Daardoor
+                    kan er e-mailverkeer met dit adres zichtbaar zijn in het klantportaal.
+                  </p>
+                ) : null}
+              </CardBody>
+            </Card>
 
-        <AfsprakenBlok
-          onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
-          indeling={afsprakenIndeling}
-          beheerders={beheerderLijst}
-        />
+            {/*
+              Ingeklapt, niet weggehaald. Dit formulier stond altijd open en nam
+              daarmee de halve breedte van het scherm in beslag voor iets wat je
+              hooguit een paar keer per jaar per contact doet.
+            */}
+            <details className="rounded-card border border-line-soft bg-white shadow-card">
+              <summary className="cursor-pointer px-5 py-4 font-display text-base font-semibold">
+                Gegevens aanpassen
+              </summary>
+              <div className="px-5 pb-5">
+                <ActionForm action={bewaarContactAction} submitLabel="Opslaan" variant="secondary">
+                  <input type="hidden" name="contactId" value={contact.id} />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Naam" htmlFor="naam" required showOptional={false}>
+                      <Input id="naam" name="fullName" defaultValue={contact.full_name} required />
+                    </Field>
+                    <Field label="Organisatie" htmlFor="org">
+                      <Select id="org" name="organizationId" defaultValue={contact.organization_id ?? ""}>
+                        <option value="">Geen organisatie</option>
+                        {(organisaties ?? []).map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Soort contact" htmlFor="type">
+                      <Select id="type" name="contactType" defaultValue={contact.contact_type ?? ""}>
+                        <option value="">Onbekend</option>
+                        {Object.entries(CONTACT_TYPE_LABELS).map(([waarde, label]) => (
+                          <option key={waarde} value={waarde}>
+                            {label}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Levensfase" htmlFor="fase">
+                      <Select id="fase" name="lifecycle" defaultValue={contact.lifecycle ?? ""}>
+                        <option value="">Onbekend</option>
+                        {Object.entries(LIFECYCLE_LABELS).map(([waarde, label]) => (
+                          <option key={waarde} value={waarde}>
+                            {label}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Functie" htmlFor="functie">
+                      <Input id="functie" name="jobTitle" defaultValue={contact.job_title ?? ""} />
+                    </Field>
+                    <Field label="Plaats" htmlFor="plaats">
+                      <Input id="plaats" name="city" defaultValue={contact.city ?? ""} />
+                    </Field>
+                    <Field label="E-mailadres" htmlFor="email">
+                      <Input id="email" name="email" type="email" defaultValue={contact.email ?? ""} />
+                    </Field>
+                    <Field label="Telefoonnummer" htmlFor="telefoon">
+                      <Input id="telefoon" name="phone" type="tel" defaultValue={contact.phone ?? ""} />
+                    </Field>
+                  </div>
+                  <Field label="Notitie" htmlFor="notitie">
+                    <Textarea id="notitie" name="note" rows={3} defaultValue={contact.note ?? ""} />
+                  </Field>
+                </ActionForm>
+              </div>
+            </details>
+          </>
+        }
+        midden={
+          <TijdlijnBlok
+            onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
+            regels={tijdlijn}
+            fragmenten={fragmentHulp.fragmenten}
+            fragmentContext={fragmentHulp.context}
+          />
+        }
+        rechts={
+          <>
+            <Card>
+              <CardHeader
+                title={`Deals (${deals.length})`}
+                description="Verkoopkansen waar deze persoon bij betrokken is."
+              />
+              {deals.length > 0 ? (
+                <ul>
+                  {deals.map((deal) => (
+                    <li key={deal.id} className="border-b border-line-soft last:border-b-0">
+                      <Link
+                        href={
+                          deal.brand === "suri_impact"
+                            ? `/admin/crm/suri/deelnemer/${deal.id}`
+                            : `/admin/crm/deal/${deal.id}`
+                        }
+                        className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-surface-2"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">{deal.title}</span>
+                          <span className="block text-sm text-muted">
+                            {deal.faseLabel ?? "onbekende fase"}
+                            {deal.expected_date ? ` · ${formatShortDate(deal.expected_date)}` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums">
+                          {formatEuroCents(deal.value_cents)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <CardBody>
+                  <p className="text-sm text-muted">
+                    Nog geen deals. Een verkoopkans maak je aan in de pijplijn, en die kun je daarna aan
+                    deze persoon hangen.
+                  </p>
+                </CardBody>
+              )}
+            </Card>
 
-        {boekingen.length > 0 ? (
-          <Card className="lg:col-span-2">
-            <CardHeader
-              title="Boekingen van de organisatie"
-              description="Boekingen horen bij de school, niet bij een persoon. Ze staan hier ter informatie."
+            <TakenBlok
+              onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
+              taken={taken}
+              beheerders={beheerderLijst}
             />
-            <ul>
-              {boekingen.map((boeking) => (
-                <li
-                  key={boeking.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3 last:border-b-0"
-                >
-                  <span className="min-w-0 truncate font-semibold">{boeking.workshop_name}</span>
-                  <span className="shrink-0 text-sm text-muted">
-                    {boeking.scheduled_date ? formatShortDate(boeking.scheduled_date) : "geen datum"} ·{" "}
-                    {boeking.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ) : null}
-      </div>
+
+            <AfsprakenBlok
+              onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
+              indeling={afsprakenIndeling}
+              beheerders={beheerderLijst}
+            />
+
+            {boekingen.length > 0 ? (
+              <Card>
+                <CardHeader
+                  title="Boekingen van de organisatie"
+                  description="Boekingen horen bij de school, niet bij een persoon. Ze staan hier ter informatie."
+                />
+                <ul>
+                  {boekingen.map((boeking) => (
+                    <li
+                      key={boeking.id}
+                      className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3 last:border-b-0"
+                    >
+                      <span className="min-w-0 truncate font-semibold">{boeking.workshop_name}</span>
+                      <span className="shrink-0 text-sm text-muted">
+                        {boeking.scheduled_date ? formatShortDate(boeking.scheduled_date) : "geen datum"} ·{" "}
+                        {boeking.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ) : null}
+          </>
+        }
+      />
     </>
   );
 }

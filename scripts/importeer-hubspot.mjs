@@ -16,6 +16,8 @@
  * Extra schakelaars:
  *   --evaluaties=laten   laat de oude evaluatiedeals open staan in plaats van
  *                        ze op Afgerond te zetten.
+ *   --zzp=overslaan      laat de ZZP-ers in HubSpot achter. Let op: daarmee
+ *                        blijven ook hun 38 afspraken daar.
  *   --max=50             stop na dit aantal records per soort. Handig om eerst
  *                        een kleine partij te bekijken.
  *
@@ -46,7 +48,7 @@
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { build } from "esbuild";
+import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 const root = process.cwd();
@@ -54,6 +56,9 @@ const args = process.argv.slice(2);
 const SCHRIJVEN = args.includes("--schrijf");
 const EVALUATIES = args.includes("--evaluaties=laten") ? "laten" : "sluiten";
 const MAX = Number(args.find((a) => a.startsWith("--max="))?.split("=")[1] ?? 0) || Infinity;
+// ZZP-ers komen mee als leverancier. Met --zzp=overslaan blijven ze in HubSpot,
+// en dan blijven hun afspraken daar ook.
+const ZZP = args.includes("--zzp=overslaan") ? "overslaan" : "leverancier";
 
 /* -------------------------------------------------------------------------- */
 /* Omgeving                                                                    */
@@ -104,18 +109,38 @@ for (const [naam, waarde] of [
 const cache = path.join(root, ".hubspot-import");
 mkdirSync(cache, { recursive: true });
 
-await build({
-  entryPoints: [path.join(root, "src/lib/crm/hubspot-import.ts")],
-  bundle: true,
-  format: "cjs",
-  platform: "node",
-  target: "node20",
-  outfile: path.join(cache, "omzetting.cjs"),
-  tsconfig: path.join(root, "tsconfig.json"),
-});
+/*
+  Twee wegen naar hetzelfde bestand.
 
-const require_ = createRequire(import.meta.url);
-const omzetting = require_(path.join(cache, "omzetting.cjs"));
+  Node kan sinds versie 22.18 zelf de types uit een .ts-bestand halen, en dan
+  is een import genoeg. Kan het dat niet, dan bundelen wij het alsnog met
+  esbuild. Die tweede weg werkt niet in elke omgeving: node_modules die op
+  Windows is geinstalleerd bevat de Windows-versie van esbuild, en dezelfde map
+  vanuit een Linux-schil gebruiken loopt daarop stuk. Vandaar de volgorde.
+*/
+let omzetting;
+try {
+  omzetting = await import(pathToFileURL(path.join(root, "src/lib/crm/hubspot-import.ts")).href);
+} catch (eersteFout) {
+  try {
+    const { build } = await import("esbuild");
+    await build({
+      entryPoints: [path.join(root, "src/lib/crm/hubspot-import.ts")],
+      bundle: true,
+      format: "cjs",
+      platform: "node",
+      target: "node20",
+      outfile: path.join(cache, "omzetting.cjs"),
+      tsconfig: path.join(root, "tsconfig.json"),
+    });
+    omzetting = createRequire(import.meta.url)(path.join(cache, "omzetting.cjs"));
+  } catch (tweedeFout) {
+    console.error("Kon de omzetregels niet laden.");
+    console.error("  Rechtstreeks inlezen:", eersteFout.message);
+    console.error("  Via esbuild:", tweedeFout.message);
+    process.exit(1);
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /* HubSpot lezen                                                               */
@@ -189,7 +214,7 @@ const bronAfspraken = await haalOp(
 
 const bronNotities = await haalOp("notes", ["hs_note_body", "hs_timestamp"], "contacts");
 
-const contactUitkomsten = bronContacten.map((r) => omzetting.leesContact(r));
+const contactUitkomsten = bronContacten.map((r) => omzetting.leesContact(r, { zzp: ZZP }));
 const { uniek: contacten, dubbel } = omzetting.ontdubbelContacten(
   contactUitkomsten.filter((u) => u.ok).map((u) => u.rij)
 );
@@ -203,59 +228,195 @@ const afspraken = afspraakUitkomsten.filter((u) => u.ok).map((u) => u.rij);
 const notitieUitkomsten = bronNotities.map((r) => omzetting.leesNotitie(r));
 const notities = notitieUitkomsten.filter((u) => u.ok).map((u) => u.rij);
 
-// Deals en afspraken van contacten die niet meekomen, kunnen nergens aan
-// hangen. Ze worden apart geteld en niet stil weggelaten.
-const bekend = new Set(contacten.map((c) => c.hubspot_id));
-const dealsZonderContact = deals.filter((d) => !bekend.has(d.contact_hubspot_id));
-const afsprakenZonderContact = afspraken.filter((a) => !bekend.has(a.contact_hubspot_id));
-const notitiesZonderContact = notities.filter((n) => !bekend.has(n.contact_hubspot_id));
+/* -------------------------------------------------------------------------- */
+/* Koppelen, tellen en verantwoorden                                           */
+/* -------------------------------------------------------------------------- */
 
+/*
+  ELK RECORD KRIJGT ZIJN CONTACT, EN ANDERS EEN REDEN
+
+  Een deal, afspraak of notitie hangt in SkoolPartner aan een contact. HubSpot
+  koppelt er soms meerdere; wij nemen de eerste die ook echt meekomt, niet
+  simpelweg de eerste uit de lijst. Blijft er geen enkele over, dan telt dat als
+  een eigen uitsluitreden en niet als een stil verlies.
+*/
+const bekend = new Set(contacten.map((c) => c.hubspot_id));
+
+function koppel(rijen, uitkomsten) {
+  const mee = [];
+  const zonder = [];
+  for (const rij of rijen) {
+    const gekozen = omzetting.kiesContact(rij.contact_hubspot_ids, bekend);
+    if (gekozen) mee.push({ ...rij, contact_hubspot_id: gekozen });
+    else zonder.push(rij);
+  }
+  const redenen = omzetting.tellRedenen(uitkomsten);
+  if (zonder.length) {
+    redenen.push({ reden: "gekoppeld contact komt zelf niet mee", aantal: zonder.length });
+  }
+  return { mee, zonder, redenen };
+}
+
+const dealsGekoppeld = koppel(deals, dealUitkomsten);
+const afsprakenGekoppeld = koppel(afspraken, afspraakUitkomsten);
+const notitiesGekoppeld = koppel(notities, notitieUitkomsten);
+
+// Deze drie zijn vanaf hier de enige lijsten die nog worden gebruikt. Er is
+// geen tweede telling meer die iets anders kan beweren.
+const dealsMee = dealsGekoppeld.mee;
+const afsprakenMee = afsprakenGekoppeld.mee;
+const notitiesMee = notitiesGekoppeld.mee;
+
+// De fases worden geteld over wat er daadwerkelijk in gaat.
 const perFase = {};
-for (const deal of deals) perFase[deal.stage_key] = (perFase[deal.stage_key] ?? 0) + 1;
+for (const deal of dealsMee) perFase[deal.stage_key] = (perFase[deal.stage_key] ?? 0) + 1;
+
+/*
+  WAT HANGT ER AAN EEN CONTACT DAT NIET MEEKOMT
+
+  Zonder dit blijft een uitsluiting een getal. Met dit weet je of er iets
+  waardevols achterblijft, en dat is precies de vraag die telt.
+*/
+const heeftDeal = new Set();
+for (const d of bronDeals) for (const id of d.contactIds ?? []) heeftDeal.add(String(id));
+const heeftAfspraak = new Set();
+for (const a of bronAfspraken) for (const id of a.contactIds ?? []) heeftAfspraak.add(String(id));
+const heeftNotitie = new Set();
+for (const n of bronNotities) for (const id of n.contactIds ?? []) heeftNotitie.add(String(id));
+
+const uitgeslotenContacten = [];
+bronContacten.forEach((bron, i) => {
+  const uitkomst = contactUitkomsten[i];
+  if (uitkomst.ok) return;
+  const id = String(bron.id);
+  uitgeslotenContacten.push({
+    hubspot_id: id,
+    reden: uitkomst.reden,
+    heeftEmail: Boolean(omzetting.leesEmail(bron.email)),
+    heeftTelefoon: Boolean(omzetting.leesTelefoon(bron.phone) ?? omzetting.leesTelefoon(bron.mobilephone)),
+    heeftDeal: heeftDeal.has(id),
+    heeftAfspraak: heeftAfspraak.has(id),
+    heeftNotitie: heeftNotitie.has(id),
+  });
+});
+
+const metHistorie = uitgeslotenContacten.filter(
+  (c) => c.heeftDeal || c.heeftAfspraak || c.heeftNotitie
+);
+
+// Hoeveel contacten dragen hun e-mailadres als naam, omdat er geen naam was.
+const naamUitEmail = contactUitkomsten.filter((u) => u.ok && u.naamUitEmail).length;
+
+// Deals die aan meer dan een contact hangen. Daar kiest het script er een van,
+// en dat is precies het soort keuze dat je wilt kunnen nakijken.
+const meerdereContacten = deals.filter((d) => d.contact_hubspot_ids.length > 1);
+
+const tellingen = [
+  omzetting.maakTelling("contacten", bronContacten.length, contacten.length, [
+    ...omzetting.tellRedenen(contactUitkomsten),
+    ...(dubbel.length ? [{ reden: "dubbel op e-mailadres, samengevoegd", aantal: dubbel.length }] : []),
+  ]),
+  omzetting.maakTelling("deals", bronDeals.length, dealsMee.length, dealsGekoppeld.redenen),
+  omzetting.maakTelling("afspraken", bronAfspraken.length, afsprakenMee.length, afsprakenGekoppeld.redenen),
+  omzetting.maakTelling("notities", bronNotities.length, notitiesMee.length, notitiesGekoppeld.redenen),
+];
 
 const plan = {
   gedraaidOp: nu.toISOString(),
-  keuzes: { oudeEvaluaties: EVALUATIES, schrijven: SCHRIJVEN },
+  keuzes: { oudeEvaluaties: EVALUATIES, zzp: ZZP, schrijven: SCHRIJVEN },
+  tellingen,
+  perFase,
   contacten: {
-    inHubSpot: bronContacten.length,
-    overgenomen: contacten.length,
-    overgeslagen: omzetting.tellRedenen(contactUitkomsten),
+    naamUitEmailadres: naamUitEmail,
     samengevoegdOpAdres: dubbel,
+    uitgeslotenMetHistorie: metHistorie,
   },
-  deals: {
-    inHubSpot: bronDeals.length,
-    overgenomen: deals.length - dealsZonderContact.length,
-    perFase,
-    overgeslagen: omzetting.tellRedenen(dealUitkomsten),
-    contactKomtNietMee: dealsZonderContact.length,
-  },
-  afspraken: {
-    inHubSpot: bronAfspraken.length,
-    overgenomen: afspraken.length - afsprakenZonderContact.length,
-    overgeslagen: omzetting.tellRedenen(afspraakUitkomsten),
-    contactKomtNietMee: afsprakenZonderContact.length,
-  },
-  notities: {
-    inHubSpot: bronNotities.length,
-    overgenomen: notities.length - notitiesZonderContact.length,
-    overgeslagen: omzetting.tellRedenen(notitieUitkomsten),
-    contactKomtNietMee: notitiesZonderContact.length,
+  koppelingen: {
+    dealsMetMeerdereContacten: meerdereContacten.length,
+    voorbeelden: meerdereContacten.slice(0, 20).map((d) => ({
+      hubspot_id: d.hubspot_id,
+      title: d.title,
+      contacten: d.contact_hubspot_ids,
+      gekozen: omzetting.kiesContact(d.contact_hubspot_ids, bekend),
+    })),
   },
 };
 
 writeFileSync(path.join(cache, "plan.json"), JSON.stringify(plan, null, 2), "utf8");
 
+function csv(rijen) {
+  if (!rijen.length) return "";
+  const kolommen = Object.keys(rijen[0]);
+  const regels = [kolommen.join(";")];
+  for (const rij of rijen) regels.push(kolommen.map((k) => String(rij[k] ?? "")).join(";"));
+  return regels.join("\r\n");
+}
+
+writeFileSync(path.join(cache, "uitgesloten-contacten.csv"), csv(uitgeslotenContacten), "utf8");
+writeFileSync(
+  path.join(cache, "uitgesloten-afspraken.csv"),
+  csv(
+    afsprakenGekoppeld.zonder.map((a) => ({
+      hubspot_id: a.hubspot_id,
+      titel: a.title,
+      start: a.starts_at,
+      stand: a.status,
+      contacten: a.contact_hubspot_ids.join(" "),
+    }))
+  ),
+  "utf8"
+);
+writeFileSync(
+  path.join(cache, "uitgesloten-deals.csv"),
+  csv(
+    dealsGekoppeld.zonder.map((d) => ({
+      hubspot_id: d.hubspot_id,
+      titel: d.title,
+      fase: d.stage_key,
+      bedrag: d.value_cents / 100,
+      contacten: d.contact_hubspot_ids.join(" "),
+    }))
+  ),
+  "utf8"
+);
+
+/* -------------------------------------------------------------------------- */
+/* Op het scherm                                                               */
+/* -------------------------------------------------------------------------- */
+
 console.log("");
-console.log("Contacten : %d in HubSpot, %d gaan mee", plan.contacten.inHubSpot, plan.contacten.overgenomen);
-for (const r of plan.contacten.overgeslagen) console.log("            - %s: %d", r.reden, r.aantal);
-console.log("            - dubbel op e-mailadres: %d", dubbel.length);
-console.log("Deals     : %d in HubSpot, %d gaan mee", plan.deals.inHubSpot, plan.deals.overgenomen);
-for (const r of plan.deals.overgeslagen) console.log("            - %s: %d", r.reden, r.aantal);
-for (const [fase, aantal] of Object.entries(perFase)) console.log("            fase %s: %d", fase, aantal);
-console.log("Afspraken : %d in HubSpot, %d gaan mee", plan.afspraken.inHubSpot, plan.afspraken.overgenomen);
-for (const r of plan.afspraken.overgeslagen) console.log("            - %s: %d", r.reden, r.aantal);
-console.log("Notities  : %d in HubSpot, %d gaan mee", plan.notities.inHubSpot, plan.notities.overgenomen);
-for (const r of plan.notities.overgeslagen) console.log("            - %s: %d", r.reden, r.aantal);
+console.log("  soort        in HubSpot   gaat mee   valt af");
+console.log("  ---------------------------------------------");
+for (const t of tellingen) {
+  console.log(
+    "  %s %s %s %s %s",
+    t.soort.padEnd(12),
+    String(t.inHubSpot).padStart(10),
+    String(t.geimporteerd).padStart(10),
+    String(t.uitgesloten).padStart(9),
+    t.klopt ? "" : "  TELLING KLOPT NIET"
+  );
+  for (const r of t.redenen) console.log("      %s %s", String(r.aantal).padStart(6), r.reden);
+}
+
+console.log("");
+console.log("  Deals per fase, geteld over wat er in gaat:");
+for (const [fase, aantal] of Object.entries(perFase).sort((a, b) => b[1] - a[1])) {
+  console.log("      %s %s", String(aantal).padStart(6), fase);
+}
+console.log("      %s TOTAAL", String(Object.values(perFase).reduce((a, b) => a + b, 0)).padStart(6));
+
+console.log("");
+console.log("  %d contacten dragen hun e-mailadres als naam, omdat HubSpot er geen had.", naamUitEmail);
+console.log("  %d uitgesloten contacten hebben toch een deal, afspraak of notitie.", metHistorie.length);
+console.log("  %d deals hangen aan meer dan een contact; er wordt er een gekozen.", meerdereContacten.length);
+
+const sluitNiet = tellingen.filter((t) => !t.klopt);
+if (sluitNiet.length) {
+  console.log("");
+  console.log("  LET OP: de telling van %s sluit niet. Niet importeren.", sluitNiet.map((t) => t.soort).join(", "));
+}
+
 console.log("");
 console.log("Plan geschreven naar .hubspot-import/plan.json");
 
@@ -367,7 +528,7 @@ await inStukken(nieuw, 200, async (stuk) => {
 });
 
 console.log("Deals wegschrijven...");
-const dealRijen = deals
+const dealRijen = dealsMee
   .filter((d) => contactId.has(d.contact_hubspot_id) && faseId.has(d.stage_key))
   .map((d) => {
     const contact = contactId.get(d.contact_hubspot_id);
@@ -395,7 +556,7 @@ await inStukken(dealRijen, 200, async (stuk) => {
 });
 
 console.log("Afspraken wegschrijven...");
-const afspraakRijen = afspraken
+const afspraakRijen = afsprakenMee
   .filter((a) => contactId.has(a.contact_hubspot_id))
   .map((a) => {
     const contact = contactId.get(a.contact_hubspot_id);
@@ -422,7 +583,7 @@ await inStukken(afspraakRijen, 200, async (stuk) => {
 });
 
 console.log("Notities wegschrijven...");
-const notitieRijen = notities
+const notitieRijen = notitiesMee
   .filter((n) => contactId.has(n.contact_hubspot_id))
   .map((n) => {
     const contact = contactId.get(n.contact_hubspot_id);
