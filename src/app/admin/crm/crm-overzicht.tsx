@@ -109,22 +109,22 @@ export function CrmOverzicht({
             {merk === "skool_workshop" ? (
               <>
                 <Link
-                  href="/admin/crm/relaties"
+                  href="/admin/crm/contacten"
                   className="inline-flex min-h-11 items-center rounded-pill bg-ink px-5 text-sm font-semibold text-white"
                 >
-                  Relaties
+                  Contacten
                 </Link>
                 <Link
                   href="/admin/crm/pijplijn"
                   className="inline-flex min-h-11 items-center rounded-pill bg-surface-3 px-5 text-sm font-semibold text-ink"
                 >
-                  Pijplijn
+                  Deals
                 </Link>
                 <Link
-                  href="/admin/organisaties"
+                  href="/admin/crm/organisaties"
                   className="inline-flex min-h-11 items-center rounded-pill bg-surface-3 px-5 text-sm font-semibold text-ink"
                 >
-                  Alle organisaties
+                  Organisaties
                 </Link>
               </>
             ) : (

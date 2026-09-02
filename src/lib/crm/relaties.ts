@@ -30,6 +30,11 @@ export interface Relatie {
   stilte: ContactStilte;
   volgendeActie: string | null;
   aantalBoekingen: number;
+  aantalContacten: number;
+  openDeals: number;
+  openWaardeCents: number;
+  gewonnenDeals: number;
+  omzetCents: number;
   heeftProfiel: boolean;
 }
 
@@ -47,13 +52,27 @@ function vandaag(): string {
 export async function getRelaties(): Promise<Relatie[]> {
   const supabase = createServiceSupabase();
 
-  const [{ data: organisaties }, { data: profielen }, { data: boekingen }] = await Promise.all([
+  const [
+    { data: organisaties },
+    { data: profielen },
+    { data: boekingen },
+    { data: contacten },
+    { data: deals },
+    { data: fases },
+    { data: facturen },
+  ] = await Promise.all([
     supabase
       .from("organizations")
       .select("id, name, city, kind, status")
       .order("name", { ascending: true }),
     supabase.from("crm_organization_profiles").select("*"),
     supabase.from("bookings").select("organization_id"),
+    supabase.from("crm_contacts").select("organization_id"),
+    supabase.from("crm_deals").select("organization_id, stage_id, value_cents"),
+    supabase.from("crm_pipeline_stages").select("id, is_won, is_lost"),
+    // Omzet komt uit de betaalde facturen, niet uit de dealwaarde. Een deal is
+    // een verwachting; een betaalde factuur is een feit.
+    supabase.from("invoices").select("organization_id, total_paid_cents"),
   ]);
 
   const profielPerOrg = new Map<string, CrmOrganizationProfileRow>(
@@ -75,6 +94,41 @@ export async function getRelaties(): Promise<Relatie[]> {
     boekingenPerOrg.set(b.organization_id, (boekingenPerOrg.get(b.organization_id) ?? 0) + 1);
   }
 
+  const contactenPerOrg = new Map<string, number>();
+  for (const c of contacten ?? []) {
+    if (c.organization_id) {
+      contactenPerOrg.set(c.organization_id, (contactenPerOrg.get(c.organization_id) ?? 0) + 1);
+    }
+  }
+
+  const faseSoort = new Map((fases ?? []).map((f) => [f.id, f]));
+  const openPerOrg = new Map<string, { aantal: number; waarde: number }>();
+  const gewonnenPerOrg = new Map<string, number>();
+  for (const deal of deals ?? []) {
+    if (!deal.organization_id) continue;
+    const fase = faseSoort.get(deal.stage_id);
+    if (fase?.is_won) {
+      gewonnenPerOrg.set(deal.organization_id, (gewonnenPerOrg.get(deal.organization_id) ?? 0) + 1);
+    } else if (!fase?.is_lost) {
+      const huidig = openPerOrg.get(deal.organization_id) ?? { aantal: 0, waarde: 0 };
+      openPerOrg.set(deal.organization_id, {
+        aantal: huidig.aantal + 1,
+        waarde: huidig.waarde + deal.value_cents,
+      });
+    }
+  }
+
+  // Omzet is wat er daadwerkelijk is betaald, niet wat er is gefactureerd en
+  // zeker niet wat een deal ooit beloofde.
+  const omzetPerOrg = new Map<string, number>();
+  for (const factuur of facturen ?? []) {
+    if (!factuur.organization_id) continue;
+    omzetPerOrg.set(
+      factuur.organization_id,
+      (omzetPerOrg.get(factuur.organization_id) ?? 0) + (factuur.total_paid_cents ?? 0)
+    );
+  }
+
   const nu = vandaag();
 
   return (organisaties ?? []).map((org) => {
@@ -92,6 +146,11 @@ export async function getRelaties(): Promise<Relatie[]> {
       stilte: contactStilte(profiel?.last_contact_at ?? null, nu),
       volgendeActie: profiel?.next_action_at ?? null,
       aantalBoekingen: boekingenPerOrg.get(org.id) ?? 0,
+      aantalContacten: contactenPerOrg.get(org.id) ?? 0,
+      openDeals: openPerOrg.get(org.id)?.aantal ?? 0,
+      openWaardeCents: openPerOrg.get(org.id)?.waarde ?? 0,
+      gewonnenDeals: gewonnenPerOrg.get(org.id) ?? 0,
+      omzetCents: omzetPerOrg.get(org.id) ?? 0,
       heeftProfiel: Boolean(profiel),
     };
   });
@@ -101,6 +160,8 @@ export interface RelatieFilter {
   lifecycle?: Lifecycle | "alles";
   /** Alleen relaties waar het langer dan dit aantal dagen stil is. */
   stilLanger?: number;
+  /** Alleen relaties met een lopende deal. */
+  metOpenDeal?: boolean;
   zoek?: string;
 }
 
@@ -120,6 +181,7 @@ export function filterRelaties(relaties: Relatie[], filter: RelatieFilter): Rela
       }
       if (r.stilte.dagen < filter.stilLanger) return false;
     }
+    if (filter.metOpenDeal && r.openDeals === 0) return false;
     if (zoek) {
       const hooiberg = `${r.name} ${r.city ?? ""}`.toLowerCase();
       if (!hooiberg.includes(zoek)) return false;
@@ -128,12 +190,24 @@ export function filterRelaties(relaties: Relatie[], filter: RelatieFilter): Rela
   });
 }
 
+export interface OrganisatieDeal {
+  id: string;
+  title: string;
+  value_cents: number;
+  expected_date: string | null;
+  faseLabel: string | null;
+  afgesloten: "gewonnen" | "verloren" | null;
+}
+
 /** De CRM-gegevens van een organisatie, voor het blok op de organisatiepagina. */
 export async function getRelatieProfiel(organizationId: string): Promise<{
   profiel: CrmOrganizationProfileRow | null;
   eigenaarNaam: string | null;
   contacten: CrmContactRow[];
   beheerders: { id: string; naam: string }[];
+  deals: OrganisatieDeal[];
+  omzetCents: number;
+  openWaardeCents: number;
 }> {
   const supabase = createServiceSupabase();
 
@@ -157,7 +231,35 @@ export async function getRelatieProfiel(organizationId: string): Promise<{
 
   const lijst = (beheerders ?? []).map((b) => ({ id: b.id, naam: b.full_name ?? b.email }));
 
+  const [{ data: dealRijen }, { data: fases }, { data: facturen }] = await Promise.all([
+    supabase
+      .from("crm_deals")
+      .select("id, title, value_cents, expected_date, stage_id")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
+    supabase.from("crm_pipeline_stages").select("id, label, is_won, is_lost"),
+    supabase.from("invoices").select("total_paid_cents").eq("organization_id", organizationId),
+  ]);
+
+  const fasePerId = new Map((fases ?? []).map((f) => [f.id, f]));
+  const deals: OrganisatieDeal[] = (dealRijen ?? []).map((d) => {
+    const fase = fasePerId.get(d.stage_id);
+    return {
+      id: d.id,
+      title: d.title,
+      value_cents: d.value_cents,
+      expected_date: d.expected_date,
+      faseLabel: fase?.label ?? null,
+      afgesloten: fase?.is_won ? "gewonnen" : fase?.is_lost ? "verloren" : null,
+    };
+  });
+
   return {
+    deals,
+    omzetCents: (facturen ?? []).reduce((som, f) => som + (f.total_paid_cents ?? 0), 0),
+    openWaardeCents: deals
+      .filter((d) => d.afgesloten === null)
+      .reduce((som, d) => som + d.value_cents, 0),
     profiel: profiel ?? null,
     eigenaarNaam: profiel?.owner_id
       ? (lijst.find((b) => b.id === profiel.owner_id)?.naam ?? null)

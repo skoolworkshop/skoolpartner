@@ -21,10 +21,12 @@
     "db:verify-crm": "node scripts/verify-crm.mjs",
     "db:verify-crm-deals": "node scripts/verify-crm-deals.mjs",
     "db:verify-crm-tijdlijn": "node scripts/verify-crm-tijdlijn.mjs",
+    "db:verify-crm-contacten": "node scripts/verify-crm-contacten.mjs",
     "visueel": "node tools/harness/render.mjs && node tools/harness/shoot.mjs",
     "visueel:crm": "node tools/harness/render.mjs crm && node tools/harness/shoot.mjs crm",
     "visueel:suri": "node tools/harness/render.mjs suri && node tools/harness/shoot.mjs suri",
     "visueel:pijplijn": "node tools/harness/render.mjs pijplijn && node tools/harness/shoot.mjs pijplijn",
+    "visueel:contacten": "node tools/harness/render.mjs contacten && node tools/harness/shoot.mjs contacten",
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"

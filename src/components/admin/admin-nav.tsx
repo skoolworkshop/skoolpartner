@@ -8,11 +8,18 @@ import { cn } from "@/lib/utils";
 /**
  * De navigatie van het beheerportaal.
  *
- * De onderdelen zijn gegroepeerd omdat er met het CRM erbij te veel losse
- * regels onder elkaar zouden komen te staan. Er is bewust niets hernoemd,
- * verplaatst of weggehaald: elk bestaand onderdeel staat nog op precies
- * dezelfde plek en heeft nog precies dezelfde link. Alleen de kopjes zijn
- * nieuw.
+ * Vier groepen, elk met een eigen vraag:
+ *
+ *   CRM          Met wie doen wij zaken, en wat loopt er?
+ *   Uitvoering   Wat is er afgesproken en moet gebeuren?
+ *   SkoolPartner Het loyaliteitsprogramma.
+ *   Klantportaal Wie kan er inloggen, en namens welke organisatie?
+ *
+ * Er is geen enkel onderdeel weggehaald en geen enkele link veranderd. Wat wel
+ * is veranderd: /admin/organisaties heet nu Organisatiebeheer en staat onder
+ * Klantportaal, want dat scherm gaat over toegang, verificatie en verwijderen.
+ * Het commerciele overzicht van dezelfde scholen staat onder CRM. Ze linken
+ * naar dezelfde detailpagina.
  */
 
 interface Item {
@@ -28,23 +35,22 @@ interface Groep {
 
 const groepen: Groep[] = [
   {
-    titel: "Dagelijks",
+    titel: "CRM",
     items: [
-      { href: "/admin", label: "Overzicht", exact: true },
-      { href: "/admin/crm", label: "CRM", exact: true },
-      { href: "/admin/crm/relaties", label: "Relaties" },
-      { href: "/admin/crm/pijplijn", label: "Pijplijn" },
-      { href: "/admin/crm/taken", label: "Taken" },
+      { href: "/admin/crm", label: "Overzicht", exact: true },
+      { href: "/admin/crm/contacten", label: "Contacten" },
+      { href: "/admin/crm/organisaties", label: "Organisaties" },
+      { href: "/admin/crm/pijplijn", label: "Deals" },
       { href: "/admin/crm/suri", label: "Reisperiodes" },
-      { href: "/admin/boekingen", label: "Boekingen" },
-      { href: "/admin/facturen", label: "Facturen" },
+      { href: "/admin/crm/taken", label: "Taken" },
     ],
   },
   {
-    titel: "Klanten",
+    titel: "Uitvoering",
     items: [
-      { href: "/admin/organisaties", label: "Organisaties" },
-      { href: "/admin/gebruikers", label: "Gebruikers" },
+      { href: "/admin", label: "Dashboard", exact: true },
+      { href: "/admin/boekingen", label: "Boekingen" },
+      { href: "/admin/facturen", label: "Facturen" },
       { href: "/admin/resultaten", label: "Resultaten" },
     ],
   },
@@ -54,6 +60,13 @@ const groepen: Groep[] = [
       { href: "/admin/skoolpoints", label: "SkoolPoints" },
       { href: "/admin/inwisselen", label: "Inwisselen" },
       { href: "/admin/cjp-tegoed", label: "CJP-tegoed" },
+    ],
+  },
+  {
+    titel: "Klantportaal",
+    items: [
+      { href: "/admin/gebruikers", label: "Gebruikers" },
+      { href: "/admin/organisaties", label: "Organisatiebeheer" },
     ],
   },
   {

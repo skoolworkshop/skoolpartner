@@ -11,11 +11,12 @@ import { hasServiceRole } from "@/lib/env";
 import { getActiefMerk } from "@/lib/crm/actief-merk";
 import { getPijplijn, type Kolom } from "@/lib/crm/pijplijn";
 import { createServiceSupabase } from "@/lib/supabase/server";
-import { formatEuroCents, formatShortDate } from "@/lib/format";
+import { formatEuroCents } from "@/lib/format";
+import { DealKaart } from "@/components/admin/deal-kaart";
 import { maakDealAction } from "@/app/admin/crm/actions";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Pijplijn" };
+export const metadata: Metadata = { title: "Deals" };
 
 function KolomKaart({ kolom }: { kolom: Kolom }) {
   const toon = kolom.fase.is_won ? "gewonnen" : kolom.fase.is_lost ? "verloren" : "lopend";
@@ -39,21 +40,22 @@ function KolomKaart({ kolom }: { kolom: Kolom }) {
       </p>
 
       <ul className="space-y-2">
-        {kolom.deals.map(({ deal, organisatieNaam, ownerNaam }) => (
-          <li key={deal.id}>
-            <Link
-              href={`/admin/crm/deal/${deal.id}`}
-              className="block rounded-card border border-line-soft bg-white p-3 shadow-card transition-colors hover:border-ink"
-            >
-              <p className="truncate font-semibold">{deal.title}</p>
-              <p className="truncate text-sm text-muted">{organisatieNaam ?? "geen organisatie"}</p>
-              <p className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted">
-                <span className="tabular-nums">{formatEuroCents(deal.value_cents)}</span>
-                <span>{deal.expected_date ? formatShortDate(deal.expected_date) : "geen datum"}</span>
-              </p>
-              {ownerNaam ? <p className="mt-1 truncate text-xs text-muted">{ownerNaam}</p> : null}
-            </Link>
-          </li>
+        {kolom.deals.map((regel) => (
+          <DealKaart
+            key={regel.deal.id}
+            deal={{
+              id: regel.deal.id,
+              titel: regel.deal.title,
+              organisatie: regel.organisatieNaam,
+              contact: regel.contactNaam,
+              waardeCents: regel.deal.value_cents,
+              datum: regel.deal.expected_date,
+              eigenaar: regel.ownerNaam,
+              dagenInFase: regel.dagenInFase,
+              volgendeTaak: regel.volgendeTaak,
+              href: `/admin/crm/deal/${regel.deal.id}`,
+            }}
+          />
         ))}
         {kolom.deals.length === 0 ? (
           <li className="rounded-card border border-dashed border-line px-3 py-4 text-center text-xs text-muted-soft">
@@ -81,7 +83,7 @@ export default async function PijplijnPagina() {
     return (
       <>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-[30px]">Pijplijn</h1>
+          <h1 className="text-[30px]">Deals</h1>
           <MerkSchakelaar actief={merk} />
         </div>
         <Card>
@@ -108,6 +110,13 @@ export default async function PijplijnPagina() {
     supabase.from("organizations").select("id, name").order("name").limit(500),
   ]);
 
+  const { data: contacten } = await supabase
+    .from("crm_contacts")
+    .select("id, full_name, organization_id")
+    .not("organization_id", "is", null)
+    .order("full_name")
+    .limit(1000);
+
   const lopend = kolommen.filter((k) => !k.fase.is_won && !k.fase.is_lost);
   const afgesloten = kolommen.filter((k) => k.fase.is_won || k.fase.is_lost);
   const openWaarde = lopend.reduce((som, k) => som + k.waardeCents, 0);
@@ -116,7 +125,7 @@ export default async function PijplijnPagina() {
   return (
     <>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[30px]">Pijplijn</h1>
+        <h1 className="text-[30px]">Deals</h1>
         <MerkSchakelaar actief={merk} />
       </div>
 
@@ -143,10 +152,14 @@ export default async function PijplijnPagina() {
         </Card>
       </div>
 
-      <div className="scroller -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="grid min-w-[720px] grid-cols-4 gap-4">
+      {/* Alle fases naast elkaar, horizontaal scrollend binnen hun eigen kader.
+          De pagina zelf schuift daardoor nooit opzij. */}
+      <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        <div className="flex gap-4">
           {lopend.map((kolom) => (
-            <KolomKaart key={kolom.fase.id} kolom={kolom} />
+            <div key={kolom.fase.id} className="w-[260px] shrink-0">
+              <KolomKaart kolom={kolom} />
+            </div>
           ))}
         </div>
       </div>
@@ -178,6 +191,20 @@ export default async function PijplijnPagina() {
                   {(organisaties ?? []).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Contactpersoon"
+                htmlFor="deal-contact"
+                hint="Met wie loopt dit gesprek? Kan later nog."
+              >
+                <Select id="deal-contact" name="contactId" defaultValue="">
+                  <option value="">Nog niet bekend</option>
+                  {(contacten ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name}
                     </option>
                   ))}
                 </Select>

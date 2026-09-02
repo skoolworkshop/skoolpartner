@@ -412,6 +412,9 @@ export default async function OrganizationDetailPage({
           profiel={relatie.profiel}
           contacten={relatie.contacten}
           beheerders={relatie.beheerders}
+          deals={relatie.deals}
+          omzetCents={relatie.omzetCents}
+          openWaardeCents={relatie.openWaardeCents}
           vandaag={new Date().toISOString().slice(0, 10)}
         />
 

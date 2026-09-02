@@ -4,8 +4,8 @@
  *
  * Wat hier bewezen wordt:
  *
- *   1. De database weigert een deal zonder onderwerp, met twee onderwerpen,
- *      of met een fase van het verkeerde merk.
+ *   1. De database weigert een deal zonder onderwerp of met een fase van het
+ *      verkeerde merk, en staat een organisatie met contactpersoon wel toe.
  *   2. Een reisperiode kan niet stiekem aan een Skool Workshop-deal hangen.
  *   3. De bezetting klopt en wordt berekend, niet bijgehouden.
  *   4. Een klant kan bij niets van dit alles.
@@ -162,9 +162,9 @@ async function main() {
   );
 
   // ---------------------------------------------------------------------------
-  // Regel 1: precies een onderwerp
+  // Regel 1: een deal hangt ergens aan
   // ---------------------------------------------------------------------------
-  console.log("\n  Een deal heeft precies een onderwerp");
+  console.log("\n  Een deal hangt aan een organisatie, een persoon of allebei");
 
   const zonder = await moetFalen(
     db,
@@ -172,12 +172,14 @@ async function main() {
   );
   check(Boolean(zonder), "Een deal zonder organisatie en zonder persoon wordt geweigerd");
 
+  // Sinds migratie 031 mag een deal aan een organisatie EN een contactpersoon
+  // hangen. Bij een school wil je juist weten met wie je praat.
   const allebei = await moetFalen(
     db,
     `insert into public.crm_deals (brand, title, stage_id, organization_id, contact_id)
-     values ('skool_workshop', 'Twee onderwerpen', '${swFase.id}', '${ORG}', 'bbbbbbbb-0000-4000-8000-000000000001')`
+     values ('skool_workshop', 'School met contactpersoon', '${swFase.id}', '${ORG}', 'bbbbbbbb-0000-4000-8000-000000000001')`
   );
-  check(Boolean(allebei), "Een deal met allebei wordt ook geweigerd");
+  check(!allebei, "Een deal mag aan een organisatie en een contactpersoon tegelijk hangen");
 
   const school = await moetFalen(
     db,
@@ -235,6 +237,58 @@ async function main() {
              'aaaaaaaa-0000-4000-8000-000000000001', 'cccccccc-0000-4000-8000-000000000001')`
   );
   check(Boolean(dubbeleAanmelding), "Dezelfde persoon staat niet twee keer in dezelfde reisperiode");
+
+  // ---------------------------------------------------------------------------
+  // De funnel van Skool Workshop
+  // ---------------------------------------------------------------------------
+  console.log("\n  De funnel");
+
+  const funnel = (
+    await db.query(
+      `select key, label, position, is_won, is_lost from public.crm_pipeline_stages
+       where brand = 'skool_workshop' order by position`
+    )
+  ).rows;
+
+  const verwacht = [
+    "nieuwe_aanvraag",
+    "contact_gelegd",
+    "offerte_verstuurd",
+    "opvolging",
+    "akkoord",
+    "facturatie",
+    "ingepland",
+    "uitgevoerd",
+    "evaluatie",
+    "afgerond",
+    "verloren",
+  ];
+  check(
+    JSON.stringify(funnel.map((f) => f.key)) === JSON.stringify(verwacht),
+    `De elf fases staan in de goede volgorde (${funnel.map((f) => f.label).join(" → ")})`
+  );
+
+  check(
+    funnel.filter((f) => f.is_won).length === 1 && funnel.find((f) => f.is_won)?.key === "afgerond",
+    "Afgerond is de enige fase die telt als gewonnen"
+  );
+  check(
+    funnel.filter((f) => f.is_lost).length === 1 && funnel.find((f) => f.is_lost)?.key === "verloren",
+    "Niet doorgegaan is de enige fase die telt als verloren"
+  );
+
+  const posities = funnel.map((f) => Number(f.position));
+  check(
+    posities.every((p, i) => i === 0 || p > posities[i - 1]),
+    "Geen twee fases delen dezelfde plek in de volgorde"
+  );
+
+  // stage_since hoort gevuld te zijn, ook bij een deal die al bestond.
+  const zonderSince = await een(
+    db,
+    `select count(*)::int as n from public.crm_deals where stage_since is null`
+  );
+  check(zonderSince.n === 0, "Elke deal weet sinds wanneer hij in zijn fase staat");
 
   // ---------------------------------------------------------------------------
   // Betalingen

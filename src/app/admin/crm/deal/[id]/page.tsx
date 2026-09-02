@@ -33,14 +33,21 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
   if (detail.deal.brand === "suri_impact") redirect(`/admin/crm/suri/deelnemer/${id}`);
 
   const supabase = createServiceSupabase();
-  const [tijdlijn, taken, { data: beheerders }] = await Promise.all([
+  const [tijdlijn, taken, { data: beheerders }, { data: contacten }] = await Promise.all([
     getTijdlijn({ dealId: id, organizationId: detail.deal.organization_id }),
     getTakenVoor({ dealId: id }),
     supabase.from("profiles").select("id, full_name, email").eq("is_admin", true).order("full_name"),
+    detail.deal.organization_id
+      ? supabase
+          .from("crm_contacts")
+          .select("id, full_name")
+          .eq("organization_id", detail.deal.organization_id)
+          .order("full_name")
+      : Promise.resolve({ data: [] }),
   ]);
 
   const beheerderLijst = (beheerders ?? []).map((b) => ({ id: b.id, naam: b.full_name ?? b.email }));
-  const { deal, fase, fases, organisatieNaam, ownerNaam, boeking } = detail;
+  const { deal, fase, fases, organisatieNaam, contactNaam, ownerNaam, boeking } = detail;
   const alleFases = [...fases.lopend, fases.gewonnen, fases.verloren].filter((f) => f !== null);
   const euro = (centen: number) => (centen / 100).toFixed(2).replace(".", ",");
 
@@ -67,6 +74,15 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
         {deal.expected_date ? ` · verwacht ${formatShortDate(deal.expected_date)}` : ""}
         {ownerNaam ? ` · ${ownerNaam}` : ""}
       </p>
+
+      {contactNaam ? (
+        <p className="mb-6 -mt-4 text-[15px] text-muted">
+          Contactpersoon:{" "}
+          <Link href={`/admin/crm/contacten/${deal.contact_id}`} className="underline">
+            {contactNaam}
+          </Link>
+        </p>
+      ) : null}
 
       {fase.is_won && !boeking ? (
         <Alert tone="info" title="Deze aanvraag is gewonnen" className="mb-5">
@@ -129,6 +145,16 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
                     {beheerderLijst.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.naam}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Contactpersoon" htmlFor="edit-contact">
+                  <Select id="edit-contact" name="contactId" defaultValue={deal.contact_id ?? ""}>
+                    <option value="">Nog niet bekend</option>
+                    {(contacten ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.full_name}
                       </option>
                     ))}
                   </Select>

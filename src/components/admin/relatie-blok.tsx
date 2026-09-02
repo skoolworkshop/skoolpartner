@@ -3,7 +3,10 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { LifecycleBadge, StilteBadge } from "@/components/admin/crm-badges";
 import { LIFECYCLE_LABELS, contactStilte, type Lifecycle } from "@/lib/crm/regels";
-import { formatShortDate } from "@/lib/format";
+import type { OrganisatieDeal } from "@/lib/crm/relaties";
+import { ContactTypeBadge } from "@/components/admin/contact-badges";
+import Link from "next/link";
+import { formatEuroCents, formatShortDate } from "@/lib/format";
 import type { CrmContactRow, CrmOrganizationProfileRow } from "@/lib/types/database";
 import {
   bewaarContactAction,
@@ -25,11 +28,17 @@ export function RelatieBlok({
   contacten,
   beheerders,
   vandaag,
+  deals = [],
+  omzetCents = 0,
+  openWaardeCents = 0,
 }: {
   organizationId: string;
   profiel: CrmOrganizationProfileRow | null;
   contacten: CrmContactRow[];
   beheerders: { id: string; naam: string }[];
+  deals?: OrganisatieDeal[];
+  omzetCents?: number;
+  openWaardeCents?: number;
   /** Als "2026-09-01". Meegegeven zodat dit onderdeel testbaar en voorspelbaar blijft. */
   vandaag: string;
 }) {
@@ -93,6 +102,15 @@ export function RelatieBlok({
             </Field>
           </ActionForm>
 
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line-soft pt-4 text-sm">
+            <dt className="text-muted">Omzet tot nu toe</dt>
+            <dd className="text-right font-semibold tabular-nums">{formatEuroCents(omzetCents)}</dd>
+            <dt className="text-muted">Open dealwaarde</dt>
+            <dd className="text-right font-semibold tabular-nums">
+              {formatEuroCents(openWaardeCents)}
+            </dd>
+          </dl>
+
           <div className="border-t border-line-soft pt-4">
             <ActionForm
               action={markeerContactAction}
@@ -118,7 +136,15 @@ export function RelatieBlok({
                 key={contact.id}
                 className="border-b border-line-soft px-5 py-3 last:border-b-0"
               >
-                <p className="font-semibold">{contact.full_name}</p>
+                <p className="flex flex-wrap items-center gap-2 font-semibold">
+                  <Link
+                    href={`/admin/crm/contacten/${contact.id}`}
+                    className="underline-offset-4 hover:underline"
+                  >
+                    {contact.full_name}
+                  </Link>
+                  <ContactTypeBadge type={contact.contact_type} />
+                </p>
                 <p className="break-words text-sm text-muted">
                   {[contact.job_title, contact.email, contact.phone].filter(Boolean).join(" · ") ||
                     "geen gegevens ingevuld"}
@@ -149,6 +175,42 @@ export function RelatieBlok({
             </div>
           </ActionForm>
         </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={`Deals (${deals.length})`}
+          description="Verkoopkansen van deze organisatie. Een school kan er meerdere tegelijk hebben."
+        />
+        {deals.length > 0 ? (
+          <ul>
+            {deals.map((deal) => (
+              <li key={deal.id} className="border-b border-line-soft last:border-b-0">
+                <Link
+                  href={`/admin/crm/deal/${deal.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-surface-2"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{deal.title}</span>
+                    <span className="block text-sm text-muted">
+                      {deal.faseLabel ?? "onbekende fase"}
+                      {deal.expected_date ? ` · ${formatShortDate(deal.expected_date)}` : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {formatEuroCents(deal.value_cents)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <CardBody>
+            <p className="text-sm text-muted">
+              Nog geen deals. Een verkoopkans maak je aan bij Deals in het CRM.
+            </p>
+          </CardBody>
+        )}
       </Card>
     </>
   );

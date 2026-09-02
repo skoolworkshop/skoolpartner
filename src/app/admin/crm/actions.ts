@@ -29,6 +29,7 @@ import {
   maakDeal,
   werkDealBij,
 } from "@/lib/crm/pijplijn";
+import { isContactType, koppelPortalAccount } from "@/lib/crm/contacten";
 import {
   isActiviteitSoort,
   legActiviteitVast,
@@ -125,7 +126,7 @@ export async function setRelatieProfielAction(
     );
 
     revalidatePath(`/admin/organisaties/${organizationId}`);
-    revalidatePath("/admin/crm/relaties");
+    revalidatePath("/admin/crm/organisaties");
     return { status: "ok", message: "De relatiegegevens zijn opgeslagen." };
   });
 }
@@ -141,7 +142,7 @@ export async function markeerContactAction(
     await markeerContact(organizationId, wie);
 
     revalidatePath(`/admin/organisaties/${organizationId}`);
-    revalidatePath("/admin/crm/relaties");
+    revalidatePath("/admin/crm/organisaties");
     return { status: "ok", message: "Vastgelegd dat er vandaag contact is geweest." };
   });
 }
@@ -154,24 +155,33 @@ export async function bewaarContactAction(
     const wie = await actor();
     const organizationId = optioneel(formData, "organizationId");
 
-    await bewaarContact(
+    const soort = tekst(formData, "contactType");
+    const fase = tekst(formData, "lifecycle");
+    const contactId = optioneel(formData, "contactId") ?? undefined;
+
+    const id = await bewaarContact(
       {
-        id: optioneel(formData, "contactId") ?? undefined,
+        id: contactId,
         organizationId,
         fullName: tekst(formData, "fullName"),
         email: optioneel(formData, "email"),
         phone: optioneel(formData, "phone"),
         jobTitle: optioneel(formData, "jobTitle"),
         note: optioneel(formData, "note"),
+        contactType: isContactType(soort) ? soort : null,
+        lifecycle: isLifecycle(fase) ? fase : null,
+        city: optioneel(formData, "city"),
       },
       wie
     );
 
     if (organizationId) revalidatePath(`/admin/organisaties/${organizationId}`);
+    revalidatePath("/admin/crm/contacten");
+    revalidatePath(`/admin/crm/contacten/${id}`);
     return {
       status: "ok",
       message:
-        "De contactpersoon staat in het CRM. Dit geeft nog geen toegang tot e-mail; dat blijft een aparte handeling.",
+        "Het contact staat in het CRM. Dit maakt geen inlogaccount aan en geeft geen toegang tot het klantportaal of tot e-mail.",
     };
   });
 }
@@ -420,6 +430,7 @@ export async function maakDealAction(_prev: AdminState, formData: FormData): Pro
     await maakDeal(
       {
         organizationId: tekst(formData, "organizationId"),
+        contactId: optioneel(formData, "contactId"),
         title: tekst(formData, "title"),
         valueCents: waarde,
         expectedDate: optioneel(formData, "expectedDate"),
@@ -453,6 +464,7 @@ export async function werkDealBijAction(_prev: AdminState, formData: FormData): 
         valueCents: waarde,
         expectedDate: optioneel(formData, "expectedDate"),
         ownerId: eigenaar === "" ? null : eigenaar,
+        contactId: optioneel(formData, "contactId"),
         source: optioneel(formData, "source"),
         note: optioneel(formData, "note"),
       },
@@ -509,6 +521,35 @@ export async function maakBoekingVanDealAction(
         `De boeking staat klaar als concept (${bookingId.slice(0, 8)}). ` +
         "Hij telt nog niet mee voor de klant en levert nog geen punten op. " +
         "Bevestig hem in Admin > Boekingen zodra de afspraak vaststaat.",
+    };
+  });
+}
+
+/**
+ * Een contact koppelen aan een bestaand klantportaalaccount, of die koppeling
+ * weghalen.
+ *
+ * Legt alleen vast wat al waar is. Er wordt geen account aangemaakt en geen
+ * toegang verleend; dat blijft gaan via Admin en Gebruikers.
+ */
+export async function koppelPortalAccountAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const contactId = tekst(formData, "contactId");
+    const userId = optioneel(formData, "userId");
+
+    await koppelPortalAccount(contactId, userId, wie);
+
+    revalidatePath(`/admin/crm/contacten/${contactId}`);
+    revalidatePath("/admin/crm/contacten");
+    return {
+      status: "ok",
+      message: userId
+        ? "Vastgelegd dat dit contact bij dat klantportaalaccount hoort."
+        : "De koppeling met het klantportaalaccount is weggehaald. De toegang zelf verandert hier niet door.",
     };
   });
 }

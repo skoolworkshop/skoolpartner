@@ -20,6 +20,10 @@ export interface DealRegel {
   organisatieNaam: string | null;
   contactNaam: string | null;
   ownerNaam: string | null;
+  /** De eerstvolgende openstaande taak bij deze deal. */
+  volgendeTaak: { titel: string; dueOn: string | null; teLaat: boolean } | null;
+  /** Hoeveel dagen deze deal al in zijn huidige fase staat. */
+  dagenInFase: number | null;
 }
 
 export interface Kolom {
@@ -50,12 +54,41 @@ async function verrijk(deals: CrmDealRow[]): Promise<DealRegel[]> {
   const contactPerId = new Map((contacten ?? []).map((c) => [c.id, c.full_name]));
   const ownerPerId = new Map((eigenaren ?? []).map((p) => [p.id, p.full_name ?? p.email]));
 
-  return deals.map((deal) => ({
-    deal,
-    organisatieNaam: deal.organization_id ? (orgPerId.get(deal.organization_id) ?? null) : null,
-    contactNaam: deal.contact_id ? (contactPerId.get(deal.contact_id) ?? null) : null,
-    ownerNaam: deal.owner_id ? (ownerPerId.get(deal.owner_id) ?? null) : null,
-  }));
+  // De eerstvolgende openstaande taak per deal. Dat is op een kaart de nuttigste
+  // regel die er is: hij beantwoordt "en nu?".
+  const { data: taken } = await supabase
+    .from("crm_tasks")
+    .select("deal_id, title, due_on")
+    .in("deal_id", deals.map((d) => d.id))
+    .is("done_at", null)
+    .order("due_on", { ascending: true, nullsFirst: false });
+
+  const vandaag = new Date().toISOString().slice(0, 10);
+  const taakPerDeal = new Map<string, { titel: string; dueOn: string | null; teLaat: boolean }>();
+  for (const taak of taken ?? []) {
+    if (!taak.deal_id || taakPerDeal.has(taak.deal_id)) continue;
+    taakPerDeal.set(taak.deal_id, {
+      titel: taak.title,
+      dueOn: taak.due_on,
+      teLaat: Boolean(taak.due_on && taak.due_on < vandaag),
+    });
+  }
+
+  const nu = Date.now();
+
+  return deals.map((deal) => {
+    const sinds = deal.stage_since ?? deal.created_at;
+    const ms = Date.parse(sinds);
+
+    return {
+      deal,
+      organisatieNaam: deal.organization_id ? (orgPerId.get(deal.organization_id) ?? null) : null,
+      contactNaam: deal.contact_id ? (contactPerId.get(deal.contact_id) ?? null) : null,
+      ownerNaam: deal.owner_id ? (ownerPerId.get(deal.owner_id) ?? null) : null,
+      volgendeTaak: taakPerDeal.get(deal.id) ?? null,
+      dagenInFase: Number.isNaN(ms) ? null : Math.max(Math.floor((nu - ms) / 86_400_000), 0),
+    };
+  });
 }
 
 /**
@@ -157,6 +190,7 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
 export async function maakDeal(
   waarden: {
     organizationId: string;
+    contactId?: string | null;
     title: string;
     valueCents: number;
     expectedDate?: string | null;
@@ -192,6 +226,7 @@ export async function maakDeal(
       title: waarden.title.trim(),
       stage_id: eersteFase.id,
       organization_id: waarden.organizationId,
+      contact_id: waarden.contactId || null,
       value_cents: Math.max(waarden.valueCents, 0),
       expected_date: waarden.expectedDate || null,
       source: waarden.source?.trim() || null,
@@ -230,6 +265,7 @@ export async function werkDealBij(
     valueCents?: number;
     expectedDate?: string | null;
     ownerId?: string | null;
+    contactId?: string | null;
     source?: string | null;
     note?: string | null;
   },
@@ -247,6 +283,7 @@ export async function werkDealBij(
       value_cents: waarden.valueCents !== undefined ? Math.max(waarden.valueCents, 0) : deal.value_cents,
       expected_date: waarden.expectedDate !== undefined ? waarden.expectedDate : deal.expected_date,
       owner_id: waarden.ownerId !== undefined ? waarden.ownerId : deal.owner_id,
+      contact_id: waarden.contactId !== undefined ? waarden.contactId : deal.contact_id,
       source: waarden.source !== undefined ? waarden.source : deal.source,
       note: waarden.note !== undefined ? waarden.note : deal.note,
     })

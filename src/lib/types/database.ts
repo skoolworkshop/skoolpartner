@@ -585,6 +585,18 @@ export type CrmPipelineStageRow = {
  * hoort bij geen enkele school. Deze tabel staat bewust naast
  * organization_contacts en verandert nooit iets aan wat een klant mag zien.
  */
+export type CrmContactType =
+  | "docent"
+  | "cultuurcoordinator"
+  | "decaan"
+  | "administratie"
+  | "directie"
+  | "ouder"
+  | "deelnemer"
+  | "opdrachtgever"
+  | "leverancier"
+  | "overig";
+
 export type CrmContactRow = {
   id: string;
   organization_id: string | null;
@@ -596,6 +608,16 @@ export type CrmContactRow = {
   is_unsubscribed: boolean;
   owner_id: string | null;
   linked_contact_id: string | null;
+  contact_type: CrmContactType | null;
+  lifecycle: CrmLifecycle | null;
+  city: string | null;
+  /**
+   * Alleen gevuld als deze persoon aantoonbaar een klantportaalaccount heeft.
+   * Wordt nooit automatisch gezet: een gelijk e-mailadres is een aanwijzing,
+   * geen bewijs.
+   */
+  portal_user_id: string | null;
+  last_contact_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -619,6 +641,8 @@ export type CrmDealRow = {
   /** Alleen bij Skool Workshop. */
   booking_id: string | null;
   closed_at: string | null;
+  /** Sinds wanneer deze deal in de huidige fase staat. */
+  stage_since: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -3,7 +3,7 @@ import "server-only";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
 import { isLifecycle, isPeriodeStatus, type BetalingSoort, type Lifecycle } from "@/lib/crm/regels";
-import type { CrmDealRow } from "@/lib/types/database";
+import type { CrmContactType, CrmDealRow } from "@/lib/types/database";
 
 /**
  * De schrijfkant van het CRM.
@@ -34,7 +34,10 @@ export function vertaalFout(error: { code?: string; message: string }): string {
       return "Vul bij een correctie een reden in.";
     }
     if (error.message.includes("een_onderwerp")) {
-      return "Een deal hoort bij precies een organisatie of precies een persoon.";
+      return "Een deal hoort bij minstens een organisatie of een persoon.";
+    }
+    if (error.message.includes("contacts_soort")) {
+      return "Dit soort contact bestaat niet.";
     }
     if (error.message.includes("volgorde")) {
       return "De einddatum moet na de startdatum liggen.";
@@ -171,6 +174,9 @@ export async function bewaarContact(
     phone?: string | null;
     jobTitle?: string | null;
     note?: string | null;
+    contactType?: CrmContactType | null;
+    lifecycle?: Lifecycle | null;
+    city?: string | null;
   },
   actor: Actor
 ): Promise<string> {
@@ -179,6 +185,9 @@ export async function bewaarContact(
 
   const email = waarden.email?.trim().toLowerCase() || null;
   if (email && !email.includes("@")) throw new Error("Dit is geen geldig e-mailadres.");
+  if (waarden.lifecycle && !isLifecycle(waarden.lifecycle)) {
+    throw new Error("Onbekende levensfase.");
+  }
 
   const supabase = createServiceSupabase();
   const rij = {
@@ -188,6 +197,9 @@ export async function bewaarContact(
     phone: waarden.phone?.trim() || null,
     job_title: waarden.jobTitle?.trim() || null,
     note: waarden.note?.trim() || null,
+    contact_type: waarden.contactType ?? null,
+    lifecycle: waarden.lifecycle ?? null,
+    city: waarden.city?.trim() || null,
   };
 
   if (waarden.id) {
@@ -429,7 +441,13 @@ export async function zetFase(
 
   const { data: bijgewerkt, error } = await supabase
     .from("crm_deals")
-    .update({ stage_id: stageId, closed_at: afgesloten ? new Date().toISOString() : null })
+    .update({
+      stage_id: stageId,
+      // Sinds wanneer staat hij in deze fase? Dat is iets anders dan wanneer
+      // hij voor het laatst is aangeraakt.
+      stage_since: new Date().toISOString(),
+      closed_at: afgesloten ? new Date().toISOString() : null,
+    })
     .eq("id", dealId)
     .select("*")
     .single();
