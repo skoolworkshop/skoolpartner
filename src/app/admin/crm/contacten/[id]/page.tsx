@@ -10,6 +10,7 @@ import { ContactTypeBadge, PortalUitleg } from "@/components/admin/contact-badge
 import { LifecycleBadge, StilteBadge } from "@/components/admin/crm-badges";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { requireAdmin } from "@/lib/auth/session";
+import { getFragmentHulp } from "@/lib/crm/fragmenten";
 import { CONTACT_TYPE_LABELS, getContact } from "@/lib/crm/contacten";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { LIFECYCLE_LABELS } from "@/lib/crm/regels";
@@ -20,13 +21,18 @@ import { bewaarContactAction, koppelPortalAccountAction } from "@/app/admin/crm/
 export const metadata: Metadata = { title: "Contact" };
 
 export default async function ContactPagina({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  const sessie = await requireAdmin();
   const { id } = await params;
 
   const detail = await getContact(id);
   if (!detail) notFound();
 
   const { contact, organisatieNaam, portal, stilte, deals, boekingen, geverifieerdeMail } = detail;
+
+  const fragmentHulp = await getFragmentHulp(
+    { contactId: contact.id, organizationId: contact.organization_id },
+    { naam: sessie.profile?.full_name ?? null, email: sessie.email }
+  );
 
   const supabase = createServiceSupabase();
   const [tijdlijn, taken, { data: organisaties }, { data: beheerders }] = await Promise.all([
@@ -220,6 +226,8 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
         <TijdlijnBlok
           onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
           regels={tijdlijn}
+          fragmenten={fragmentHulp.fragmenten}
+          fragmentContext={fragmentHulp.context}
         />
 
         <TakenBlok

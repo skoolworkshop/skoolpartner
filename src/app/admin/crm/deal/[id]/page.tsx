@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { requireAdmin } from "@/lib/auth/session";
+import { getFragmentHulp } from "@/lib/crm/fragmenten";
 import { getDeal } from "@/lib/crm/pijplijn";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { createServiceSupabase } from "@/lib/supabase/server";
@@ -22,7 +23,7 @@ import {
 export const metadata: Metadata = { title: "Aanvraag" };
 
 export default async function DealPagina({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  const sessie = await requireAdmin();
   const { id } = await params;
 
   const detail = await getDeal(id);
@@ -48,6 +49,13 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
 
   const beheerderLijst = (beheerders ?? []).map((b) => ({ id: b.id, naam: b.full_name ?? b.email }));
   const { deal, fase, fases, organisatieNaam, contactNaam, ownerNaam, boeking } = detail;
+
+  // De fragmentkiezer bij de tijdlijn. Faalt zacht: geen fragmenten betekent
+  // geen knop, en verder blijft het scherm precies zoals het was.
+  const fragmentHulp = await getFragmentHulp(
+    { dealId: deal.id, organizationId: deal.organization_id, contactId: deal.contact_id, merk: deal.brand },
+    { naam: sessie.profile?.full_name ?? null, email: sessie.email }
+  );
   const alleFases = [...fases.lopend, fases.gewonnen, fases.verloren].filter((f) => f !== null);
   const euro = (centen: number) => (centen / 100).toFixed(2).replace(".", ",");
 
@@ -249,6 +257,8 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
         <TijdlijnBlok
           onderwerp={{ dealId: deal.id, organizationId: deal.organization_id }}
           regels={tijdlijn}
+          fragmenten={fragmentHulp.fragmenten}
+          fragmentContext={fragmentHulp.context}
         />
 
         <TakenBlok

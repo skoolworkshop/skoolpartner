@@ -30,6 +30,7 @@ import {
   werkDealBij,
 } from "@/lib/crm/pijplijn";
 import { isContactType, koppelPortalAccount } from "@/lib/crm/contacten";
+import { archiveerFragment, bewaarFragment, legGebruikVast } from "@/lib/crm/fragmenten";
 import {
   isActiviteitSoort,
   legActiviteitVast,
@@ -552,4 +553,66 @@ export async function koppelPortalAccountAction(
         : "De koppeling met het klantportaalaccount is weggehaald. De toegang zelf verandert hier niet door.",
     };
   });
+}
+
+// -----------------------------------------------------------------------------
+// Fragmenten
+// -----------------------------------------------------------------------------
+
+export async function bewaarFragmentAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+
+    await bewaarFragment(
+      {
+        id: optioneel(formData, "id"),
+        brand: optioneel(formData, "brand"),
+        shortcut: optioneel(formData, "shortcut"),
+        name: tekst(formData, "name"),
+        body: tekst(formData, "body"),
+        category: optioneel(formData, "category"),
+      },
+      wie
+    );
+
+    revalidatePath("/admin/crm/fragmenten");
+    return { status: "ok", message: "Het fragment is opgeslagen." };
+  });
+}
+
+export async function archiveerFragmentAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const archiveren = tekst(formData, "archiveren") !== "nee";
+
+    await archiveerFragment(tekst(formData, "id"), archiveren, wie);
+
+    revalidatePath("/admin/crm/fragmenten");
+    return {
+      status: "ok",
+      message: archiveren ? "Het fragment staat in het archief." : "Het fragment is terug.",
+    };
+  });
+}
+
+/**
+ * Vastleggen dat een fragment is gebruikt.
+ *
+ * Bewust een aparte actie en geen bijwerking van het invoegen zelf: het
+ * invoegen gebeurt in de browser en hoeft niet op de server te wachten. Deze
+ * actie is de telling, en die mag rustig een tel later komen.
+ */
+export async function legFragmentGebruikVastAction(formData: FormData): Promise<void> {
+  try {
+    const wie = await actor();
+    await legGebruikVast(tekst(formData, "snippetId"), onderwerpUit(formData), wie);
+  } catch {
+    /* Een telling die mislukt mag niemand in de weg zitten. */
+  }
 }

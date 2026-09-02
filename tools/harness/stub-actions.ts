@@ -25,3 +25,6 @@ export const zetTaakAfAction = niets;
 export const maakDealAction = niets;
 export const werkDealBijAction = niets;
 export const maakBoekingVanDealAction = niets;
+export const bewaarFragmentAction = niets;
+export const archiveerFragmentAction = niets;
+export const legFragmentGebruikVastAction = async () => {};

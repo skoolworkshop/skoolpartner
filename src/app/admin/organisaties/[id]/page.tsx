@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select } from "@/components/ui/form";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { requireAdmin } from "@/lib/auth/session";
+import { getFragmentHulp } from "@/lib/crm/fragmenten";
 import { getOrganizationDetail } from "@/lib/admin/queries";
 import {
   getCreditBalanceForAdmin,
@@ -52,10 +53,12 @@ export default async function OrganizationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const sessie = await requireAdmin();
   const { id } = await params;
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
+
+  const fragmentHulp = await getFragmentHulp({ organizationId: id }, { naam: sessie.profile?.full_name ?? null, email: sessie.email });
 
   const [settings, tegoed, tegoedMutaties, relatie] = await Promise.all([
     getSettings(),
@@ -418,7 +421,12 @@ export default async function OrganizationDetailPage({
           vandaag={new Date().toISOString().slice(0, 10)}
         />
 
-        <TijdlijnBlok onderwerp={{ organizationId: id }} regels={tijdlijn} />
+        <TijdlijnBlok
+          onderwerp={{ organizationId: id }}
+          regels={tijdlijn}
+          fragmenten={fragmentHulp.fragmenten}
+          fragmentContext={fragmentHulp.context}
+        />
 
         <TakenBlok
           onderwerp={{ organizationId: id }}

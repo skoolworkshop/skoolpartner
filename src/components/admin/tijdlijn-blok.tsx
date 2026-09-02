@@ -1,4 +1,6 @@
 import { ActionForm } from "@/components/admin/action-form";
+import { FragmentKiezer } from "@/components/admin/fragment-kiezer";
+import type { KiesbaarFragment, TokenContext } from "@/lib/crm/fragment-tekst";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { formatDateTime, formatShortDate } from "@/lib/format";
@@ -38,10 +40,15 @@ export function TijdlijnBlok({
   onderwerp,
   regels,
   titel = "Tijdlijn",
+  fragmenten,
+  fragmentContext,
 }: {
   onderwerp: OnderwerpVelden;
   regels: TijdlijnRegel[];
   titel?: string;
+  /* Optioneel: zonder fragmenten werkt dit blok precies zoals eerst. */
+  fragmenten?: KiesbaarFragment[];
+  fragmentContext?: TokenContext;
 }) {
   return (
     <Card>
@@ -109,6 +116,14 @@ export function TijdlijnBlok({
           <Field label="Toelichting" htmlFor="activiteit-body">
             <Textarea id="activiteit-body" name="body" rows={3} />
           </Field>
+          {fragmenten && fragmenten.length > 0 ? (
+            <FragmentKiezer
+              fragmenten={fragmenten}
+              context={fragmentContext ?? {}}
+              doelId="activiteit-body"
+              onderwerp={onderwerp}
+            />
+          ) : null}
         </ActionForm>
       </CardBody>
     </Card>

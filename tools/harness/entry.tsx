@@ -7,6 +7,7 @@ import { Harness as CrmSuri } from "./crm-suri-harness";
 import { Harness as CrmPijplijn } from "./crm-pijplijn-harness";
 import { Harness as CrmContacten } from "./crm-contacten-harness";
 import { Harness as CrmDashboard } from "./crm-dashboard-harness";
+import { Harness as CrmFragmenten } from "./crm-fragmenten-harness";
 
 /**
  * Welke harness gerenderd wordt, kies je met de omgevingsvariabele HARNESS.
@@ -18,6 +19,7 @@ import { Harness as CrmDashboard } from "./crm-dashboard-harness";
  *   npm run visueel:pijplijn      de pijplijn, de taken en de tijdlijn
  *   npm run visueel:contacten     de contacten en de dealkaarten
  *   npm run visueel:dashboard     het commerciele dashboard
+ *   npm run visueel:fragmenten    de fragmenten en de keuzelijst
  */
 const harnessen = {
   diagnose: Diagnose,
@@ -26,6 +28,7 @@ const harnessen = {
   pijplijn: CrmPijplijn,
   contacten: CrmContacten,
   dashboard: CrmDashboard,
+  fragmenten: CrmFragmenten,
 };
 const gekozen = (process.env.HARNESS ?? "diagnose") as keyof typeof harnessen;
 const Harness = harnessen[gekozen] ?? Diagnose;

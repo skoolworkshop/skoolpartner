@@ -10,6 +10,7 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { BetaalBadge, LeeftijdBadge } from "@/components/admin/crm-badges";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { requireAdmin } from "@/lib/auth/session";
+import { getFragmentHulp } from "@/lib/crm/fragmenten";
 import { getDeelnemer, getPeriodes } from "@/lib/crm/suri";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { createServiceSupabase } from "@/lib/supabase/server";
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = { title: "Deelnemer" };
 
 export default async function DeelnemerPagina({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  const sessie = await requireAdmin();
   const { id } = await params;
 
   const deelnemer = await getDeelnemer(id);
@@ -40,6 +41,11 @@ export default async function DeelnemerPagina({ params }: { params: Promise<{ id
   ]);
   const beheerderLijst = (beheerders ?? []).map((b) => ({ id: b.id, naam: b.full_name ?? b.email }));
   const { contact, deal, fase, profiel, periode, betalingen, stand, leeftijd } = deelnemer;
+
+  const fragmentHulp = await getFragmentHulp(
+    { dealId: deal.id, contactId: contact.id, merk: "suri_impact" },
+    { naam: sessie.profile?.full_name ?? null, email: sessie.email }
+  );
   const alleFases = [...deelnemer.fases.lopend, deelnemer.fases.gewonnen, deelnemer.fases.verloren]
     .filter((f) => f !== null)
     .map((f) => f);
@@ -244,6 +250,8 @@ export default async function DeelnemerPagina({ params }: { params: Promise<{ id
         <TijdlijnBlok
           onderwerp={{ dealId: deal.id, contactId: contact.id }}
           regels={tijdlijn}
+          fragmenten={fragmentHulp.fragmenten}
+          fragmentContext={fragmentHulp.context}
         />
 
         <TakenBlok

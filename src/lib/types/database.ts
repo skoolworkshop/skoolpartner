@@ -747,6 +747,31 @@ export type CrmTaskRow = {
   updated_at: string;
 };
 
+/** Een herbruikbaar tekstblok met personalisatie. brand leeg betekent: beide merken. */
+export type CrmSnippetRow = {
+  id: string;
+  brand: CrmBrand | null;
+  shortcut: string;
+  name: string;
+  body: string;
+  category: string | null;
+  is_archived: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Een regel per keer dat een fragment is gebruikt. Het aantal wordt hieruit geteld. */
+export type CrmSnippetUseRow = {
+  id: string;
+  snippet_id: string;
+  organization_id: string | null;
+  contact_id: string | null;
+  deal_id: string | null;
+  actor_id: string | null;
+  used_at: string;
+};
+
 /** Altijd berekend uit de deals en de betalingen, nooit uit een losse kolom. */
 export type CrmSuriEditionCapacityRow = {
   edition_id: string;
@@ -905,6 +930,8 @@ export type Database = {
       crm_suri_payments: TableDef<CrmSuriPaymentRow>;
       crm_activities: TableDef<CrmActivityRow>;
       crm_tasks: TableDef<CrmTaskRow>;
+      crm_snippets: TableDef<CrmSnippetRow>;
+      crm_snippet_uses: TableDef<CrmSnippetUseRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;
