@@ -601,6 +601,104 @@ export type CrmContactRow = {
   updated_at: string;
 };
 
+export type CrmDealRow = {
+  id: string;
+  brand: CrmBrand;
+  title: string;
+  stage_id: string;
+  /** Precies een van deze twee is gevuld; de database bewaakt dat. */
+  organization_id: string | null;
+  contact_id: string | null;
+  value_cents: number;
+  expected_date: string | null;
+  owner_id: string | null;
+  source: string | null;
+  note: string | null;
+  /** Alleen bij Suri. */
+  edition_id: string | null;
+  /** Alleen bij Skool Workshop. */
+  booking_id: string | null;
+  closed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrmDealEventRow = {
+  id: string;
+  deal_id: string;
+  from_stage_id: string | null;
+  to_stage_id: string | null;
+  actor_id: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type CrmSuriEditionStatus = "concept" | "open" | "gesloten" | "afgerond";
+
+export type CrmSuriEditionRow = {
+  id: string;
+  name: string;
+  starts_on: string;
+  ends_on: string;
+  capacity: number;
+  price_cents: number;
+  status: CrmSuriEditionStatus;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Aanvullende gegevens van een deelnemer.
+ *
+ * Bewust alleen verkoop- en planningsgegevens. Medische gegevens, dieetwensen
+ * en paspoortgegevens horen hier niet in; zie de migratie voor de reden.
+ */
+export type CrmSuriProfileRow = {
+  contact_id: string;
+  birth_date: string | null;
+  education_level: string | null;
+  interest: string | null;
+  guardian_name: string | null;
+  guardian_email: string | null;
+  guardian_phone: string | null;
+  together_with: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrmSuriPaymentKind = "aanbetaling" | "restant" | "correctie" | "terugbetaling";
+
+export type CrmSuriPaymentRow = {
+  id: string;
+  deal_id: string;
+  kind: CrmSuriPaymentKind;
+  amount_cents: number;
+  received_on: string;
+  note: string | null;
+  external_reference: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+/** Altijd berekend uit de deals en de betalingen, nooit uit een losse kolom. */
+export type CrmSuriEditionCapacityRow = {
+  edition_id: string;
+  name: string;
+  starts_on: string;
+  ends_on: string;
+  status: CrmSuriEditionStatus;
+  capacity: number;
+  price_cents: number;
+  aangemeld: number;
+  volledig_betaald: number;
+  afgehaakt: number;
+  vrij: number;
+  ontvangen_cents: number;
+};
+
 /** Interne gegevens over een organisatie. Nooit zichtbaar voor de klant zelf. */
 export type CrmOrganizationProfileRow = {
   organization_id: string;
@@ -736,10 +834,16 @@ export type Database = {
       crm_pipeline_stages: TableDef<CrmPipelineStageRow>;
       crm_contacts: TableDef<CrmContactRow>;
       crm_organization_profiles: TableDef<CrmOrganizationProfileRow>;
+      crm_deals: TableDef<CrmDealRow>;
+      crm_deal_events: TableDef<CrmDealEventRow>;
+      crm_suri_editions: TableDef<CrmSuriEditionRow>;
+      crm_suri_profiles: TableDef<CrmSuriProfileRow>;
+      crm_suri_payments: TableDef<CrmSuriPaymentRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;
       cjp_credit_balances: ViewDef<CjpCreditBalanceRow>;
+      crm_suri_edition_capacity: ViewDef<CrmSuriEditionCapacityRow>;
     };
     Functions: {
       request_redemption: {

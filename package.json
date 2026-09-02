@@ -19,8 +19,10 @@
     "db:verify-sql": "node scripts/verify-sql-setup.mjs",
     "db:verify-cjp": "node scripts/verify-cjp.mjs",
     "db:verify-crm": "node scripts/verify-crm.mjs",
+    "db:verify-crm-deals": "node scripts/verify-crm-deals.mjs",
     "visueel": "node tools/harness/render.mjs && node tools/harness/shoot.mjs",
     "visueel:crm": "node tools/harness/render.mjs crm && node tools/harness/shoot.mjs crm",
+    "visueel:suri": "node tools/harness/render.mjs suri && node tools/harness/shoot.mjs suri",
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"

@@ -86,7 +86,12 @@ async function main() {
     daar precies aan verandert. Dat is sterker dan een lijstje kolomnamen die
     er niet mogen zijn: dit valt ook op wat ik niet had bedacht.
   */
-  for (const file of files.filter((f) => f !== CRM_MIGRATIE)) {
+  // Alles wat VOOR het CRM komt. Latere CRM-migraties leunen op deze, dus die
+  // mogen hier nog niet meedraaien.
+  const ervoor = files.filter((f) => f < CRM_MIGRATIE);
+  const erna = files.filter((f) => f > CRM_MIGRATIE);
+
+  for (const file of ervoor) {
     try {
       await db.exec(await readFile(path.join(MIGRATIONS_DIR, file), "utf8"));
     } catch (error) {
@@ -128,6 +133,18 @@ async function main() {
 
   const naFoto = await schemaFoto();
   const naPolicies = await policyFoto();
+
+  // En daarna de rest, zodat de database er verder uitziet zoals in productie.
+  for (const file of erna) {
+    try {
+      await db.exec(await readFile(path.join(MIGRATIONS_DIR, file), "utf8"));
+    } catch (error) {
+      console.error(`\n  FOUT in ${file}\n       ${error.message}\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   console.log(`\n  ${files.length} migraties geladen, inclusief het CRM-fundament\n`);
 
   // ---------------------------------------------------------------------------

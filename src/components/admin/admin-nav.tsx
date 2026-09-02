@@ -31,7 +31,9 @@ const groepen: Groep[] = [
     titel: "Dagelijks",
     items: [
       { href: "/admin", label: "Overzicht", exact: true },
-      { href: "/admin/crm", label: "CRM" },
+      { href: "/admin/crm", label: "CRM", exact: true },
+      { href: "/admin/crm/relaties", label: "Relaties" },
+      { href: "/admin/crm/suri", label: "Reisperiodes" },
       { href: "/admin/boekingen", label: "Boekingen" },
       { href: "/admin/facturen", label: "Facturen" },
     ],

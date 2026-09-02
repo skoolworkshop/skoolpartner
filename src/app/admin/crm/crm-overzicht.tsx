@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { MerkSchakelaar } from "@/components/admin/merk-schakelaar";
@@ -101,27 +103,54 @@ export function CrmOverzicht({
       </Card>
 
       <Card className="mt-6">
+        <CardHeader title="Waar je heen kunt" />
+        <CardBody>
+          <div className="flex flex-wrap gap-2">
+            {merk === "skool_workshop" ? (
+              <>
+                <Link
+                  href="/admin/crm/relaties"
+                  className="inline-flex min-h-11 items-center rounded-pill bg-ink px-5 text-sm font-semibold text-white"
+                >
+                  Relaties
+                </Link>
+                <Link
+                  href="/admin/organisaties"
+                  className="inline-flex min-h-11 items-center rounded-pill bg-surface-3 px-5 text-sm font-semibold text-ink"
+                >
+                  Alle organisaties
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/admin/crm/suri"
+                className="inline-flex min-h-11 items-center rounded-pill bg-ink px-5 text-sm font-semibold text-white"
+              >
+                Reisperiodes en deelnemers
+              </Link>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card className="mt-6">
         <CardHeader
           title="Wat hier nog niet staat"
-          description="Fase 1 legt het fundament. Deze schermen komen daarna."
+          description="Wat er nu is, dekt relaties en deelnemers. Deze onderdelen komen daarna."
         />
         <CardBody>
           <ul className="space-y-2 text-sm text-muted">
-            <li>
-              <strong className="text-ink">Relatiekaart per school.</strong> Boekingen, facturen,
-              berichten, punten en CJP-tegoed op een scherm.
-            </li>
-            <li>
-              <strong className="text-ink">Deelnemers en reisperiodes.</strong> Voor Suri Impact,
-              inclusief de bezetting per periode.
-            </li>
             <li>
               <strong className="text-ink">Activiteiten, notities en taken.</strong> Wie heeft wat
               besproken, en wie pakt het op.
             </li>
             <li>
-              <strong className="text-ink">De pijplijn zelf.</strong> Deals als kaarten in de fases
-              hierboven.
+              <strong className="text-ink">De pijplijn van Skool Workshop.</strong> Aanvragen als
+              kaarten in de fases hierboven, en een gewonnen deal die een boeking wordt.
+            </li>
+            <li>
+              <strong className="text-ink">Eigen formulieren.</strong> Nu komen nieuwe aanvragen nog
+              bij HubSpot binnen en niet in dit systeem.
             </li>
           </ul>
         </CardBody>

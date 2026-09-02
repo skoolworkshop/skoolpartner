@@ -1,3 +1,20 @@
-/** Stubs voor de visuele controle: geen server, alleen de beginstand. */
-export const submitParkingRequest = async () => ({ status: "idle" as const });
+/**
+ * Stubs voor de visuele controle: geen server, alleen de beginstand.
+ *
+ * De harness bundelt de echte componenten, en die importeren serveracties.
+ * Die kunnen hier niet draaien, dus ze worden vervangen door iets wat niets
+ * doet. De opmaak blijft daarmee wel de echte.
+ */
+const niets = async () => ({ status: "idle" as const });
+
+export const submitParkingRequest = niets;
 export const kiesMerk = async () => {};
+
+export const setRelatieProfielAction = niets;
+export const markeerContactAction = niets;
+export const bewaarContactAction = niets;
+export const bewaarPeriodeAction = niets;
+export const meldDeelnemerAanAction = niets;
+export const zetFaseAction = niets;
+export const bewaarBetalingAction = niets;
+export const verplaatsNaarPeriodeAction = niets;

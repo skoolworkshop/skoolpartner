@@ -57,9 +57,12 @@ const require_ = createRequire(import.meta.url);
 const { html } = require_(path.join(out, "bundle.cjs"));
 
 // Tailwind los draaien over de bronbestanden, zodat alle klassen meekomen.
+// De paden staan tussen aanhalingstekens omdat een map met een spatie erin
+// anders als twee argumenten wordt gelezen. Op Windows staat een project vaak
+// onder een pad met spaties.
 execSync(
-  `npx @tailwindcss/cli -i src/app/globals.css -o ${path.join(out, "harness.css")} --minify`,
-  { stdio: "inherit" }
+  `npx @tailwindcss/cli -i "src/app/globals.css" -o "${path.join(out, "harness.css")}" --minify`,
+  { stdio: "inherit", shell: true }
 );
 
 writeFileSync(

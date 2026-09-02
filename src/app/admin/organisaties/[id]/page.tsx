@@ -20,6 +20,8 @@ import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import { OrgLogo } from "@/components/portal/org-logo";
+import { RelatieBlok } from "@/components/admin/relatie-blok";
+import { getRelatieProfiel } from "@/lib/crm/relaties";
 import {
   clearOrganizationLogoAction,
   fetchOrganizationLogoAction,
@@ -53,10 +55,11 @@ export default async function OrganizationDetailPage({
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
 
-  const [settings, tegoed, tegoedMutaties] = await Promise.all([
+  const [settings, tegoed, tegoedMutaties, relatie] = await Promise.all([
     getSettings(),
     getCreditBalanceForAdmin(id),
     getCreditTransactionsForAdmin(id, 25),
+    getRelatieProfiel(id),
   ]);
   const members = detail.members as unknown as MemberRow[];
   const mbContacten = detail.moneybirdContacts as unknown as {
@@ -397,6 +400,14 @@ export default async function OrganizationDetailPage({
             </ActionForm>
           </CardBody>
         </Card>
+
+        <RelatieBlok
+          organizationId={id}
+          profiel={relatie.profiel}
+          contacten={relatie.contacten}
+          beheerders={relatie.beheerders}
+          vandaag={new Date().toISOString().slice(0, 10)}
+        />
 
         <Card>
           <CardHeader title="Geverifieerde contactpersonen" description="Bepaalt welke e-mailthreads zichtbaar zijn." />
