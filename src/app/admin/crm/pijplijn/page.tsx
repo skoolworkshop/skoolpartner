@@ -22,7 +22,9 @@ function KolomKaart({ kolom }: { kolom: Kolom }) {
   const toon = kolom.fase.is_won ? "gewonnen" : kolom.fase.is_lost ? "verloren" : "lopend";
 
   return (
-    <section className="min-w-0">
+    // Het anker maakt het mogelijk om vanaf het dashboard rechtstreeks naar een
+    // fase te springen. Verder verandert er niets aan dit scherm.
+    <section id={`fase-${kolom.fase.key}`} className="min-w-0 scroll-mt-24">
       <div className="mb-2 flex items-baseline justify-between gap-2 px-1">
         <h2
           className={cn(

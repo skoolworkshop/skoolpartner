@@ -3,13 +3,27 @@ import type { Metadata } from "next";
 import { Alert } from "@/components/ui/feedback";
 import { requireAdmin } from "@/lib/auth/session";
 import { hasServiceRole } from "@/lib/env";
-import { getActiefMerk } from "@/lib/crm/actief-merk";
-import { getCijfers, getFases } from "@/lib/crm/queries";
-import { CrmOverzicht } from "@/app/admin/crm/crm-overzicht";
+import { getDashboard } from "@/lib/crm/dashboard";
+import { isPeriodeKey, maakPeriode, parseMerkFilter } from "@/lib/crm/dashboard-berekening";
+import { DashboardScherm } from "@/app/admin/crm/dashboard-scherm";
 
 export const metadata: Metadata = { title: "CRM" };
 
-export default async function CrmPagina() {
+/**
+ * Het commerciele dashboard van het CRM.
+ *
+ * Het merkfilter staat hier bewust in de adresbalk en niet in de merkcookie
+ * die de rest van het CRM gebruikt. Twee redenen: op dit scherm wil je ook
+ * "Alles" kunnen kiezen, wat op de andere schermen geen zinnige stand is, en
+ * een filter dat je hier zet hoort de pijplijn en de contactenlijst niet stil
+ * om te gooien. De schermen die de cookie gebruiken blijven dus precies doen
+ * wat ze deden.
+ */
+export default async function CrmPagina({
+  searchParams,
+}: {
+  searchParams: Promise<{ periode?: string; merk?: string; vanaf?: string; tot?: string }>;
+}) {
   await requireAdmin();
 
   if (!hasServiceRole()) {
@@ -21,8 +35,23 @@ export default async function CrmPagina() {
     );
   }
 
-  const merk = await getActiefMerk();
-  const [fases, cijfers] = await Promise.all([getFases(merk), getCijfers(merk)]);
+  const params = await searchParams;
+  const vandaag = new Date().toISOString().slice(0, 10);
+  const merk = parseMerkFilter(params.merk);
+  const periode = maakPeriode(isPeriodeKey(params.periode) ? params.periode : "deze-maand", vandaag, {
+    vanaf: params.vanaf ?? null,
+    tot: params.tot ?? null,
+  });
 
-  return <CrmOverzicht merk={merk} fases={fases} cijfers={cijfers} />;
+  const cijfers = await getDashboard(periode, merk, vandaag);
+
+  return (
+    <DashboardScherm
+      cijfers={cijfers}
+      periode={periode}
+      merk={merk}
+      vandaag={vandaag}
+      aangepast={{ vanaf: params.vanaf ?? null, tot: params.tot ?? null }}
+    />
+  );
 }
