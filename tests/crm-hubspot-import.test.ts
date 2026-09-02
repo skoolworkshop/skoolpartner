@@ -269,6 +269,21 @@ describe("deals", () => {
     });
   });
 
+  it("haalt HTML-entiteiten uit de dealnaam", () => {
+    const uitkomst = leesDeal(
+      {
+        id: "205",
+        dealname: "Kbs Petrus &amp; Paulus -&nbsp;Workshop Ghetto Drums",
+        dealstage: "729498082",
+        contactIds: ["101"],
+      },
+      OPTIES
+    );
+    expect(uitkomst.ok).toBe(true);
+    if (!uitkomst.ok) return;
+    expect(uitkomst.rij.title).toBe("Kbs Petrus & Paulus - Workshop Ghetto Drums");
+  });
+
   it("slaat een deal zonder contact over, want die kan nergens aan hangen", () => {
     const uitkomst = leesDeal(
       { id: "202", dealname: "Losse deal", dealstage: "closedlost", contactIds: [] },

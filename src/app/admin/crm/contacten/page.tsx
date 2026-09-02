@@ -189,7 +189,7 @@ export default async function ContactenPagina({
                       <td className="px-3 py-3">
                         {organisatieNaam ? (
                           <Link
-                            href={`/admin/organisaties/${contact.organization_id}`}
+                            href={`/admin/crm/organisaties/${contact.organization_id}`}
                             className="text-muted underline-offset-4 hover:text-ink hover:underline"
                           >
                             {organisatieNaam}

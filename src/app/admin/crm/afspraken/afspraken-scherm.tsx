@@ -23,7 +23,7 @@ function Onderwerp({ afspraak }: { afspraak: Afspraak }) {
     delen.push(
       <Link
         key="org"
-        href={`/admin/organisaties/${afspraak.organizationId}`}
+        href={`/admin/crm/organisaties/${afspraak.organizationId}`}
         className="underline-offset-4 hover:text-ink hover:underline"
       >
         {afspraak.organisatieNaam}

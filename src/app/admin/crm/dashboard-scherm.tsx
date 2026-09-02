@@ -625,7 +625,7 @@ export function DashboardScherm({
                           afspraak.dealId
                             ? `/admin/crm/deal/${afspraak.dealId}`
                             : afspraak.organizationId
-                              ? `/admin/organisaties/${afspraak.organizationId}`
+                              ? `/admin/crm/organisaties/${afspraak.organizationId}`
                               : "/admin/crm/afspraken"
                         }
                         className="min-w-0 truncate underline-offset-4 hover:underline"
@@ -703,7 +703,7 @@ export function DashboardScherm({
                           afspraak.dealId
                             ? `/admin/crm/deal/${afspraak.dealId}`
                             : afspraak.organizationId
-                              ? `/admin/organisaties/${afspraak.organizationId}`
+                              ? `/admin/crm/organisaties/${afspraak.organizationId}`
                               : "/admin/crm/afspraken"
                         }
                         className="min-w-0 truncate underline-offset-4 hover:underline"
@@ -732,7 +732,7 @@ export function DashboardScherm({
                           afspraak.dealId
                             ? `/admin/crm/deal/${afspraak.dealId}`
                             : afspraak.organizationId
-                              ? `/admin/organisaties/${afspraak.organizationId}`
+                              ? `/admin/crm/organisaties/${afspraak.organizationId}`
                               : "/admin/crm/afspraken"
                         }
                         className="min-w-0 truncate underline-offset-4 hover:underline"
@@ -961,7 +961,7 @@ export function DashboardScherm({
                       className="flex items-baseline justify-between gap-3 border-b border-line-soft px-5 py-2.5 text-sm last:border-b-0"
                     >
                       <Link
-                        href={`/admin/organisaties/${org.organizationId}`}
+                        href={`/admin/crm/organisaties/${org.organizationId}`}
                         className="min-w-0 truncate underline-offset-4 hover:underline"
                       >
                         {naam(org.organizationId)}
@@ -1016,7 +1016,7 @@ export function DashboardScherm({
                       className="flex items-baseline justify-between gap-3 text-sm"
                     >
                       <Link
-                        href={`/admin/organisaties/${org.organizationId}`}
+                        href={`/admin/crm/organisaties/${org.organizationId}`}
                         className="min-w-0 truncate underline-offset-4 hover:underline"
                       >
                         {naam(org.organizationId)}

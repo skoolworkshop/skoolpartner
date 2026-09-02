@@ -34,7 +34,7 @@ function Regel({ relatie }: { relatie: Relatie }) {
   return (
     <li>
       <Link
-        href={`/admin/organisaties/${relatie.id}`}
+        href={`/admin/crm/organisaties/${relatie.id}`}
         className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-5 py-3.5 transition-colors last:border-b-0 hover:bg-surface-2"
       >
         <span className="min-w-0 flex-1 basis-full sm:basis-auto">

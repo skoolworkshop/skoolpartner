@@ -344,41 +344,92 @@ const plan = {
 
 writeFileSync(path.join(cache, "plan.json"), JSON.stringify(plan, null, 2), "utf8");
 
+// Puntkomma's, aanhalingstekens en regeleindes komen in dealnamen echt voor.
+// Zonder aanhalingstekens eromheen schuift een tabel dan een kolom op, en dan
+// klopt precies het bestand niet dat je gebruikt om te controleren.
+function veld(waarde) {
+  const tekst = String(waarde ?? "");
+  return /[";\r\n]/.test(tekst) ? `"${tekst.replace(/"/g, '""')}"` : tekst;
+}
+
 function csv(rijen) {
   if (!rijen.length) return "";
   const kolommen = Object.keys(rijen[0]);
   const regels = [kolommen.join(";")];
-  for (const rij of rijen) regels.push(kolommen.map((k) => String(rij[k] ?? "")).join(";"));
+  for (const rij of rijen) regels.push(kolommen.map((k) => veld(rij[k])).join(";"));
   return regels.join("\r\n");
 }
 
 writeFileSync(path.join(cache, "uitgesloten-contacten.csv"), csv(uitgeslotenContacten), "utf8");
-writeFileSync(
-  path.join(cache, "uitgesloten-afspraken.csv"),
-  csv(
-    afsprakenGekoppeld.zonder.map((a) => ({
-      hubspot_id: a.hubspot_id,
-      titel: a.title,
-      start: a.starts_at,
-      stand: a.status,
-      contacten: a.contact_hubspot_ids.join(" "),
-    }))
-  ),
-  "utf8"
-);
-writeFileSync(
-  path.join(cache, "uitgesloten-deals.csv"),
-  csv(
-    dealsGekoppeld.zonder.map((d) => ({
-      hubspot_id: d.hubspot_id,
-      titel: d.title,
-      fase: d.stage_key,
-      bedrag: d.value_cents / 100,
-      contacten: d.contact_hubspot_ids.join(" "),
-    }))
-  ),
-  "utf8"
-);
+
+/*
+  DE UITGESLOTEN RECORDS, MET NAAM EN TOENAAM
+
+  De eerste versie schreef hier alleen de records waarvan het contact niet
+  meekwam. Zodra dat was opgelost bleven de bestanden leeg, terwijl er nog
+  steeds elf deals afvielen om een andere reden. Een leeg bestand naast een
+  rapport dat elf uitsluitingen meldt, is erger dan geen bestand: het suggereert
+  dat er niets te zien is.
+
+  Nu staat elk record dat niet meekomt erin, met de reden erbij, ongeacht waar
+  in de omzetting het is afgevallen.
+*/
+function uitgeslotenLijst(bron, uitkomsten, velden) {
+  const rijen = [];
+  bron.forEach((record, i) => {
+    const uitkomst = uitkomsten[i];
+    if (uitkomst.ok) return;
+    rijen.push({ hubspot_id: String(record.id), reden: uitkomst.reden, ...velden(record) });
+  });
+  return rijen;
+}
+
+const uitgeslotenDeals = [
+  ...uitgeslotenLijst(bronDeals, dealUitkomsten, (d) => ({
+    titel: omzetting.schoon(omzetting.naarPlatteTekst(d.dealname)),
+    fase: omzetting.HUBSPOT_FASES[omzetting.schoon(d.dealstage)]?.label ?? omzetting.schoon(d.dealstage),
+    bedrag: omzetting.leesBedrag(d.amount) / 100,
+    sluitdatum: omzetting.leesMoment(d.closedate)?.slice(0, 10) ?? "",
+  })),
+  ...dealsGekoppeld.zonder.map((d) => ({
+    hubspot_id: d.hubspot_id,
+    reden: "gekoppeld contact komt zelf niet mee",
+    titel: d.title,
+    fase: d.stage_key,
+    bedrag: d.value_cents / 100,
+    sluitdatum: d.expected_date ?? "",
+  })),
+];
+
+const uitgeslotenAfspraken = [
+  ...uitgeslotenLijst(bronAfspraken, afspraakUitkomsten, (a) => ({
+    titel: omzetting.schoon(omzetting.naarPlatteTekst(a.hs_meeting_title)),
+    start: omzetting.leesMoment(a.hs_meeting_start_time) ?? "",
+  })),
+  ...afsprakenGekoppeld.zonder.map((a) => ({
+    hubspot_id: a.hubspot_id,
+    reden: "gekoppeld contact komt zelf niet mee",
+    titel: a.title,
+    start: a.starts_at,
+  })),
+];
+
+const uitgeslotenNotities = [
+  ...uitgeslotenLijst(bronNotities, notitieUitkomsten, (n) => ({
+    tekst: omzetting.samenvatting(omzetting.naarPlatteTekst(n.hs_note_body)),
+    wanneer: omzetting.leesMoment(n.hs_timestamp) ?? "",
+  })),
+  ...notitiesGekoppeld.zonder.map((n) => ({
+    hubspot_id: n.hubspot_id,
+    reden: "gekoppeld contact komt zelf niet mee",
+    tekst: n.summary,
+    wanneer: n.occurred_at,
+  })),
+];
+
+writeFileSync(path.join(cache, "uitgesloten-deals.csv"), csv(uitgeslotenDeals), "utf8");
+writeFileSync(path.join(cache, "uitgesloten-afspraken.csv"), csv(uitgeslotenAfspraken), "utf8");
+writeFileSync(path.join(cache, "uitgesloten-notities.csv"), csv(uitgeslotenNotities), "utf8");
 
 /* -------------------------------------------------------------------------- */
 /* Op het scherm                                                               */

@@ -10,8 +10,6 @@ import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select } from "@/components/ui/form";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { requireAdmin } from "@/lib/auth/session";
-import { getFragmentHulp } from "@/lib/crm/fragmenten";
-import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { getOrganizationDetail } from "@/lib/admin/queries";
 import {
   getCreditBalanceForAdmin,
@@ -22,11 +20,10 @@ import { formatEuroCents, formatPoints, formatShortDate } from "@/lib/format";
 import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import { OrgLogo } from "@/components/portal/org-logo";
-import { RelatieBlok } from "@/components/admin/relatie-blok";
-import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
-import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
-import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
+
 import { getRelatieProfiel } from "@/lib/crm/relaties";
+import { LifecycleBadge } from "@/components/admin/crm-badges";
+import type { Lifecycle } from "@/lib/crm/regels";
 import {
   clearOrganizationLogoAction,
   fetchOrganizationLogoAction,
@@ -55,26 +52,16 @@ export default async function OrganizationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const sessie = await requireAdmin();
+  await requireAdmin();
   const { id } = await params;
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
-
-  const fragmentHulp = await getFragmentHulp({ organizationId: id }, { naam: sessie.profile?.full_name ?? null, email: sessie.email });
-
-  // De afspraken bij dit onderwerp. Eerst wat blijft liggen, dan wat er
-  // aankomt: dat is de volgorde waarin je ernaar kijkt.
-  const afsprakenIndeling = deelIn(await getAfspraken({ organizationId: id }), new Date().toISOString());
 
   const [settings, tegoed, tegoedMutaties, relatie] = await Promise.all([
     getSettings(),
     getCreditBalanceForAdmin(id),
     getCreditTransactionsForAdmin(id, 25),
     getRelatieProfiel(id),
-  ]);
-  const [tijdlijn, taken] = await Promise.all([
-    getTijdlijn({ organizationId: id }),
-    getTakenVoor({ organizationId: id }),
   ]);
   const members = detail.members as unknown as MemberRow[];
   const mbContacten = detail.moneybirdContacts as unknown as {
@@ -416,35 +403,44 @@ export default async function OrganizationDetailPage({
           </CardBody>
         </Card>
 
-        <RelatieBlok
-          organizationId={id}
-          profiel={relatie.profiel}
-          contacten={relatie.contacten}
-          beheerders={relatie.beheerders}
-          deals={relatie.deals}
-          omzetCents={relatie.omzetCents}
-          openWaardeCents={relatie.openWaardeCents}
-          vandaag={new Date().toISOString().slice(0, 10)}
-        />
+        {/*
+          HIER STOND HET COMMERCIELE DEEL
 
-        <TijdlijnBlok
-          onderwerp={{ organizationId: id }}
-          regels={tijdlijn}
-          fragmenten={fragmentHulp.fragmenten}
-          fragmentContext={fragmentHulp.context}
-        />
+          De levensfase, de eigenaar, de personen in het CRM, de deals, de
+          tijdlijn, de taken en de afspraken stonden tussen de punten, het
+          tegoed, de domeinen en de knop om deze organisatie te verwijderen.
+          Twee verschillende soorten werk op een scherm.
 
-        <TakenBlok
-          onderwerp={{ organizationId: id }}
-          taken={taken}
-          beheerders={relatie.beheerders}
-        />
-
-        <AfsprakenBlok
-          onderwerp={{ organizationId: id }}
-          indeling={afsprakenIndeling}
-          beheerders={relatie.beheerders}
-        />
+          Ze zijn niet weg, ze staan op de CRM-pagina van dezelfde organisatie.
+          Er is niets aan die blokken veranderd; alleen waar ze staan.
+        */}
+        <Card>
+          <CardHeader
+            title="Commercieel"
+            description="Levensfase, eigenaar, personen, deals, tijdlijn, taken en afspraken staan in het CRM."
+          />
+          <CardBody className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <LifecycleBadge waarde={(relatie.profiel?.lifecycle ?? "klant") as Lifecycle} />
+              {relatie.eigenaarNaam ? (
+                <span className="rounded-pill bg-surface-3 px-2.5 py-1 text-xs font-semibold text-muted">
+                  Eigenaar {relatie.eigenaarNaam}
+                </span>
+              ) : null}
+              {relatie.deals.length > 0 ? (
+                <span className="rounded-pill bg-surface-3 px-2.5 py-1 text-xs font-semibold text-muted">
+                  {relatie.deals.length} {relatie.deals.length === 1 ? "deal" : "deals"}
+                </span>
+              ) : null}
+            </div>
+            <Link
+              href={`/admin/crm/organisaties/${id}`}
+              className="inline-flex min-h-9 items-center rounded-pill border border-line bg-white px-3.5 text-sm font-semibold text-ink hover:bg-surface-2"
+            >
+              Commercieel overzicht openen
+            </Link>
+          </CardBody>
+        </Card>
 
         <Card>
           <CardHeader title="Geverifieerde contactpersonen" description="Bepaalt welke e-mailthreads zichtbaar zijn." />

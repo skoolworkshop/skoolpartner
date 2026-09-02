@@ -78,7 +78,7 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
       <h1 className="mb-1 text-[30px]">{deal.title}</h1>
       <p className="mb-6 text-[15px] text-muted">
         {organisatieNaam ? (
-          <Link href={`/admin/organisaties/${deal.organization_id}`} className="underline">
+          <Link href={`/admin/crm/organisaties/${deal.organization_id}`} className="underline">
             {organisatieNaam}
           </Link>
         ) : (

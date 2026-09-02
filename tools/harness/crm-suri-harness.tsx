@@ -5,7 +5,7 @@ import {
   type DeelnemerRegelGegevens,
   type PeriodeKaartGegevens,
 } from "@/components/admin/periode-kaart";
-import { RelatieBlok } from "@/components/admin/relatie-blok";
+import { RelatiePersonen, RelatieProfiel } from "@/components/admin/relatie-blok";
 import { LifecycleBadge, StilteBadge } from "@/components/admin/crm-badges";
 import { bezetting, contactStilte, type Lifecycle } from "@/lib/crm/regels";
 
@@ -133,7 +133,7 @@ export function Harness() {
 
       <Scherm titel="Het relatieblok op de organisatiepagina">
         <div className="grid gap-5 lg:grid-cols-2">
-          <RelatieBlok
+          <RelatieProfiel
             organizationId="demo"
             vandaag="2026-09-01"
             profiel={{
@@ -147,6 +147,14 @@ export function Harness() {
               created_at: "2026-06-14T10:00:00.000Z",
               updated_at: "2026-06-14T10:00:00.000Z",
             }}
+            beheerders={[
+              { id: "u1", naam: "Clinten" },
+              { id: "u2", naam: "Collega" },
+            ]}
+          />
+
+          <RelatiePersonen
+            organizationId="demo"
             contacten={[
               {
                 id: "c1",
@@ -168,10 +176,6 @@ export function Harness() {
                 created_at: "2026-06-14T10:00:00.000Z",
                 updated_at: "2026-06-14T10:00:00.000Z",
               },
-            ]}
-            beheerders={[
-              { id: "u1", naam: "Clinten" },
-              { id: "u2", naam: "Collega" },
             ]}
           />
         </div>

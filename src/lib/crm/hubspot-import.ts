@@ -401,7 +401,13 @@ export function leesDeal(bron: HubSpotDeal, opties: DealOpties): Uitkomst<DealRi
   const hubspotId = schoon(bron.id);
   if (!hubspotId) return { ok: false, reden: "geen recordnummer" };
 
-  const titel = schoon(bron.dealname);
+  /*
+    Namen uit HubSpot bevatten HTML-entiteiten. In de export staat bijvoorbeeld
+    "Kbs Petrus &amp; Paulus -&nbsp;Workshop Ghetto Drums". Die letterlijk
+    overnemen levert een dealnaam op waar &amp; in staat, en dat is precies het
+    soort ruis dat je nooit meer opruimt zodra het er eenmaal in zit.
+  */
+  const titel = schoon(naarPlatteTekst(bron.dealname));
   if (titel.length < 2) return { ok: false, reden: "geen bruikbare naam" };
 
   // Een deal zonder contact heeft in SkoolPartner niets om aan te hangen: de
@@ -521,7 +527,7 @@ export function leesAfspraak(bron: HubSpotMeeting, nu: Date): Uitkomst<AfspraakR
   */
   const status: AfspraakRij["status"] = gemeld ?? (beginMs < nu.getTime() ? "gehouden" : "gepland");
 
-  const titel = schoon(bron.hs_meeting_title) || "Afspraak uit HubSpot";
+  const titel = schoon(naarPlatteTekst(bron.hs_meeting_title)) || "Afspraak uit HubSpot";
 
   return {
     ok: true,

@@ -86,7 +86,7 @@ export function PortalUitleg({
           href={`/admin/organisaties/${organizationId}`}
           className="mt-2 inline-flex min-h-9 items-center rounded-pill bg-white px-4 text-sm font-semibold text-ink"
         >
-          Naar de organisatie
+          Naar het organisatiebeheer
         </Link>
       ) : null}
     </div>

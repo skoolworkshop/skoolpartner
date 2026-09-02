@@ -15,28 +15,33 @@ import {
 } from "@/app/admin/crm/actions";
 
 /**
- * Het commerciele blok op de organisatiepagina.
+ * De commerciele blokken van een organisatie.
  *
- * Bewust hier en niet op een eigen relatiekaart. Admin > Organisaties toont al
- * boekingen, facturen, punten, tegoed, gebruikers en geverifieerde
- * contactpersonen. Daar nog een tweede scherm naast zetten met dezelfde
- * gegevens levert twee halve waarheden op in plaats van een hele.
+ * ============================================================================
+ * DRIE LOSSE ONDERDELEN, GEEN EEN GROOT BLOK
+ * ============================================================================
+ *
+ * Ze stonden eerst als een blok onder elkaar op de beheerpagina van een
+ * organisatie, tussen de punten, het tegoed, de domeinen en de facturen. Dat
+ * betekende dat het commerciele en het operationele deel door elkaar liepen:
+ * op hetzelfde scherm stond zowel "welke levensfase heeft deze school" als
+ * "verwijder deze organisatie definitief".
+ *
+ * Nu staan ze los, zodat de CRM-pagina van een organisatie ze kan verdelen
+ * over zijn kolommen: het profiel links, de personen en de deals rechts. Wat
+ * er in staat is niet veranderd.
  */
-export function RelatieBlok({
+export function RelatieProfiel({
   organizationId,
   profiel,
-  contacten,
   beheerders,
   vandaag,
-  deals = [],
   omzetCents = 0,
   openWaardeCents = 0,
 }: {
   organizationId: string;
   profiel: CrmOrganizationProfileRow | null;
-  contacten: CrmContactRow[];
   beheerders: { id: string; naam: string }[];
-  deals?: OrganisatieDeal[];
   omzetCents?: number;
   openWaardeCents?: number;
   /** Als "2026-09-01". Meegegeven zodat dit onderdeel testbaar en voorspelbaar blijft. */
@@ -65,7 +70,14 @@ export function RelatieBlok({
 
           <ActionForm action={setRelatieProfielAction} submitLabel="Opslaan">
             <input type="hidden" name="organizationId" value={organizationId} />
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/*
+              Een kolom, geen twee. Deze blokken staan sinds de nieuwe indeling
+              in een kolom van ongeveer 320 pixels breed. Twee velden naast
+              elkaar betekent daar een datumveld dat wordt afgekapt en labels
+              die over drie regels breken. Op een smalle plek is onder elkaar
+              rustiger en beter leesbaar.
+            */}
+            <div className="grid gap-4">
               <Field label="Levensfase" htmlFor="lifecycle" required showOptional={false}>
                 <Select id="lifecycle" name="lifecycle" defaultValue={lifecycle}>
                   {Object.entries(LIFECYCLE_LABELS).map(([waarde, label]) => (
@@ -123,7 +135,19 @@ export function RelatieBlok({
           </div>
         </CardBody>
       </Card>
+    </>
+  );
+}
 
+export function RelatiePersonen({
+  organizationId,
+  contacten,
+}: {
+  organizationId: string;
+  contacten: CrmContactRow[];
+}) {
+  return (
+    <>
       <Card>
         <CardHeader
           title="Personen in het CRM"
@@ -156,10 +180,18 @@ export function RelatieBlok({
             ))}
           </ul>
         ) : null}
-        <CardBody className={contacten.length > 0 ? "border-t border-line-soft" : undefined}>
+        {/*
+          Het toevoegformulier is ingeklapt. Een persoon toevoegen doe je af en
+          toe; de lijst lezen doe je elke keer.
+        */}
+        <details className={contacten.length > 0 ? "border-t border-line-soft" : undefined}>
+          <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+            Persoon toevoegen
+          </summary>
+          <CardBody className="pt-0">
           <ActionForm action={bewaarContactAction} submitLabel="Persoon toevoegen" variant="secondary">
             <input type="hidden" name="organizationId" value={organizationId} />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4">
               <Field label="Naam" htmlFor="crm-fullName" required showOptional={false}>
                 <Input id="crm-fullName" name="fullName" required autoComplete="off" />
               </Field>
@@ -174,9 +206,15 @@ export function RelatieBlok({
               </Field>
             </div>
           </ActionForm>
-        </CardBody>
+          </CardBody>
+        </details>
       </Card>
+    </>
+  );
+}
 
+export function RelatieDeals({ deals = [] }: { deals?: OrganisatieDeal[] }) {
+  return (
       <Card>
         <CardHeader
           title={`Deals (${deals.length})`}
@@ -212,6 +250,5 @@ export function RelatieBlok({
           </CardBody>
         )}
       </Card>
-    </>
   );
 }

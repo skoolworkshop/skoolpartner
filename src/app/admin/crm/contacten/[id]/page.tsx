@@ -69,7 +69,7 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
       <p className="mb-4 text-[15px] text-muted">
         {contact.job_title ? `${contact.job_title} · ` : ""}
         {organisatieNaam ? (
-          <Link href={`/admin/organisaties/${contact.organization_id}`} className="underline">
+          <Link href={`/admin/crm/organisaties/${contact.organization_id}`} className="underline">
             {organisatieNaam}
           </Link>
         ) : (
@@ -173,7 +173,8 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
               <div className="px-5 pb-5">
                 <ActionForm action={bewaarContactAction} submitLabel="Opslaan" variant="secondary">
                   <input type="hidden" name="contactId" value={contact.id} />
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  {/* Een kolom: dit formulier staat in de smalle linkerkolom. */}
+                  <div className="grid gap-4">
                     <Field label="Naam" htmlFor="naam" required showOptional={false}>
                       <Input id="naam" name="fullName" defaultValue={contact.full_name} required />
                     </Field>
