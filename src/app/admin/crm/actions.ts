@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth/session";
-import { parseMerk } from "@/lib/crm/merk";
+import { isMerk, parseMerk } from "@/lib/crm/merk";
 import { MERK_COOKIE, MERK_COOKIE_MAX_AGE } from "@/lib/crm/actief-merk";
 import {
   bedragNaarCenten,
@@ -30,6 +30,17 @@ import {
   werkDealBij,
 } from "@/lib/crm/pijplijn";
 import { isContactType, koppelPortalAccount } from "@/lib/crm/contacten";
+import { archiveerTemplate, bewaarTemplate } from "@/lib/crm/templates";
+import {
+  bewaarSequence,
+  isStapSoort,
+  meldAan,
+  stapGedaan,
+  stopDeelname,
+  verplaatsStap,
+  verwijderStap,
+  voegStapToe,
+} from "@/lib/crm/sequences";
 import { archiveerFragment, bewaarFragment, legGebruikVast } from "@/lib/crm/fragmenten";
 import { bewaarAfspraak, zetAfspraakStand } from "@/lib/crm/afspraken";
 import { bewaarBoekingsLink, zetLinkAan } from "@/lib/crm/boekingslinks";
@@ -812,4 +823,179 @@ export async function verplaatsDealAction(
       fout: error instanceof Error ? error.message : "De fase kon niet worden bijgewerkt.",
     };
   }
+}
+
+// -----------------------------------------------------------------------------
+// Templates
+// -----------------------------------------------------------------------------
+
+export async function bewaarTemplateAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const merk = optioneel(formData, "brand");
+
+    await bewaarTemplate(
+      {
+        id: optioneel(formData, "id"),
+        brand: merk && isMerk(merk) ? merk : null,
+        name: tekst(formData, "name"),
+        subject: tekst(formData, "subject"),
+        body: tekst(formData, "body"),
+        category: optioneel(formData, "category"),
+      },
+      wie
+    );
+
+    revalidatePath("/admin/crm/templates");
+    return { status: "ok", message: "Het template staat erin." };
+  });
+}
+
+export async function archiveerTemplateAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const terug = tekst(formData, "terughalen") === "ja";
+
+    await archiveerTemplate(tekst(formData, "id"), !terug, wie);
+
+    revalidatePath("/admin/crm/templates");
+    return {
+      status: "ok",
+      message: terug ? "Het template staat weer in de lijst." : "Het template is gearchiveerd.",
+    };
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Sequences
+// -----------------------------------------------------------------------------
+
+export async function bewaarSequenceAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const merk = parseMerk(tekst(formData, "brand")) ?? "skool_workshop";
+
+    const id = await bewaarSequence(
+      {
+        id: optioneel(formData, "id"),
+        brand: merk,
+        name: tekst(formData, "name"),
+        description: optioneel(formData, "description"),
+        senderId: optioneel(formData, "senderId"),
+        isActive: tekst(formData, "isActive") === "ja",
+      },
+      wie
+    );
+
+    revalidatePath("/admin/crm/sequences");
+    revalidatePath(`/admin/crm/sequences/${id}`);
+    return { status: "ok", message: "De reeks is opgeslagen." };
+  });
+}
+
+export async function voegStapToeAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const sequenceId = tekst(formData, "sequenceId");
+    const soort = tekst(formData, "kind");
+
+    await voegStapToe(
+      {
+        sequenceId,
+        kind: isStapSoort(soort) ? soort : "taak",
+        waitDays: Number(tekst(formData, "waitDays") || "0"),
+        templateId: optioneel(formData, "templateId"),
+        title: optioneel(formData, "title"),
+        note: optioneel(formData, "note"),
+      },
+      wie
+    );
+
+    revalidatePath(`/admin/crm/sequences/${sequenceId}`);
+    return { status: "ok", message: "De stap staat erin." };
+  });
+}
+
+export async function verplaatsStapAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    await actor();
+    const richting = tekst(formData, "richting") === "omhoog" ? "omhoog" : "omlaag";
+
+    await verplaatsStap(tekst(formData, "stapId"), richting);
+
+    revalidatePath(`/admin/crm/sequences/${tekst(formData, "sequenceId")}`);
+    return { status: "ok", message: "De volgorde is aangepast." };
+  });
+}
+
+export async function verwijderStapAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    await actor();
+
+    await verwijderStap(tekst(formData, "stapId"));
+
+    revalidatePath(`/admin/crm/sequences/${tekst(formData, "sequenceId")}`);
+    return { status: "ok", message: "De stap is weg." };
+  });
+}
+
+export async function meldAanSequenceAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const sequenceId = tekst(formData, "sequenceId");
+
+    await meldAan(sequenceId, tekst(formData, "contactId"), wie, optioneel(formData, "dealId"));
+
+    revalidatePath(`/admin/crm/sequences/${sequenceId}`);
+    return { status: "ok", message: "Toegevoegd aan de reeks." };
+  });
+}
+
+export async function stapGedaanAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+
+    await stapGedaan(tekst(formData, "deelnameId"), wie);
+
+    revalidatePath(`/admin/crm/sequences/${tekst(formData, "sequenceId")}`);
+    return { status: "ok", message: "Afgevinkt. De volgende stap staat klaar." };
+  });
+}
+
+export async function stopDeelnameAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+
+    await stopDeelname(tekst(formData, "deelnameId"), tekst(formData, "reden"), wie);
+
+    revalidatePath(`/admin/crm/sequences/${tekst(formData, "sequenceId")}`);
+    return { status: "ok", message: "Uit de reeks gehaald." };
+  });
 }

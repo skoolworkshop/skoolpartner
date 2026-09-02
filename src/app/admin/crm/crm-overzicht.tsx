@@ -32,11 +32,6 @@ export function CrmOverzicht({
         <MerkSchakelaar actief={merk} />
       </div>
 
-      <p className="mb-6 max-w-2xl text-muted">
-        Je kijkt naar <strong className="text-ink">{stijl.label}</strong>. {stijl.omschrijving} De
-        keuze bovenaan bepaalt wat je in het hele CRM ziet en blijft staan als je naar een ander
-        scherm gaat.
-      </p>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>

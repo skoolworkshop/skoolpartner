@@ -172,12 +172,7 @@ export function FragmentenScherm({
 
   return (
     <>
-      <h1 className="mb-1 text-[30px]">Fragmenten</h1>
-      <p className="mb-6 max-w-3xl text-muted">
-        Tekstblokken die je steeds opnieuw gebruikt, met de naam van de school of de deal er
-        automatisch in. Je voegt ze in bij een notitie op de tijdlijn. Er wordt niets verstuurd:
-        wat je invoegt zie je eerst zelf.
-      </p>
+      <h1 className="mb-6 text-[30px]">Fragmenten</h1>
 
       <Card className="mb-6">
         <CardHeader

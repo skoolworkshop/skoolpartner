@@ -122,12 +122,6 @@ export default async function RelatiesPagina({
         <MerkSchakelaar actief={merk} />
       </div>
 
-      <p className="mb-6 max-w-3xl text-muted">
-        Scholen, BSO&apos;s, gemeenten, bedrijven en andere opdrachtgevers. Een organisatie kan
-        meerdere contactpersonen en meerdere deals hebben, en die hoeven geen van allen een
-        klantportaalaccount te hebben. Klik door voor het volledige beeld: contactpersonen,
-        boekingen, facturen, punten, tegoed en de tijdlijn.
-      </p>
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

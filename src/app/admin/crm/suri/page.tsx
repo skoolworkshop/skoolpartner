@@ -59,11 +59,6 @@ export default async function SuriOverzicht() {
         <MerkSchakelaar actief={merk} />
       </div>
 
-      <p className="mb-6 max-w-2xl text-muted">
-        Het Breekjaar wordt per persoon verkocht, met een vast aantal plaatsen per periode. De
-        bezetting hieronder wordt berekend uit de aanmeldingen, dus je hoeft nergens een teller bij
-        te houden.
-      </p>
 
       {komend.length === 0 ? (
         <Card>

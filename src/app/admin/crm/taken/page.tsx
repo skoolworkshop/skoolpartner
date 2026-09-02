@@ -56,11 +56,7 @@ export default async function TakenPagina() {
 
   return (
     <>
-      <h1 className="mb-1 text-[30px]">Taken</h1>
-      <p className="mb-6 max-w-2xl text-muted">
-        Alles wat openstaat, over beide merken heen. Een taak hoeft niet aan een relatie te hangen:
-        niet alles wat moet gebeuren hoort bij een klant.
-      </p>
+      <h1 className="mb-6 text-[30px]">Taken</h1>
 
       {taken.length === 0 ? (
         <Card className="mb-5">

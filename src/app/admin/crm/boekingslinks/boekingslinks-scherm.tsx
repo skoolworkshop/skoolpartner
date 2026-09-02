@@ -204,11 +204,7 @@ export function BoekingsLinksScherm({
 }) {
   return (
     <>
-      <h1 className="mb-1 text-[30px]">Boekingslinks</h1>
-      <p className="mb-6 max-w-3xl text-muted">
-        Een link die je aan een school stuurt, waarmee die zelf een moment kiest uit je vrije tijd.
-        De afspraak komt in het CRM, in je agenda, en de school krijgt meteen een bevestiging.
-      </p>
+      <h1 className="mb-6 text-[30px]">Boekingslinks</h1>
 
       {agendaWaarschuwing ? (
         <Alert tone="warning" title="Je agenda telt nu niet mee" className="mb-6">

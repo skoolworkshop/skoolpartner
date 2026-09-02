@@ -165,12 +165,7 @@ export function AfsprakenScherm({
 
   return (
     <>
-      <h1 className="mb-1 text-[30px]">Afspraken</h1>
-      <p className="mb-6 max-w-3xl text-muted">
-        Gesprekken, bezoeken en belafspraken met scholen en deelnemers. Je plant ze aan bij de
-        deal, de contactpersoon of de organisatie; hier zie je ze allemaal bij elkaar. Er gaat
-        vanuit dit scherm geen uitnodiging de deur uit.
-      </p>
+      <h1 className="mb-6 text-[30px]">Afspraken</h1>
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-card border border-line-soft bg-white p-4 shadow-card">

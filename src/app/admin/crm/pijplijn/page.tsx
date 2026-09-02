@@ -67,8 +67,23 @@ export default async function PijplijnPagina() {
     .order("full_name")
     .limit(1000);
 
-  const lopend = kolommen.filter((k) => !k.fase.is_won && !k.fase.is_lost);
-  const gewonnen = kolommen.find((k) => k.fase.is_won);
+  /*
+    WAT ER OP HET BORD KOMT
+
+    Alleen de fases die niet gearchiveerd zijn. Sinds migratie 039 zijn dat er
+    zes; de fases die daarin zijn samengevoegd bestaan nog wel, maar horen niet
+    meer op het bord. Draait die migratie nog niet, dan is is_archived overal
+    leeg en ziet het bord er precies zo uit als eerst.
+
+    Niet doorgegaan hoort er ook niet bij. Een verloren deal is geen stap in het
+    proces maar een uitkomst, en een permanente kolom met driehonderd afgewezen
+    offertes maakt het bord onleesbaar. Ze staan onder het bord, ingeklapt.
+  */
+  const zichtbaar = kolommen.filter((k) => !k.fase.is_archived);
+  const lopend = zichtbaar.filter((k) => !k.fase.is_won && !k.fase.is_lost);
+  const gewonnen = zichtbaar.find((k) => k.fase.is_won);
+  const verloren = kolommen.filter((k) => k.fase.is_lost);
+  const verlorenDeals = verloren.flatMap((k) => k.deals);
   const openWaarde = lopend.reduce((som, k) => som + k.waardeCents, 0);
   const openAantal = lopend.reduce((som, k) => som + k.deals.length, 0);
 
@@ -83,18 +98,22 @@ export default async function PijplijnPagina() {
     het bord opzij als ze niet passen. Dat is ook hoe je erover praat: een deal
     schuift naar rechts tot hij klaar is.
   */
-  const bordFases = kolommen.map((k) => ({
-    id: k.fase.id,
-    key: k.fase.key,
-    label: k.fase.label,
-    isWon: k.fase.is_won,
-    isLost: k.fase.is_lost,
-  }));
+  const bordFases = zichtbaar
+    .filter((k) => !k.fase.is_lost)
+    .map((k) => ({
+      id: k.fase.id,
+      key: k.fase.key,
+      label: k.fase.label,
+      isWon: k.fase.is_won,
+      isLost: k.fase.is_lost,
+    }));
 
-  const bordDeals = kolommen.flatMap((kolom) =>
+  const bordDeals = zichtbaar
+    .filter((k) => !k.fase.is_lost)
+    .flatMap((kolom) =>
     kolom.deals.map((regel) => ({
-      id: regel.deal.id,
-      stageId: regel.deal.stage_id,
+        id: regel.deal.id,
+        stageId: regel.deal.stage_id,
       titel: regel.deal.title,
       organisatie: regel.organisatieNaam,
       contact: regel.contactNaam,
@@ -103,8 +122,8 @@ export default async function PijplijnPagina() {
       eigenaar: regel.ownerNaam,
       volgendeTaak: regel.volgendeTaak,
       href: `/admin/crm/deal/${regel.deal.id}`,
-    }))
-  );
+      }))
+    );
 
   return (
     <>
@@ -137,6 +156,41 @@ export default async function PijplijnPagina() {
       </div>
 
       <PijplijnBord fases={bordFases} deals={bordDeals} />
+
+      {/*
+        De verloren deals: bereikbaar, maar niet in beeld zolang je ze niet
+        opzoekt. Ze staan op aantal na de nieuwste bovenaan.
+      */}
+      {verlorenDeals.length > 0 ? (
+        <details className="mt-4 rounded-card border border-line-soft bg-white shadow-card">
+          <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+            Niet doorgegaan ({verlorenDeals.length})
+          </summary>
+          <ul className="border-t border-line-soft">
+            {verlorenDeals.slice(0, 100).map((regel) => (
+              <li key={regel.deal.id}>
+                <Link
+                  href={`/admin/crm/deal/${regel.deal.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-2.5 last:border-b-0 hover:bg-surface-2"
+                >
+                  <span className="min-w-0 flex-1 truncate">{regel.deal.title}</span>
+                  <span className="shrink-0 text-sm text-muted">
+                    {regel.organisatieNaam ?? regel.contactNaam ?? ""}
+                  </span>
+                  <span className="shrink-0 text-sm tabular-nums text-muted">
+                    {formatEuroCents(regel.deal.value_cents)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {verlorenDeals.length > 100 ? (
+            <p className="px-5 py-3 text-sm text-muted">
+              De honderd nieuwste staan hier. De rest vind je via de deal zelf.
+            </p>
+          ) : null}
+        </details>
+      ) : null}
 
       {/*
         Ingeklapt. Een aanvraag met de hand invoeren doe je af en toe; naar het

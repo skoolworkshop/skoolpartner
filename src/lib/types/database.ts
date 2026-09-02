@@ -812,6 +812,68 @@ export type CrmMeetingRow = {
 };
 
 /** Een herbruikbaar tekstblok met personalisatie. brand leeg betekent: beide merken. */
+/**
+ * Templates en sequences (migratie 038).
+ *
+ * Met de hand bijgehouden tot `npm run db:types` weer wordt gedraaid tegen een
+ * database waar migratie 038 in staat. Dat is bewust: zonder deze regels kan de
+ * code die de schermen bouwt niet typecheckt worden voordat de migratie is
+ * toegepast, en dan zou je hem pas na het pushen kunnen controleren.
+ */
+export type CrmTemplateRow = {
+  id: string;
+  brand: CrmBrand | null;
+  name: string;
+  subject: string;
+  body: string;
+  category: string | null;
+  is_archived: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrmSequenceRow = {
+  id: string;
+  brand: CrmBrand;
+  name: string;
+  description: string | null;
+  sender_id: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrmSequenceStepRow = {
+  id: string;
+  sequence_id: string;
+  position: number;
+  wait_days: number;
+  kind: string;
+  template_id: string | null;
+  title: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrmSequenceEnrollmentRow = {
+  id: string;
+  sequence_id: string;
+  contact_id: string;
+  deal_id: string | null;
+  status: string;
+  next_step: number;
+  next_action_at: string | null;
+  stop_reason: string | null;
+  started_by: string | null;
+  started_at: string;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CrmSnippetRow = {
   id: string;
   brand: CrmBrand | null;
@@ -999,6 +1061,10 @@ export type Database = {
       crm_meetings: TableDef<CrmMeetingRow>;
       crm_booking_links: TableDef<CrmBookingLinkRow>;
       crm_booking_availability: TableDef<CrmBookingAvailabilityRow>;
+      crm_templates: TableDef<CrmTemplateRow>;
+      crm_sequences: TableDef<CrmSequenceRow>;
+      crm_sequence_steps: TableDef<CrmSequenceStepRow>;
+      crm_sequence_enrollments: TableDef<CrmSequenceEnrollmentRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;

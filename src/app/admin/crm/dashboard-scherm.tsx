@@ -348,10 +348,6 @@ export function DashboardScherm({
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[30px]">Dashboard</h1>
       </div>
-      <p className="mb-5 max-w-3xl text-muted">
-        Alles op dit scherm komt uit het CRM zelf. Omzet is wat er daadwerkelijk is betaald, niet
-        wat een deal beloofde. Klik door op een getal om te zien waar het vandaan komt.
-      </p>
 
       {/* De twee filters, in een rij boven de cijfers. */}
       <div className="mb-5 space-y-2">

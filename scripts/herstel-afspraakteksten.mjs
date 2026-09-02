@@ -36,6 +36,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { createClient } from "@supabase/supabase-js";
 
 const root = process.cwd();
@@ -69,11 +70,41 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(1);
 }
 
-// Dezelfde opschoonfunctie als het scherm gebruikt. Twee versies van deze regel
-// zou betekenen dat de database en het scherm uit elkaar kunnen lopen.
-const { platteTekst } = await import(
-  pathToFileURL(path.join(root, "src/lib/crm/afspraak-tekst.ts")).href
-);
+/*
+  Dezelfde opschoonfunctie als het scherm gebruikt. Twee versies van deze regel
+  zou betekenen dat de database en het scherm uit elkaar kunnen lopen.
+
+  Node kan sinds versie 22.18 zelf de types uit een .ts-bestand halen. Kan het
+  dat niet, dan bundelen wij het alsnog met esbuild. Precies dezelfde volgorde
+  als in het importscript, en om dezelfde reden.
+*/
+let platteTekst;
+try {
+  ({ platteTekst } = await import(
+    pathToFileURL(path.join(root, "src/lib/crm/afspraak-tekst.ts")).href
+  ));
+} catch (eersteFout) {
+  try {
+    const { build } = await import("esbuild");
+    const uit = path.join(root, ".hubspot-import", "afspraak-tekst.cjs");
+    mkdirSync(path.dirname(uit), { recursive: true });
+    await build({
+      entryPoints: [path.join(root, "src/lib/crm/afspraak-tekst.ts")],
+      bundle: true,
+      format: "cjs",
+      platform: "node",
+      target: "node20",
+      outfile: uit,
+      tsconfig: path.join(root, "tsconfig.json"),
+    });
+    ({ platteTekst } = createRequire(import.meta.url)(uit));
+  } catch (tweedeFout) {
+    console.error("Kon de opschoonfunctie niet laden.");
+    console.error("  Rechtstreeks inlezen:", eersteFout.message);
+    console.error("  Via esbuild:", tweedeFout.message);
+    process.exit(1);
+  }
+}
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },

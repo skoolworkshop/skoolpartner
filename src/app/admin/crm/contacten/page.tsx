@@ -69,13 +69,7 @@ export default async function ContactenPagina({
 
   return (
     <>
-      <h1 className="mb-1 text-[30px]">Contacten</h1>
-      <p className="mb-6 max-w-3xl text-muted">
-        Iedereen die je kent: docenten, cultuurcoördinatoren, decanen, directies, ouders,
-        deelnemers en opdrachtgevers. Een contact is <strong className="text-ink">geen</strong>{" "}
-        SkoolPartner-gebruiker. Alleen wie echt toegang heeft tot het klantportaal krijgt hier een
-        accountlabel.
-      </p>
+      <h1 className="mb-6 text-[30px]">Contacten</h1>
 
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
         <Card>

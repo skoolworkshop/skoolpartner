@@ -40,6 +40,8 @@
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
     "db:verify-crm-hubspot": "node scripts/verify-crm-hubspot.mjs",
     "db:verify-crm-sequences": "node scripts/verify-crm-sequences.mjs",
+    "db:verify-crm-zes-fases": "node scripts/verify-crm-zes-fases.mjs",
+    "db:dryrun-zes-fases": "node scripts/dryrun-zes-fases.mjs",
     "import:hubspot": "node scripts/importeer-hubspot.mjs",
     "import:hubspot:schrijf": "node scripts/importeer-hubspot.mjs --schrijf",
     "import:controle": "node scripts/controleer-import.mjs",

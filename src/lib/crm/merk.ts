@@ -98,6 +98,15 @@ export interface Fase {
   position: number;
   is_won: boolean;
   is_lost: boolean;
+  /**
+   * Een gearchiveerde fase bestaat nog, maar is geen kolom meer op het bord en
+   * is niet meer te kiezen. Zo blijft de historie leesbaar zonder dat de
+   * pijplijn volloopt met fases die niemand meer gebruikt.
+   *
+   * Optioneel getypeerd, want de kolom komt pas met migratie 039. Zolang die
+   * niet is toegepast leest hij als undefined, en dan is niets gearchiveerd.
+   */
+  is_archived?: boolean | null;
 }
 
 export interface FaseOverzicht {
@@ -110,7 +119,15 @@ export interface FaseOverzicht {
 }
 
 export function sorteerFases(fases: Fase[]): FaseOverzicht {
-  const opVolgorde = [...fases].sort((a, b) => a.position - b.position || a.label.localeCompare(b.label));
+  /*
+    Gearchiveerde fases doen niet meer mee. Ze bestaan nog zodat de historie
+    ernaar kan verwijzen, maar je kunt een deal er niet meer in zetten: een fase
+    aanbieden die niet meer op het bord staat, betekent dat een deal daarna
+    nergens meer te zien is.
+  */
+  const opVolgorde = [...fases]
+    .filter((f) => !f.is_archived)
+    .sort((a, b) => a.position - b.position || a.label.localeCompare(b.label));
   return {
     lopend: opVolgorde.filter((f) => !f.is_won && !f.is_lost),
     gewonnen: opVolgorde.find((f) => f.is_won) ?? null,
