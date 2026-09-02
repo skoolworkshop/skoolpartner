@@ -747,6 +747,41 @@ export type CrmTaskRow = {
   updated_at: string;
 };
 
+/** Een openbaar te boeken soort afspraak. */
+export type CrmBookingLinkRow = {
+  id: string;
+  slug: string;
+  name: string;
+  intro: string | null;
+  brand: CrmBrand;
+  meeting_kind: string;
+  meeting_form: string;
+  location: string | null;
+  owner_id: string | null;
+  duration_minutes: number;
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
+  notice_hours: number;
+  horizon_days: number;
+  slot_step_minutes: number;
+  timezone: string;
+  is_active: boolean;
+  max_per_day: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Werktijden per weekdag, in minuten na middernacht in de tijdzone van de link. */
+export type CrmBookingAvailabilityRow = {
+  id: string;
+  link_id: string;
+  weekday: number;
+  start_minute: number;
+  end_minute: number;
+  created_at: string;
+};
+
 /** Een afspraak. Ligt voor je en heeft een begin en een eind; een activiteit ligt achter je. */
 export type CrmMeetingRow = {
   id: string;
@@ -765,6 +800,11 @@ export type CrmMeetingRow = {
   owner_id: string | null;
   source: string;
   calendar_event_id: string | null;
+  booking_link_id: string | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  guest_company: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -956,6 +996,8 @@ export type Database = {
       crm_snippets: TableDef<CrmSnippetRow>;
       crm_snippet_uses: TableDef<CrmSnippetUseRow>;
       crm_meetings: TableDef<CrmMeetingRow>;
+      crm_booking_links: TableDef<CrmBookingLinkRow>;
+      crm_booking_availability: TableDef<CrmBookingAvailabilityRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;

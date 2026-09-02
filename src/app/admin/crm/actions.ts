@@ -32,6 +32,8 @@ import {
 import { isContactType, koppelPortalAccount } from "@/lib/crm/contacten";
 import { archiveerFragment, bewaarFragment, legGebruikVast } from "@/lib/crm/fragmenten";
 import { bewaarAfspraak, zetAfspraakStand } from "@/lib/crm/afspraken";
+import { bewaarBoekingsLink, zetLinkAan } from "@/lib/crm/boekingslinks";
+import { leesKlok, type Werkvenster } from "@/lib/crm/beschikbaarheid";
 import {
   isActiviteitSoort,
   legActiviteitVast,
@@ -692,5 +694,82 @@ export async function zetAfspraakStandAction(
     vernieuw(onderwerp);
     revalidatePath("/admin/crm/afspraken");
     return { status: "ok", message: "Bijgewerkt." };
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Boekingslinks
+// -----------------------------------------------------------------------------
+
+/**
+ * De werktijden uit het formulier lezen.
+ *
+ * Per weekdag een van-veld en een tot-veld. Allebei leeg betekent: die dag niet
+ * beschikbaar. Een van de twee leeg is een vergissing, en die wordt hier
+ * genegeerd in plaats van als halve dag opgeslagen.
+ */
+function venstersUit(formData: FormData): Werkvenster[] {
+  const vensters: Werkvenster[] = [];
+  for (let dag = 0; dag <= 6; dag += 1) {
+    const vanaf = leesKlok(tekst(formData, `vanaf-${dag}`));
+    const tot = leesKlok(tekst(formData, `tot-${dag}`));
+    if (vanaf === null || tot === null) continue;
+    vensters.push({ weekdag: dag, vanafMinuut: vanaf, totMinuut: tot });
+  }
+  return vensters;
+}
+
+function getal(formData: FormData, veld: string, standaard: number): number {
+  const waarde = Number(tekst(formData, veld));
+  return Number.isFinite(waarde) ? waarde : standaard;
+}
+
+export async function bewaarBoekingsLinkAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+
+    await bewaarBoekingsLink(
+      {
+        id: optioneel(formData, "id"),
+        name: tekst(formData, "name"),
+        intro: optioneel(formData, "intro"),
+        brand: optioneel(formData, "brand"),
+        meetingKind: optioneel(formData, "meetingKind"),
+        meetingForm: optioneel(formData, "meetingForm"),
+        location: optioneel(formData, "location"),
+        ownerId: optioneel(formData, "ownerId"),
+        durationMinutes: getal(formData, "durationMinutes", 30),
+        bufferAfterMinutes: getal(formData, "bufferAfterMinutes", 15),
+        noticeHours: getal(formData, "noticeHours", 24),
+        horizonDays: getal(formData, "horizonDays", 60),
+        isActive: tekst(formData, "isActive") !== "nee",
+        vensters: venstersUit(formData),
+      },
+      wie
+    );
+
+    revalidatePath("/admin/crm/boekingslinks");
+    return { status: "ok", message: "De boekingslink is opgeslagen." };
+  });
+}
+
+export async function zetBoekingsLinkAanAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const actief = tekst(formData, "actief") !== "nee";
+
+    await zetLinkAan(tekst(formData, "id"), actief, wie);
+
+    revalidatePath("/admin/crm/boekingslinks");
+    return {
+      status: "ok",
+      message: actief ? "De link staat aan." : "De link staat uit. Bestaande afspraken blijven staan.",
+    };
   });
 }

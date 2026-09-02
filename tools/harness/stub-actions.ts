@@ -30,3 +30,5 @@ export const archiveerFragmentAction = niets;
 export const legFragmentGebruikVastAction = async () => {};
 export const bewaarAfspraakAction = niets;
 export const zetAfspraakStandAction = niets;
+export const bewaarBoekingsLinkAction = niets;
+export const zetBoekingsLinkAanAction = niets;

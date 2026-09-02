@@ -12,6 +12,10 @@ const PUBLIC_PATHS = [
   "/uitnodiging",
   "/wachten",
   "/privacy",
+  // De openbare boekingspagina. Een school die een gesprek inplant, hoort geen
+  // account nodig te hebben. De pagina zelf leest en schrijft via de
+  // serviceclient in een serveractie, met alle controles daar.
+  "/afspraak",
   "/api/webhooks",
   "/api/cron",
 ];

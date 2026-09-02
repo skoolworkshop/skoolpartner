@@ -33,8 +33,19 @@ for (const [naam, breedte] of [
   });
 
   // Loopt er iets buiten het scherm? Dat is op mobiel de klassieke fout.
-  const overloop = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  /*
+    Twee metingen, en de tweede is de belangrijke.
+
+    documentElement staat in dit project op overflow-x: clip. Een element dat
+    te breed is, duwt dan wel de body op maar niet het documentElement, en de
+    eerste meting geeft dan netjes nul terwijl de pagina toch niet klopt.
+    Vandaar dat ook de body wordt gemeten.
+  */
+  const overloop = await page.evaluate(() =>
+    Math.max(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      document.body.scrollWidth - document.body.clientWidth
+    )
   );
   if (overloop > 0) overloopGevonden = true;
   console.log(`${naam} (${breedte}px): horizontale overloop ${overloop}px`);

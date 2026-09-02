@@ -9,6 +9,7 @@ import { Harness as CrmContacten } from "./crm-contacten-harness";
 import { Harness as CrmDashboard } from "./crm-dashboard-harness";
 import { Harness as CrmFragmenten } from "./crm-fragmenten-harness";
 import { Harness as CrmAfspraken } from "./crm-afspraken-harness";
+import { Harness as CrmBoeking } from "./crm-boeking-harness";
 
 /**
  * Welke harness gerenderd wordt, kies je met de omgevingsvariabele HARNESS.
@@ -22,6 +23,7 @@ import { Harness as CrmAfspraken } from "./crm-afspraken-harness";
  *   npm run visueel:dashboard     het commerciele dashboard
  *   npm run visueel:fragmenten    de fragmenten en de keuzelijst
  *   npm run visueel:afspraken     de afspraken
+ *   npm run visueel:boeking       de openbare boekingspagina
  */
 const harnessen = {
   diagnose: Diagnose,
@@ -32,6 +34,7 @@ const harnessen = {
   dashboard: CrmDashboard,
   fragmenten: CrmFragmenten,
   afspraken: CrmAfspraken,
+  boeking: CrmBoeking,
 };
 const gekozen = (process.env.HARNESS ?? "diagnose") as keyof typeof harnessen;
 const Harness = harnessen[gekozen] ?? Diagnose;
