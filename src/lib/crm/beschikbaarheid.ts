@@ -40,22 +40,37 @@
 
 const ZONE_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 
+/**
+ * Een formatter per tijdzone, met UTC als terugval.
+ *
+ * Intl gooit een fout bij een zone die niet bestaat. Dat mag hier nooit
+ * doorwerken: de tijdzone komt uit de database, en een typefout in een
+ * instelling hoort geen openbare boekingspagina om te gooien. Dan liever
+ * rekenen in UTC en tijden die een uur schelen, dan een witte pagina.
+ */
 function formatter(tijdzone: string): Intl.DateTimeFormat {
-  let bestaand = ZONE_FORMATTERS.get(tijdzone);
-  if (!bestaand) {
-    bestaand = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tijdzone,
-      hour12: false,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    ZONE_FORMATTERS.set(tijdzone, bestaand);
+  const bestaand = ZONE_FORMATTERS.get(tijdzone);
+  if (bestaand) return bestaand;
+
+  const opties: Intl.DateTimeFormatOptions = {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  };
+
+  let gemaakt: Intl.DateTimeFormat;
+  try {
+    gemaakt = new Intl.DateTimeFormat("en-CA", { ...opties, timeZone: tijdzone });
+  } catch {
+    gemaakt = new Intl.DateTimeFormat("en-CA", { ...opties, timeZone: "UTC" });
   }
-  return bestaand;
+
+  ZONE_FORMATTERS.set(tijdzone, gemaakt);
+  return gemaakt;
 }
 
 export interface LokaleTijd {
@@ -404,4 +419,31 @@ export function controleerVensters(vensters: Werkvenster[]): string[] {
   }
 
   return fouten;
+}
+
+/**
+ * De tijdzone zoals een bezoeker hem herkent.
+ *
+ * "UTC +02:00 (Europa) Central European Summer Time" is wat HubSpot toont, en
+ * dat is nuttiger dan alleen "Europe/Amsterdam": wie vanuit het buitenland
+ * boekt, ziet meteen dat de tijden Nederlandse tijden zijn.
+ */
+export function tijdzoneLabel(tijdzone: string, opMoment = new Date()): string {
+  const offset = zoneOffsetOp(opMoment, tijdzone);
+  const teken = offset < 0 ? "-" : "+";
+  const uren = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+  const minuten = String(Math.abs(offset) % 60).padStart(2, "0");
+
+  let naam = tijdzone;
+  try {
+    const delen = new Intl.DateTimeFormat("nl-NL", {
+      timeZone: tijdzone,
+      timeZoneName: "long",
+    }).formatToParts(opMoment);
+    naam = delen.find((d) => d.type === "timeZoneName")?.value ?? tijdzone;
+  } catch {
+    /* Onbekende zone: dan blijft de technische naam staan. */
+  }
+
+  return `UTC ${teken}${uren}:${minuten} \u00b7 ${naam}`;
 }

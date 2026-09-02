@@ -4,6 +4,7 @@ import {
   STANDAARD_REGELS,
   STANDAARD_VENSTERS,
   berekenVrijeMomenten,
+  tijdzoneLabel,
 } from "@/lib/crm/beschikbaarheid";
 import type { BoekingsLink } from "@/lib/crm/boekingslinks";
 
@@ -75,17 +76,24 @@ export function Harness() {
           oplossen die er niet zijn. */}
       <Scherm titel="De openbare pagina, zoals een school hem ziet">
         <div className="-mx-4 bg-white px-4 sm:-mx-6 sm:px-6">
-          <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-soft">
-            Skool Workshop
-          </p>
-          <h1 className="text-balance break-words text-[26px] leading-tight">{LINK.name}</h1>
-          <p className="mt-2 text-muted">30 min · Videobellen · Google Meet</p>
-          <p className="mb-6 mt-4 text-muted">{LINK.intro}</p>
+          <div className="mb-8 text-center">
+            <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-soft">
+              Skool Workshop
+            </p>
+            <h1 className="text-balance break-words text-[26px] leading-tight sm:text-[34px]">
+              {LINK.name}
+            </h1>
+            <p className="mx-auto mt-3 max-w-prose text-muted">{LINK.intro}</p>
+          </div>
           <BoekingsFormulier
             slug={LINK.slug}
             dagen={DAGEN}
             tijdzone={LINK.timezone}
+            tijdzoneLabel={tijdzoneLabel(LINK.timezone, NU)}
             duurTekst="30 min"
+            locatie={LINK.location}
+            vormTekst="Videobellen"
+            eigenaarNaam="Anne Bakker"
           />
         </div>
       </Scherm>

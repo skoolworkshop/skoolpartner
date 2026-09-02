@@ -172,6 +172,8 @@ export interface AgendaAfspraak {
   /** De school. Krijgt van Google een uitnodiging als sendUpdates aan staat. */
   gastEmail?: string | null;
   gastNaam?: string | null;
+  /** Collega's die de boeker heeft meegenomen. */
+  extraGasten?: string[];
 }
 
 /**
@@ -210,9 +212,12 @@ export async function zetInAgenda(
           location: afspraak.locatie ?? undefined,
           start: { dateTime: afspraak.startsAt, timeZone: afspraak.tijdzone },
           end: { dateTime: afspraak.endsAt, timeZone: afspraak.tijdzone },
-          attendees: afspraak.gastEmail
-            ? [{ email: afspraak.gastEmail, displayName: afspraak.gastNaam ?? undefined }]
-            : undefined,
+          attendees: [
+            ...(afspraak.gastEmail
+              ? [{ email: afspraak.gastEmail, displayName: afspraak.gastNaam ?? undefined }]
+              : []),
+            ...(afspraak.extraGasten ?? []).map((email) => ({ email })),
+          ].slice(0, 20),
         }),
         cache: "no-store",
       }

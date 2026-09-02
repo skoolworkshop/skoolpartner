@@ -416,6 +416,8 @@ export interface BoekingInvoer {
   organisatie: string;
   /** Het gekozen moment, als ISO-tijdstip. */
   startsAt: string;
+  /** Extra genodigden. Hooguit tien, net als bij HubSpot. */
+  gasten?: string[];
   /** Verborgen veld dat een mens leeg laat. */
   honeypot?: string | null;
 }
@@ -462,7 +464,25 @@ export async function boekAfspraak(
   if (telefoon.replace(/\D/g, "").length < 8) {
     return { ok: false, fout: "Vul een geldig telefoonnummer in." };
   }
-  if (organisatie.length < 2) return { ok: false, fout: "Vul de naam van je school of organisatie in." };
+  /*
+    De naam van de onderneming is optioneel.
+
+    Op de HubSpot-schermafbeelding staat bij dat veld geen sterretje, en dat is
+    ook de betere keuze: een cultuurcoordinator die snel een gesprek inplant,
+    moet niet blijven hangen op een veld dat jij ook uit het e-mailadres kunt
+    afleiden. Ingevuld is het waardevol, leeg is het geen reden om iemand tegen
+    te houden.
+  */
+
+  // De genodigden. Alles wat niet op een adres lijkt gaat eruit, en er blijven
+  // er hooguit tien over.
+  const gasten = [
+    ...new Set(
+      (invoer.gasten ?? [])
+        .map((a) => a.trim().toLowerCase())
+        .filter((a) => EMAIL_PATROON.test(a) && a !== email)
+    ),
+  ].slice(0, 10);
 
   const supabase = createServiceSupabase();
 
@@ -498,6 +518,7 @@ export async function boekAfspraak(
 
   const eindeTijd = new Date(Date.parse(invoer.startsAt) + link.durationMinutes * 60_000);
   const volledigeNaam = `${voornaam} ${achternaam}`;
+  const bijWie = organisatie || volledigeNaam;
 
   // Het contact. Bestaat er al iemand met dit e-mailadres, dan wordt die
   // gebruikt; anders komt er een nieuw contact bij. Er wordt nooit een account
@@ -519,7 +540,9 @@ export async function boekAfspraak(
         phone: telefoon,
         contact_type: "opdrachtgever",
         lifecycle: "lead",
-        note: `Aangemeld via de boekingslink "${link.name}". Opgegeven organisatie: ${organisatie}.`,
+        note: organisatie
+          ? `Aangemeld via de boekingslink "${link.name}". Opgegeven organisatie: ${organisatie}.`
+          : `Aangemeld via de boekingslink "${link.name}".`,
       })
       .select("id")
       .single();
@@ -529,7 +552,7 @@ export async function boekAfspraak(
   const { data: afspraak, error } = await supabase
     .from("crm_meetings")
     .insert({
-      title: `${link.name} met ${organisatie}`,
+      title: `${link.name} met ${bijWie}`,
       kind: link.meetingKind,
       form: link.meetingForm,
       starts_at: invoer.startsAt,
@@ -544,7 +567,8 @@ export async function boekAfspraak(
       guest_name: volledigeNaam,
       guest_email: email,
       guest_phone: telefoon,
-      guest_company: organisatie,
+      guest_company: organisatie || null,
+      guest_extra_emails: gasten,
     })
     .select("id, starts_at, ends_at")
     .single();
@@ -563,19 +587,23 @@ export async function boekAfspraak(
   // Vanaf hier staat de afspraak er. Wat hierna misgaat, mag de boeking niet
   // ongedaan maken.
   const agenda = await zetInAgenda({
-    titel: `${link.name} met ${organisatie}`,
+    titel: `${link.name} met ${bijWie}`,
     omschrijving: [
       `Geboekt via SkoolPartner (${link.name}).`,
-      `${volledigeNaam}, ${organisatie}`,
+      organisatie ? `${volledigeNaam}, ${organisatie}` : volledigeNaam,
       email,
       telefoon,
-    ].join("\n"),
+      gasten.length > 0 ? `Neemt mee: ${gasten.join(", ")}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
     locatie: link.location,
     startsAt: afspraak.starts_at,
     endsAt: afspraak.ends_at,
     tijdzone: link.timezone,
     gastEmail: email,
     gastNaam: volledigeNaam,
+    extraGasten: gasten,
   });
 
   if (agenda.eventId) {
@@ -589,7 +617,12 @@ export async function boekAfspraak(
     action: "crm.boeking.aangenomen",
     entityType: "crm_meeting",
     entityId: afspraak.id,
-    after: { link: link.name, organisatie, in_agenda: Boolean(agenda.eventId) },
+    after: {
+      link: link.name,
+      organisatie: organisatie || null,
+      genodigden: gasten.length,
+      in_agenda: Boolean(agenda.eventId),
+    },
   });
 
   return {

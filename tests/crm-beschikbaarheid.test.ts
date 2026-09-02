@@ -12,6 +12,7 @@ import {
   minutenOpDeDag,
   naarInstant,
   schrijfKlok,
+  tijdzoneLabel,
   zoneOffsetOp,
   type BezetBlok,
   type BoekingsRegels,
@@ -409,5 +410,22 @@ describe("controleerVensters", () => {
         { weekdag: 2, vanafMinuut: 780, totMinuut: 1020 },
       ])
     ).toEqual([]);
+  });
+});
+
+describe("tijdzoneLabel", () => {
+  it("noemt de zomertijd met het juiste verschil", () => {
+    // Wat een bezoeker van de boekingspagina te zien krijgt. Zonder dit label
+    // weet iemand die vanaf vakantie boekt niet of de tijden Nederlands zijn.
+    const label = tijdzoneLabel(AMS, new Date("2026-07-15T12:00:00Z"));
+    expect(label).toContain("UTC +02:00");
+  });
+
+  it("noemt de wintertijd met een uur verschil", () => {
+    expect(tijdzoneLabel(AMS, new Date("2026-01-15T12:00:00Z"))).toContain("UTC +01:00");
+  });
+
+  it("valt niet om op een onbekende zone", () => {
+    expect(typeof tijdzoneLabel("Onzin/Bestaat-Niet")).toBe("string");
   });
 });

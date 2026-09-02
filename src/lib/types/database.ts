@@ -805,6 +805,7 @@ export type CrmMeetingRow = {
   guest_email: string | null;
   guest_phone: string | null;
   guest_company: string | null;
+  guest_extra_emails: string[];
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -65,6 +65,10 @@ export async function boekAfspraakAction(
     telefoon: tekst(formData, "telefoon"),
     organisatie: tekst(formData, "organisatie"),
     startsAt: tekst(formData, "startsAt"),
+    gasten: tekst(formData, "gasten")
+      .split(",")
+      .map((a) => a.trim().toLowerCase())
+      .filter(Boolean),
     honeypot: tekst(formData, "website"),
   });
 
