@@ -39,8 +39,10 @@
     "visueel:organisatie": "node tools/harness/render.mjs organisatie && node tools/harness/shoot.mjs organisatie",
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
     "db:verify-crm-hubspot": "node scripts/verify-crm-hubspot.mjs",
+    "db:verify-crm-sequences": "node scripts/verify-crm-sequences.mjs",
     "import:hubspot": "node scripts/importeer-hubspot.mjs",
     "import:hubspot:schrijf": "node scripts/importeer-hubspot.mjs --schrijf",
+    "import:controle": "node scripts/controleer-import.mjs",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"
   },
