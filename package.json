@@ -24,6 +24,7 @@
     "db:verify-crm-contacten": "node scripts/verify-crm-contacten.mjs",
     "db:verify-crm-dashboard": "node scripts/verify-crm-dashboard.mjs",
     "db:verify-crm-fragmenten": "node scripts/verify-crm-fragmenten.mjs",
+    "db:verify-crm-afspraken": "node scripts/verify-crm-afspraken.mjs",
     "visueel": "node tools/harness/render.mjs && node tools/harness/shoot.mjs",
     "visueel:crm": "node tools/harness/render.mjs crm && node tools/harness/shoot.mjs crm",
     "visueel:suri": "node tools/harness/render.mjs suri && node tools/harness/shoot.mjs suri",
@@ -31,6 +32,7 @@
     "visueel:contacten": "node tools/harness/render.mjs contacten && node tools/harness/shoot.mjs contacten",
     "visueel:dashboard": "node tools/harness/render.mjs dashboard && node tools/harness/shoot.mjs dashboard",
     "visueel:fragmenten": "node tools/harness/render.mjs fragmenten && node tools/harness/shoot.mjs fragmenten",
+    "visueel:afspraken": "node tools/harness/render.mjs afspraken && node tools/harness/shoot.mjs afspraken",
     "db:verify-hubspot": "node scripts/verify-hubspot-opruimen.mjs",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"

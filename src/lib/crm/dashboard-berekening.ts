@@ -264,6 +264,24 @@ export interface SuriBetalingInvoer {
   ontvangenOp: string;
 }
 
+/**
+ * Een afspraak, zoals het dashboard hem nodig heeft.
+ *
+ * Bewust alleen de velden waar het dashboard iets mee doet. De volledige
+ * afspraak staat in afspraken.ts; hier gaat het om de vraag "moet hier nog
+ * iets mee gebeuren".
+ */
+export interface AfspraakInvoer {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  outcome: string | null;
+  dealId: string | null;
+  organizationId: string | null;
+}
+
 export interface TaakInvoer {
   id: string;
   title: string;
@@ -282,6 +300,7 @@ export interface DashboardInvoer {
   facturen: FactuurInvoer[];
   suriBetalingen: SuriBetalingInvoer[];
   taken: TaakInvoer[];
+  afspraken: AfspraakInvoer[];
   periode: Periode;
   merk: MerkFilter;
   vandaag: DatumString;
@@ -939,9 +958,23 @@ export interface OpvolgingDeal {
   reden: string;
 }
 
+export interface OpvolgingAfspraak {
+  id: string;
+  title: string;
+  startsAt: string;
+  dealId: string | null;
+  organizationId: string | null;
+}
+
 export interface Opvolging {
   achterstalligeTaken: TaakInvoer[];
   takenVandaag: TaakInvoer[];
+  /** Gepland, en het moment is voorbij zonder dat er iets is bijgewerkt. */
+  afsprakenBlijvenLiggen: OpvolgingAfspraak[];
+  /** Gehouden, maar er staat niet wat eruit kwam. */
+  afsprakenZonderUitkomst: OpvolgingAfspraak[];
+  /** Wat er vandaag en morgen in de agenda staat. */
+  afsprakenBinnenkort: OpvolgingAfspraak[];
   /** Lopende deals die te lang stilstaan, langste eerst. */
   stilstaandeDeals: OpvolgingDeal[];
   /** Lopende deals waar geen enkele openstaande taak aan hangt. */
@@ -954,6 +987,7 @@ export function bepaalOpvolging(
   taken: TaakInvoer[],
   merk: MerkFilter,
   vandaag: DatumString,
+  afspraken: AfspraakInvoer[] = [],
   drempelDagen = TE_LANG_DAGEN,
   maximumPerLijst = 8
 ): Opvolging {
@@ -998,12 +1032,67 @@ export function bepaalOpvolging(
   stil.sort((a, b) => b.dagenInFase - a.dagenInFase);
   zonderTaak.sort((a, b) => b.waardeCents - a.waardeCents || b.dagenInFase - a.dagenInFase);
 
+  const eigenAfspraken = afsprakenVoorMerk(afspraken, relevanteDeals, merk);
+  const dagGrens = `${vandaag}T00:00:00.000Z`;
+  const overmorgen = new Date(Date.parse(dagGrens) + 2 * 86_400_000).toISOString();
+
+  const blijvenLiggen: OpvolgingAfspraak[] = [];
+  const zonderUitkomst: OpvolgingAfspraak[] = [];
+  const binnenkort: OpvolgingAfspraak[] = [];
+
+  for (const afspraak of eigenAfspraken) {
+    const kort: OpvolgingAfspraak = {
+      id: afspraak.id,
+      title: afspraak.title,
+      startsAt: afspraak.startsAt,
+      dealId: afspraak.dealId,
+      organizationId: afspraak.organizationId,
+    };
+
+    if (afspraak.status === "gepland") {
+      // Het moment is voorbij en er is niets bijgewerkt. Zolang dat zo blijft,
+      // klopt de telling van gehouden gesprekken niet.
+      if (afspraak.endsAt < dagGrens) blijvenLiggen.push(kort);
+      else if (afspraak.startsAt < overmorgen) binnenkort.push(kort);
+      continue;
+    }
+
+    if (afspraak.status === "gehouden" && !afspraak.outcome?.trim()) {
+      zonderUitkomst.push(kort);
+    }
+  }
+
+  blijvenLiggen.sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  zonderUitkomst.sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  binnenkort.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+
   return {
     achterstalligeTaken: achterstallig.slice(0, maximumPerLijst),
     takenVandaag: vandaagLijst.slice(0, maximumPerLijst),
+    afsprakenBlijvenLiggen: blijvenLiggen.slice(0, maximumPerLijst),
+    afsprakenZonderUitkomst: zonderUitkomst.slice(0, maximumPerLijst),
+    afsprakenBinnenkort: binnenkort.slice(0, maximumPerLijst),
     stilstaandeDeals: stil.slice(0, maximumPerLijst),
     dealsZonderTaak: zonderTaak.slice(0, maximumPerLijst),
   };
+}
+
+/**
+ * Welke afspraken bij het gekozen merk horen.
+ *
+ * Dezelfde regel als bij taken: hangt hij aan een deal, dan volgt het merk uit
+ * die deal. Hangt hij alleen aan een organisatie, dan telt hij mee bij
+ * "Alles". Zo wordt een afspraak nooit aan het verkeerde merk toegeschreven en
+ * verdwijnt hij ook nergens stilletjes uit beeld.
+ */
+export function afsprakenVoorMerk(
+  afspraken: AfspraakInvoer[],
+  deals: DealInvoer[],
+  merk: MerkFilter
+): AfspraakInvoer[] {
+  if (merk === "alles") return afspraken;
+  const dealIds = new Set(deals.filter((d) => merkPast(d.brand, merk)).map((d) => d.id));
+  return afspraken.filter((a) => a.dealId !== null && dealIds.has(a.dealId));
 }
 
 // -----------------------------------------------------------------------------
@@ -1021,7 +1110,7 @@ export interface DashboardCijfers {
 }
 
 export function berekenDashboard(invoer: DashboardInvoer): DashboardCijfers {
-  const { deals, fases, gebeurtenissen, facturen, suriBetalingen, taken, periode, merk, vandaag } =
+  const { deals, fases, gebeurtenissen, facturen, suriBetalingen, taken, afspraken, periode, merk, vandaag } =
     invoer;
 
   return {
@@ -1040,7 +1129,7 @@ export function berekenDashboard(invoer: DashboardInvoer): DashboardCijfers {
             omzetBestaandCents: 0,
           },
     klantenbehoud: berekenKlantenbehoud(deals, fases, merk, vandaag),
-    opvolging: bepaalOpvolging(deals, fases, taken, merk, vandaag),
+    opvolging: bepaalOpvolging(deals, fases, taken, merk, vandaag, afspraken),
   };
 }
 

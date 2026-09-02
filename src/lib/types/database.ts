@@ -747,6 +747,29 @@ export type CrmTaskRow = {
   updated_at: string;
 };
 
+/** Een afspraak. Ligt voor je en heeft een begin en een eind; een activiteit ligt achter je. */
+export type CrmMeetingRow = {
+  id: string;
+  title: string;
+  kind: string;
+  form: string;
+  starts_at: string;
+  ends_at: string;
+  location: string | null;
+  status: string;
+  outcome: string | null;
+  note: string | null;
+  organization_id: string | null;
+  contact_id: string | null;
+  deal_id: string | null;
+  owner_id: string | null;
+  source: string;
+  calendar_event_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Een herbruikbaar tekstblok met personalisatie. brand leeg betekent: beide merken. */
 export type CrmSnippetRow = {
   id: string;
@@ -932,6 +955,7 @@ export type Database = {
       crm_tasks: TableDef<CrmTaskRow>;
       crm_snippets: TableDef<CrmSnippetRow>;
       crm_snippet_uses: TableDef<CrmSnippetUseRow>;
+      crm_meetings: TableDef<CrmMeetingRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;

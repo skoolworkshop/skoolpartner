@@ -11,6 +11,7 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { BookingStatusBadge, InvoiceStatusBadge } from "@/components/portal/status-badges";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
+import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { getOrganizationDetail } from "@/lib/admin/queries";
 import {
   getCreditBalanceForAdmin,
@@ -23,6 +24,7 @@ import { getSettings } from "@/lib/settings";
 import { OrgLogo } from "@/components/portal/org-logo";
 import { RelatieBlok } from "@/components/admin/relatie-blok";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
+import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { getRelatieProfiel } from "@/lib/crm/relaties";
 import {
@@ -59,6 +61,10 @@ export default async function OrganizationDetailPage({
   if (!detail) notFound();
 
   const fragmentHulp = await getFragmentHulp({ organizationId: id }, { naam: sessie.profile?.full_name ?? null, email: sessie.email });
+
+  // De afspraken bij dit onderwerp. Eerst wat blijft liggen, dan wat er
+  // aankomt: dat is de volgorde waarin je ernaar kijkt.
+  const afsprakenIndeling = deelIn(await getAfspraken({ organizationId: id }), new Date().toISOString());
 
   const [settings, tegoed, tegoedMutaties, relatie] = await Promise.all([
     getSettings(),
@@ -431,6 +437,12 @@ export default async function OrganizationDetailPage({
         <TakenBlok
           onderwerp={{ organizationId: id }}
           taken={taken}
+          beheerders={relatie.beheerders}
+        />
+
+        <AfsprakenBlok
+          onderwerp={{ organizationId: id }}
+          indeling={afsprakenIndeling}
           beheerders={relatie.beheerders}
         />
 

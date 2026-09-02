@@ -31,6 +31,7 @@ import {
 } from "@/lib/crm/pijplijn";
 import { isContactType, koppelPortalAccount } from "@/lib/crm/contacten";
 import { archiveerFragment, bewaarFragment, legGebruikVast } from "@/lib/crm/fragmenten";
+import { bewaarAfspraak, zetAfspraakStand } from "@/lib/crm/afspraken";
 import {
   isActiviteitSoort,
   legActiviteitVast,
@@ -615,4 +616,81 @@ export async function legFragmentGebruikVastAction(formData: FormData): Promise<
   } catch {
     /* Een telling die mislukt mag niemand in de weg zitten. */
   }
+}
+
+// -----------------------------------------------------------------------------
+// Afspraken
+// -----------------------------------------------------------------------------
+
+/**
+ * Een afspraak plannen of bijwerken.
+ *
+ * De zone-offset komt uit de browser mee als verborgen veld. Zonder dat getal
+ * zou "14:00" worden gelezen als de lokale tijd van de server, en die staat op
+ * Vercel niet in Nederland. Een afspraak zou dan in de zomer een uur
+ * verschuiven, en dat merk je pas als iemand voor een dichte deur staat.
+ */
+export async function bewaarAfspraakAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const onderwerp = onderwerpUit(formData);
+
+    const offset = Number(tekst(formData, "zoneOffsetMinuten"));
+
+    const resultaat = await bewaarAfspraak(
+      {
+        ...onderwerp,
+        id: optioneel(formData, "id"),
+        title: tekst(formData, "title"),
+        kind: tekst(formData, "kind"),
+        form: tekst(formData, "form"),
+        startsAt: optioneel(formData, "startsAt"),
+        endsAt: optioneel(formData, "endsAt"),
+        location: optioneel(formData, "location"),
+        note: optioneel(formData, "note"),
+        ownerId: optioneel(formData, "ownerId"),
+        zoneOffsetMinuten: Number.isFinite(offset) ? offset : 0,
+      },
+      wie
+    );
+
+    vernieuw(onderwerp);
+    revalidatePath("/admin/crm/afspraken");
+
+    if (resultaat.botsingen.length > 0) {
+      // Bewust een melding en geen weigering: twee afspraken tegelijk kan een
+      // vergissing zijn, maar ook een bewuste keuze.
+      const namen = resultaat.botsingen.map((b) => b.title).join(", ");
+      return {
+        status: "ok",
+        message: `De afspraak staat erin. Let op: op hetzelfde moment staat ook ${namen}.`,
+      };
+    }
+
+    return { status: "ok", message: "De afspraak staat in de agenda van het CRM." };
+  });
+}
+
+export async function zetAfspraakStandAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  return veilig(async () => {
+    const wie = await actor();
+    const onderwerp = onderwerpUit(formData);
+
+    await zetAfspraakStand(
+      tekst(formData, "id"),
+      tekst(formData, "status"),
+      optioneel(formData, "outcome"),
+      wie
+    );
+
+    vernieuw(onderwerp);
+    revalidatePath("/admin/crm/afspraken");
+    return { status: "ok", message: "Bijgewerkt." };
+  });
 }

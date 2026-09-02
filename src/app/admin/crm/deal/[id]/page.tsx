@@ -8,8 +8,10 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
+import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
+import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { getDeal } from "@/lib/crm/pijplijn";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { createServiceSupabase } from "@/lib/supabase/server";
@@ -56,6 +58,10 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
     { dealId: deal.id, organizationId: deal.organization_id, contactId: deal.contact_id, merk: deal.brand },
     { naam: sessie.profile?.full_name ?? null, email: sessie.email }
   );
+
+  // De afspraken bij dit onderwerp. Eerst wat blijft liggen, dan wat er
+  // aankomt: dat is de volgorde waarin je ernaar kijkt.
+  const afsprakenIndeling = deelIn(await getAfspraken({ dealId: deal.id, organizationId: deal.organization_id }), new Date().toISOString());
   const alleFases = [...fases.lopend, fases.gewonnen, fases.verloren].filter((f) => f !== null);
   const euro = (centen: number) => (centen / 100).toFixed(2).replace(".", ",");
 
@@ -264,6 +270,12 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
         <TakenBlok
           onderwerp={{ dealId: deal.id, organizationId: deal.organization_id }}
           taken={taken}
+          beheerders={beheerderLijst}
+        />
+
+        <AfsprakenBlok
+          onderwerp={{ dealId: deal.id, organizationId: deal.organization_id }}
+          indeling={afsprakenIndeling}
           beheerders={beheerderLijst}
         />
 

@@ -16,6 +16,8 @@ import {
   omzetPerMaand,
   parseMerkFilter,
   takenVoorMerk,
+  afsprakenVoorMerk,
+  type AfspraakInvoer,
   type DashboardInvoer,
   type DealGebeurtenisInvoer,
   type DealInvoer,
@@ -297,6 +299,7 @@ describe("omzet en dealwaarde blijven gescheiden", () => {
       facturen,
       suriBetalingen: [],
       taken: [],
+      afspraken: [],
       periode: maakPeriode("deze-maand", VANDAAG),
       merk: "alles",
       vandaag: VANDAAG,
@@ -316,6 +319,7 @@ describe("omzet en dealwaarde blijven gescheiden", () => {
       facturen: [],
       suriBetalingen: [],
       taken: [],
+      afspraken: [],
       periode: maakPeriode("deze-maand", VANDAAG),
       merk: "alles",
       vandaag: VANDAAG,
@@ -380,6 +384,7 @@ describe("berekenKpis", () => {
     facturen: [],
     suriBetalingen: [],
     taken: [],
+    afspraken: [],
     periode: maakPeriode("deze-maand", VANDAAG),
     merk: "alles",
     vandaag: VANDAAG,
@@ -424,6 +429,7 @@ describe("berekenKpis", () => {
   it("telt een deal die vorige maand is gewonnen niet mee in deze maand", () => {
     const vorige = berekenKpis({
       ...basis,
+      afspraken: [],
       periode: maakPeriode("aangepast", VANDAAG, { vanaf: "2026-08-01", tot: "2026-08-31" }),
       merk: "skool_workshop",
     });
@@ -467,6 +473,7 @@ describe("openstaande en achterstallige taken", () => {
     facturen: [],
     suriBetalingen: [],
     taken,
+    afspraken: [],
     periode: maakPeriode("deze-maand", VANDAAG),
     merk: "alles",
     vandaag: VANDAAG,
@@ -835,6 +842,7 @@ describe("berekenDashboard", () => {
     facturen: [{ organizationId: "org-1", betaaldOp: "2026-09-01", betaaldCents: 100_000 }],
     suriBetalingen: [{ dealId: "b", amountCents: 50_000, ontvangenOp: "2026-09-01" }],
     taken: [taak({ id: "t", dealId: "a", dueOn: "2026-08-01" })],
+    afspraken: [],
     periode: maakPeriode("deze-maand", VANDAAG),
     merk: "alles",
     vandaag: VANDAAG,
@@ -876,5 +884,134 @@ describe("parseMerkFilter", () => {
     expect(parseMerkFilter("kapot")).toBe("alles");
     expect(parseMerkFilter(undefined)).toBe("alles");
     expect(parseMerkFilter("suri_impact")).toBe("suri_impact");
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Afspraken in de opvolging
+// -----------------------------------------------------------------------------
+
+describe("afspraken in bepaalOpvolging", () => {
+  function afspraak(waarden: Partial<AfspraakInvoer> & { id: string }): AfspraakInvoer {
+    return {
+      title: `Afspraak ${waarden.id}`,
+      startsAt: "2026-09-15T09:00:00.000Z",
+      endsAt: "2026-09-15T10:00:00.000Z",
+      status: "gepland",
+      outcome: null,
+      dealId: null,
+      organizationId: "org-1",
+      ...waarden,
+    };
+  }
+
+  const deals = [
+    deal({ id: "sw-deal", stageId: SW_NIEUW.id }),
+    deal({
+      id: "suri-deal",
+      brand: "suri_impact",
+      stageId: SU_AANMELDING.id,
+      organizationId: null,
+      contactId: "c-1",
+    }),
+  ];
+
+  const afspraken: AfspraakInvoer[] = [
+    // Gepland en het moment is voorbij: hier is niets bijgewerkt.
+    afspraak({
+      id: "blijft-liggen",
+      dealId: "sw-deal",
+      startsAt: "2026-08-20T09:00:00.000Z",
+      endsAt: "2026-08-20T10:00:00.000Z",
+    }),
+    // Vandaag.
+    afspraak({
+      id: "vandaag",
+      dealId: "sw-deal",
+      startsAt: "2026-09-02T14:00:00.000Z",
+      endsAt: "2026-09-02T15:00:00.000Z",
+    }),
+    // Morgen.
+    afspraak({
+      id: "morgen",
+      dealId: "sw-deal",
+      startsAt: "2026-09-03T10:00:00.000Z",
+      endsAt: "2026-09-03T11:00:00.000Z",
+    }),
+    // Volgende week: nog niet "binnenkort".
+    afspraak({ id: "volgende-week", dealId: "sw-deal" }),
+    // Gehouden zonder dat er iets is vastgelegd.
+    afspraak({
+      id: "geen-uitkomst",
+      dealId: "sw-deal",
+      status: "gehouden",
+      outcome: "   ",
+      startsAt: "2026-08-25T09:00:00.000Z",
+      endsAt: "2026-08-25T10:00:00.000Z",
+    }),
+    // Gehouden met uitkomst: klaar, hoort nergens in de opvolging.
+    afspraak({
+      id: "netjes",
+      dealId: "sw-deal",
+      status: "gehouden",
+      outcome: "Offerte gevraagd voor maart.",
+      startsAt: "2026-08-26T09:00:00.000Z",
+      endsAt: "2026-08-26T10:00:00.000Z",
+    }),
+    // Afgezegd: telt nooit als ontbrekende uitkomst.
+    afspraak({
+      id: "afgezegd",
+      dealId: "sw-deal",
+      status: "geannuleerd",
+      startsAt: "2026-08-27T09:00:00.000Z",
+      endsAt: "2026-08-27T10:00:00.000Z",
+    }),
+    // Van het andere merk.
+    afspraak({
+      id: "suri",
+      dealId: "suri-deal",
+      organizationId: null,
+      startsAt: "2026-08-21T09:00:00.000Z",
+      endsAt: "2026-08-21T10:00:00.000Z",
+    }),
+  ];
+
+  it("wijst afspraken aan die blijven liggen", () => {
+    const opvolging = bepaalOpvolging(deals, FASES, [], "alles", VANDAAG, afspraken);
+    // Meest recente voorop: suri is van 21 augustus, blijft-liggen van 20 augustus.
+    // Een gehouden afspraak hoort hier niet bij, ook niet zonder uitkomst.
+    expect(opvolging.afsprakenBlijvenLiggen.map((a) => a.id)).toEqual(["suri", "blijft-liggen"]);
+  });
+
+  it("toont alleen vandaag en morgen bij binnenkort", () => {
+    const opvolging = bepaalOpvolging(deals, FASES, [], "alles", VANDAAG, afspraken);
+    expect(opvolging.afsprakenBinnenkort.map((a) => a.id)).toEqual(["vandaag", "morgen"]);
+  });
+
+  it("wijst gehouden afspraken zonder uitkomst aan, en alleen die", () => {
+    const opvolging = bepaalOpvolging(deals, FASES, [], "alles", VANDAAG, afspraken);
+    expect(opvolging.afsprakenZonderUitkomst.map((a) => a.id)).toEqual(["geen-uitkomst"]);
+  });
+
+  it("houdt de merken uit elkaar", () => {
+    const skool = bepaalOpvolging(deals, FASES, [], "skool_workshop", VANDAAG, afspraken);
+    const suri = bepaalOpvolging(deals, FASES, [], "suri_impact", VANDAAG, afspraken);
+
+    expect(skool.afsprakenBlijvenLiggen.map((a) => a.id)).toEqual(["blijft-liggen"]);
+    expect(suri.afsprakenBlijvenLiggen.map((a) => a.id)).toEqual(["suri"]);
+    expect(suri.afsprakenZonderUitkomst).toEqual([]);
+  });
+
+  it("laat een afspraak zonder deal alleen bij Alles meetellen", () => {
+    const los = [afspraak({ id: "los", dealId: null, organizationId: "org-9" })];
+    expect(afsprakenVoorMerk(los, deals, "alles")).toHaveLength(1);
+    expect(afsprakenVoorMerk(los, deals, "skool_workshop")).toHaveLength(0);
+  });
+
+  it("werkt zonder afspraken, want die lijst mag leeg zijn", () => {
+    const opvolging = bepaalOpvolging(deals, FASES, [], "alles", VANDAAG);
+    expect(opvolging.afsprakenBlijvenLiggen).toEqual([]);
+    expect(opvolging.afsprakenBinnenkort).toEqual([]);
+    expect(opvolging.afsprakenZonderUitkomst).toEqual([]);
   });
 });

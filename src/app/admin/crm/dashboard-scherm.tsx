@@ -508,12 +508,20 @@ export function DashboardScherm({
           title="Wat er nu ligt"
           description="Niet wat er is gebeurd, maar wat er wacht. Dit is de lijst waar je 's ochtends mee begint."
           action={
-            <Link
-              href="/admin/crm/taken"
-              className="inline-flex min-h-9 items-center rounded-pill bg-surface-3 px-4 text-sm font-semibold text-ink"
-            >
-              Alle taken
-            </Link>
+            <span className="flex flex-wrap gap-2">
+              <Link
+                href="/admin/crm/taken"
+                className="inline-flex min-h-9 items-center rounded-pill bg-surface-3 px-4 text-sm font-semibold text-ink"
+              >
+                Alle taken
+              </Link>
+              <Link
+                href="/admin/crm/afspraken"
+                className="inline-flex min-h-9 items-center rounded-pill bg-surface-3 px-4 text-sm font-semibold text-ink"
+              >
+                Alle afspraken
+              </Link>
+            </span>
           }
         />
         <CardBody className="grid gap-5 lg:grid-cols-2">
@@ -546,6 +554,35 @@ export function DashboardScherm({
                 ))}
               </ul>
             )}
+
+            {opvolging.afsprakenBlijvenLiggen.length > 0 ? (
+              <>
+                <h3 className="mb-2 mt-4 text-sm font-semibold text-ink">
+                  Afspraken die blijven liggen ({opvolging.afsprakenBlijvenLiggen.length})
+                </h3>
+                <ul className="space-y-1.5">
+                  {opvolging.afsprakenBlijvenLiggen.map((afspraak) => (
+                    <li key={afspraak.id} className="flex items-baseline justify-between gap-3 text-sm">
+                      <Link
+                        href={
+                          afspraak.dealId
+                            ? `/admin/crm/deal/${afspraak.dealId}`
+                            : afspraak.organizationId
+                              ? `/admin/organisaties/${afspraak.organizationId}`
+                              : "/admin/crm/afspraken"
+                        }
+                        className="min-w-0 truncate underline-offset-4 hover:underline"
+                      >
+                        {afspraak.title}
+                      </Link>
+                      <span className="shrink-0 text-xs font-semibold text-danger tabular-nums">
+                        {formatShortDate(afspraak.startsAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
 
             {opvolging.takenVandaag.length > 0 ? (
               <>
@@ -595,6 +632,64 @@ export function DashboardScherm({
                 ))}
               </ul>
             )}
+
+            {opvolging.afsprakenBinnenkort.length > 0 ? (
+              <>
+                <h3 className="mb-2 mt-4 text-sm font-semibold text-ink">
+                  Afspraken vandaag en morgen ({opvolging.afsprakenBinnenkort.length})
+                </h3>
+                <ul className="space-y-1.5">
+                  {opvolging.afsprakenBinnenkort.map((afspraak) => (
+                    <li key={afspraak.id} className="flex items-baseline justify-between gap-3 text-sm">
+                      <Link
+                        href={
+                          afspraak.dealId
+                            ? `/admin/crm/deal/${afspraak.dealId}`
+                            : afspraak.organizationId
+                              ? `/admin/organisaties/${afspraak.organizationId}`
+                              : "/admin/crm/afspraken"
+                        }
+                        className="min-w-0 truncate underline-offset-4 hover:underline"
+                      >
+                        {afspraak.title}
+                      </Link>
+                      <span className="shrink-0 text-xs text-muted tabular-nums">
+                        {formatShortDate(afspraak.startsAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+
+            {opvolging.afsprakenZonderUitkomst.length > 0 ? (
+              <>
+                <h3 className="mb-2 mt-4 text-sm font-semibold text-ink">
+                  Gehouden, uitkomst ontbreekt ({opvolging.afsprakenZonderUitkomst.length})
+                </h3>
+                <ul className="space-y-1.5">
+                  {opvolging.afsprakenZonderUitkomst.map((afspraak) => (
+                    <li key={afspraak.id} className="flex items-baseline justify-between gap-3 text-sm">
+                      <Link
+                        href={
+                          afspraak.dealId
+                            ? `/admin/crm/deal/${afspraak.dealId}`
+                            : afspraak.organizationId
+                              ? `/admin/organisaties/${afspraak.organizationId}`
+                              : "/admin/crm/afspraken"
+                        }
+                        className="min-w-0 truncate underline-offset-4 hover:underline"
+                      >
+                        {afspraak.title}
+                      </Link>
+                      <span className="shrink-0 text-xs font-semibold text-warning tabular-nums">
+                        {formatShortDate(afspraak.startsAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
 
             {opvolging.dealsZonderTaak.length > 0 ? (
               <>

@@ -9,8 +9,10 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { ContactTypeBadge, PortalUitleg } from "@/components/admin/contact-badges";
 import { LifecycleBadge, StilteBadge } from "@/components/admin/crm-badges";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
+import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
+import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { CONTACT_TYPE_LABELS, getContact } from "@/lib/crm/contacten";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { LIFECYCLE_LABELS } from "@/lib/crm/regels";
@@ -33,6 +35,10 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
     { contactId: contact.id, organizationId: contact.organization_id },
     { naam: sessie.profile?.full_name ?? null, email: sessie.email }
   );
+
+  // De afspraken bij dit onderwerp. Eerst wat blijft liggen, dan wat er
+  // aankomt: dat is de volgorde waarin je ernaar kijkt.
+  const afsprakenIndeling = deelIn(await getAfspraken({ contactId: contact.id, organizationId: contact.organization_id }), new Date().toISOString());
 
   const supabase = createServiceSupabase();
   const [tijdlijn, taken, { data: organisaties }, { data: beheerders }] = await Promise.all([
@@ -233,6 +239,12 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
         <TakenBlok
           onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
           taken={taken}
+          beheerders={beheerderLijst}
+        />
+
+        <AfsprakenBlok
+          onderwerp={{ contactId: contact.id, organizationId: contact.organization_id }}
+          indeling={afsprakenIndeling}
           beheerders={beheerderLijst}
         />
 

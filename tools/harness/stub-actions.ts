@@ -28,3 +28,5 @@ export const maakBoekingVanDealAction = niets;
 export const bewaarFragmentAction = niets;
 export const archiveerFragmentAction = niets;
 export const legFragmentGebruikVastAction = async () => {};
+export const bewaarAfspraakAction = niets;
+export const zetAfspraakStandAction = niets;

@@ -9,8 +9,10 @@ import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select } from "@/components/ui/form";
 import { BetaalBadge, LeeftijdBadge } from "@/components/admin/crm-badges";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
+import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
+import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { getDeelnemer, getPeriodes } from "@/lib/crm/suri";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
 import { createServiceSupabase } from "@/lib/supabase/server";
@@ -46,6 +48,10 @@ export default async function DeelnemerPagina({ params }: { params: Promise<{ id
     { dealId: deal.id, contactId: contact.id, merk: "suri_impact" },
     { naam: sessie.profile?.full_name ?? null, email: sessie.email }
   );
+
+  // De afspraken bij dit onderwerp. Eerst wat blijft liggen, dan wat er
+  // aankomt: dat is de volgorde waarin je ernaar kijkt.
+  const afsprakenIndeling = deelIn(await getAfspraken({ dealId: deal.id, contactId: contact.id }), new Date().toISOString());
   const alleFases = [...deelnemer.fases.lopend, deelnemer.fases.gewonnen, deelnemer.fases.verloren]
     .filter((f) => f !== null)
     .map((f) => f);
@@ -257,6 +263,12 @@ export default async function DeelnemerPagina({ params }: { params: Promise<{ id
         <TakenBlok
           onderwerp={{ dealId: deal.id, contactId: contact.id }}
           taken={taken}
+          beheerders={beheerderLijst}
+        />
+
+        <AfsprakenBlok
+          onderwerp={{ dealId: deal.id, contactId: contact.id }}
+          indeling={afsprakenIndeling}
           beheerders={beheerderLijst}
         />
 

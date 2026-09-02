@@ -4,6 +4,7 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 import {
   berekenDashboard,
   type DashboardCijfers,
+  type AfspraakInvoer,
   type DealGebeurtenisInvoer,
   type DealInvoer,
   type FactuurInvoer,
@@ -20,7 +21,7 @@ import type { Merk } from "@/lib/crm/merk";
  *
  * OVER HET AANTAL VRAGEN AAN DE DATABASE
  *
- *   Dit scherm stelt zes vragen, allemaal tegelijk, en rekent daarna zelf.
+ *   Dit scherm stelt zeven vragen, allemaal tegelijk, en rekent daarna zelf.
  *   Niet zes per KPI-tegel en niet een per fase: dat zou bij twaalf fases en
  *   elf tegels op tientallen rondjes uitkomen, en dat merk je.
  *
@@ -72,6 +73,7 @@ export async function getDashboard(
     { data: factuurRijen },
     { data: suriRijen },
     { data: taakRijen },
+    { data: afspraakRijen },
   ] = await Promise.all([
     supabase
       .from("crm_pipeline_stages")
@@ -106,6 +108,16 @@ export async function getDashboard(
       .from("crm_tasks")
       .select("id, title, due_on, done_at, deal_id, organization_id, contact_id, owner_id")
       .is("done_at", null),
+
+    // Afspraken die nog aandacht vragen: wat gepland staat, en wat is gehouden
+    // zonder dat er iets is vastgelegd. Afgezegde afspraken en afgeronde met
+    // een uitkomst hoeven hier niet bij.
+    supabase
+      .from("crm_meetings")
+      .select("id, title, starts_at, ends_at, status, outcome, deal_id, organization_id")
+      .in("status", ["gepland", "gehouden"])
+      .order("starts_at", { ascending: false })
+      .limit(500),
   ]);
 
   const fases: FaseInvoer[] = (faseRijen ?? []).map((f) => ({
@@ -166,6 +178,17 @@ export async function getDashboard(
     ownerId: t.owner_id,
   }));
 
+  const afspraken: AfspraakInvoer[] = (afspraakRijen ?? []).map((a) => ({
+    id: a.id,
+    title: a.title,
+    startsAt: a.starts_at,
+    endsAt: a.ends_at,
+    status: a.status,
+    outcome: a.outcome,
+    dealId: a.deal_id,
+    organizationId: a.organization_id,
+  }));
+
   const cijfers = berekenDashboard({
     deals,
     fases,
@@ -173,6 +196,7 @@ export async function getDashboard(
     facturen,
     suriBetalingen,
     taken,
+    afspraken,
     periode,
     merk,
     vandaag,
