@@ -8,9 +8,17 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { DetailIndeling } from "@/components/admin/detail-indeling";
+import { TemplateKiezer } from "@/components/admin/template-kiezer";
 import { requireAdmin } from "@/lib/auth/session";
 import { hasServiceRole } from "@/lib/env";
-import { getDeelnames, getSequence, DEELNAME_STANDEN, STAP_SOORTEN } from "@/lib/crm/sequences";
+import {
+  blokkadeVoorSequenceStart,
+  getDeelnames,
+  getSequence,
+  DEELNAME_STANDEN,
+  STAP_SOORTEN,
+} from "@/lib/crm/sequences";
+import { bouwTokenContext } from "@/lib/crm/fragmenten";
 import { getTemplates } from "@/lib/crm/templates";
 import { getContacten } from "@/lib/crm/contacten";
 import { createServiceSupabase } from "@/lib/supabase/server";
@@ -35,7 +43,7 @@ const SOORT_ICOON = {
 } as const;
 
 export default async function SequencePagina({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  const sessie = await requireAdmin();
   const { id } = await params;
 
   if (!hasServiceRole()) {
@@ -67,7 +75,30 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
   const alIn = new Set(lopend.map((d) => d.contactId));
   const kiesbaar = contacten.filter(
     (regel) =>
-      !alIn.has(regel.contact.id) && regel.contact.email && !regel.contact.is_unsubscribed
+      !alIn.has(regel.contact.id) && blokkadeVoorSequenceStart(regel.contact) === null
+  );
+
+  const contextPerDeelname = new Map<
+    string,
+    Awaited<ReturnType<typeof bouwTokenContext>>
+  >();
+  await Promise.all(
+    lopend
+      .filter(
+        (deelname) =>
+          deelname.volgendeStap?.kind === "email" && deelname.volgendeStap.templateId
+      )
+      .map(async (deelname) => {
+        try {
+          const context = await bouwTokenContext(
+            { dealId: deelname.dealId, contactId: deelname.contactId },
+            { naam: sessie.profile?.full_name ?? null, email: sessie.email }
+          );
+          contextPerDeelname.set(deelname.id, context);
+        } catch {
+          contextPerDeelname.set(deelname.id, {});
+        }
+      })
   );
 
   return (
@@ -203,28 +234,39 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
                         <p className="mt-1 whitespace-pre-line text-sm text-muted">{stap.note}</p>
                       ) : null}
 
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <ActionForm action={verplaatsStapAction} submitLabel="Omhoog" variant="ghost" inline>
-                          <input type="hidden" name="stapId" value={stap.id} />
-                          <input type="hidden" name="sequenceId" value={reeks.id} />
-                          <input type="hidden" name="richting" value="omhoog" />
-                        </ActionForm>
-                        <ActionForm action={verplaatsStapAction} submitLabel="Omlaag" variant="ghost" inline>
-                          <input type="hidden" name="stapId" value={stap.id} />
-                          <input type="hidden" name="sequenceId" value={reeks.id} />
-                          <input type="hidden" name="richting" value="omlaag" />
-                        </ActionForm>
-                        <ActionForm action={verwijderStapAction} submitLabel="Verwijderen" variant="ghost" inline>
-                          <input type="hidden" name="stapId" value={stap.id} />
-                          <input type="hidden" name="sequenceId" value={reeks.id} />
-                        </ActionForm>
-                      </div>
+                      {reeks.aantalActief === 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {index > 0 ? (
+                            <ActionForm action={verplaatsStapAction} submitLabel="Omhoog" variant="ghost" inline>
+                              <input type="hidden" name="stapId" value={stap.id} />
+                              <input type="hidden" name="sequenceId" value={reeks.id} />
+                              <input type="hidden" name="richting" value="omhoog" />
+                            </ActionForm>
+                          ) : null}
+                          {index < reeks.stappen.length - 1 ? (
+                            <ActionForm action={verplaatsStapAction} submitLabel="Omlaag" variant="ghost" inline>
+                              <input type="hidden" name="stapId" value={stap.id} />
+                              <input type="hidden" name="sequenceId" value={reeks.id} />
+                              <input type="hidden" name="richting" value="omlaag" />
+                            </ActionForm>
+                          ) : null}
+                          <ActionForm action={verwijderStapAction} submitLabel="Verwijderen" variant="danger" inline>
+                            <input type="hidden" name="stapId" value={stap.id} />
+                            <input type="hidden" name="sequenceId" value={reeks.id} />
+                          </ActionForm>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
               </ol>
             )}
 
+            {reeks.aantalActief > 0 ? (
+              <p className="border-t border-line-soft bg-warning-wash px-5 py-3 text-sm text-warning">
+                Stappen staan vast zolang er contacten in deze reeks lopen.
+              </p>
+            ) : (
             <details className="border-t border-line-soft">
               <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
                 Stap toevoegen
@@ -284,6 +326,7 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
                 </ActionForm>
               </CardBody>
             </details>
+            )}
           </Card>
         }
         rechts={
@@ -298,6 +341,7 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
                 <ul>
                   {lopend.map((deelname) => {
                     const teLaat = deelname.nextActionAt !== null && deelname.nextActionAt < vandaag;
+                    const volgendeStap = deelname.volgendeStap;
                     return (
                       <li key={deelname.id} className="border-b border-line-soft px-5 py-3 last:border-b-0">
                         <Link
@@ -313,8 +357,81 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
                             : ""}
                         </p>
 
+                        {volgendeStap ? (
+                          <div className="mt-2 rounded-card border border-line-soft bg-surface-2 px-3 py-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-soft">
+                              Volgende stap · {STAP_SOORTEN[volgendeStap.kind]}
+                            </p>
+                            <p className="mt-0.5 text-sm font-semibold text-ink">
+                              {volgendeStap.kind === "email"
+                                ? volgendeStap.templateNaam
+                                : volgendeStap.title}
+                            </p>
+                            {volgendeStap.note ? (
+                              <p className="mt-1 whitespace-pre-line text-xs text-muted">
+                                {volgendeStap.note}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-pill bg-surface-3" aria-hidden>
+                          <div
+                            className="h-full rounded-pill bg-accent"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.max(
+                                  0,
+                                  ((deelname.nextStep - 1) / Math.max(deelname.aantalStappen, 1)) * 100
+                                )
+                              )}%`,
+                            }}
+                          />
+                        </div>
+
+                        {volgendeStap?.kind === "email" &&
+                        volgendeStap.templateId &&
+                        volgendeStap.templateNaam &&
+                        volgendeStap.templateOnderwerp &&
+                        volgendeStap.templateTekst ? (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-semibold text-muted">
+                              E-mail voorbereiden
+                            </summary>
+                            <div className="mt-2 border-l-2 border-line-soft pl-3">
+                              <TemplateKiezer
+                                templates={[
+                                  {
+                                    id: volgendeStap.templateId,
+                                    naam: volgendeStap.templateNaam,
+                                    onderwerp: volgendeStap.templateOnderwerp,
+                                    tekst: volgendeStap.templateTekst,
+                                    categorie: null,
+                                  },
+                                ]}
+                                context={contextPerDeelname.get(deelname.id) ?? {}}
+                                naarEmail={deelname.contactEmail}
+                                standaardTemplateId={volgendeStap.templateId}
+                                toonKeuze={false}
+                              />
+                            </div>
+                          </details>
+                        ) : null}
+
                         <div className="mt-1.5 flex flex-wrap gap-2">
-                          <ActionForm action={stapGedaanAction} submitLabel="Stap gedaan" variant="secondary" inline>
+                          <ActionForm
+                            action={stapGedaanAction}
+                            submitLabel={
+                              volgendeStap?.kind === "email"
+                                ? "E-mail verzonden"
+                                : volgendeStap?.kind === "taak"
+                                  ? "Taak afgerond"
+                                  : "Stap afgerond"
+                            }
+                            variant="secondary"
+                            inline
+                          >
                             <input type="hidden" name="deelnameId" value={deelname.id} />
                             <input type="hidden" name="sequenceId" value={reeks.id} />
                           </ActionForm>
@@ -346,6 +463,7 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
                 </ul>
               )}
 
+              {reeks.isActive ? (
               <details className="border-t border-line-soft">
                 <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
                   Contact toevoegen
@@ -372,6 +490,11 @@ export default async function SequencePagina({ params }: { params: Promise<{ id:
                   </ActionForm>
                 </CardBody>
               </details>
+              ) : (
+                <p className="border-t border-line-soft px-5 py-3 text-sm text-muted">
+                  Zet de reeks aan voordat je contacten toevoegt.
+                </p>
+              )}
             </Card>
 
             {klaar.length > 0 ? (

@@ -933,10 +933,10 @@ export async function verplaatsStapAction(
   formData: FormData
 ): Promise<AdminState> {
   return veilig(async () => {
-    await actor();
+    const wie = await actor();
     const richting = tekst(formData, "richting") === "omhoog" ? "omhoog" : "omlaag";
 
-    await verplaatsStap(tekst(formData, "stapId"), richting);
+    await verplaatsStap(tekst(formData, "stapId"), richting, wie);
 
     revalidatePath(`/admin/crm/sequences/${tekst(formData, "sequenceId")}`);
     return { status: "ok", message: "De volgorde is aangepast." };
@@ -948,9 +948,9 @@ export async function verwijderStapAction(
   formData: FormData
 ): Promise<AdminState> {
   return veilig(async () => {
-    await actor();
+    const wie = await actor();
 
-    await verwijderStap(tekst(formData, "stapId"));
+    await verwijderStap(tekst(formData, "stapId"), wie);
 
     revalidatePath(`/admin/crm/sequences/${tekst(formData, "sequenceId")}`);
     return { status: "ok", message: "De stap is weg." };

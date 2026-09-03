@@ -43,6 +43,7 @@ export function FragmentKiezer({
   onderwerp,
   label = "Fragment invoegen",
   standaardOpen = false,
+  gebruikVastleggen = true,
 }: {
   fragmenten: KiesbaarFragment[];
   context: TokenContext;
@@ -51,6 +52,8 @@ export function FragmentKiezer({
   label?: string;
   /** Alleen voor de visuele controle, zodat de lijst op een schermafbeelding staat. */
   standaardOpen?: boolean;
+  /** Bij het samenstellen van een template is invoegen nog geen echt gebruik. */
+  gebruikVastleggen?: boolean;
 }) {
   const [open, setOpen] = useState(standaardOpen);
   const [zoek, setZoek] = useState("");
@@ -95,12 +98,14 @@ export function FragmentKiezer({
 
     // De telling. Bewust zonder await en zonder foutafhandeling in beeld: of
     // dit lukt mag niemand tegenhouden.
-    const gegevens = new FormData();
-    gegevens.set("snippetId", fragment.id);
-    if (onderwerp.organizationId) gegevens.set("organizationId", onderwerp.organizationId);
-    if (onderwerp.contactId) gegevens.set("contactId", onderwerp.contactId);
-    if (onderwerp.dealId) gegevens.set("dealId", onderwerp.dealId);
-    void legFragmentGebruikVastAction(gegevens);
+    if (gebruikVastleggen) {
+      const gegevens = new FormData();
+      gegevens.set("snippetId", fragment.id);
+      if (onderwerp.organizationId) gegevens.set("organizationId", onderwerp.organizationId);
+      if (onderwerp.contactId) gegevens.set("contactId", onderwerp.contactId);
+      if (onderwerp.dealId) gegevens.set("dealId", onderwerp.dealId);
+      void legFragmentGebruikVastAction(gegevens);
+    }
   }
 
   return (

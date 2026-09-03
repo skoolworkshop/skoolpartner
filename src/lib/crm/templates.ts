@@ -124,6 +124,13 @@ export async function bewaarTemplate(invoer: TemplateInvoer, actor: Actor): Prom
   if (onderwerp.length < 2) throw new Error("Een template zonder onderwerpregel kun je niet versturen.");
   if (tekst.length < 2) throw new Error("Geef het template een tekst.");
 
+  const onbekend = tokensIn(`${onderwerp}\n${tekst}`).onbekend;
+  if (onbekend.length > 0) {
+    throw new Error(
+      `Onbekend personalisatieveld: ${onbekend.map((token) => `{{${token}}}`).join(", ")}. Controleer de spelling.`
+    );
+  }
+
   const velden = {
     brand: invoer.brand,
     name: naam,

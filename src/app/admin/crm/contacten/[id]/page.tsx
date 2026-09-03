@@ -15,6 +15,7 @@ import { TemplateKiezer } from "@/components/admin/template-kiezer";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
 import { getTemplates } from "@/lib/crm/templates";
+import { getActiefMerk } from "@/lib/crm/actief-merk";
 import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { CONTACT_TYPE_LABELS, getContact } from "@/lib/crm/contacten";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
@@ -33,9 +34,10 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
   if (!detail) notFound();
 
   const { contact, organisatieNaam, portal, stilte, deals, boekingen, geverifieerdeMail } = detail;
+  const merk = await getActiefMerk();
 
   const fragmentHulp = await getFragmentHulp(
-    { contactId: contact.id, organizationId: contact.organization_id },
+    { contactId: contact.id, organizationId: contact.organization_id, merk },
     { naam: sessie.profile?.full_name ?? null, email: sessie.email }
   );
 
@@ -47,7 +49,7 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
   const [tijdlijn, taken, templates, { data: organisaties }, { data: beheerders }] = await Promise.all([
     getTijdlijn({ contactId: id, organizationId: contact.organization_id }),
     getTakenVoor({ contactId: id }),
-    getTemplates(),
+    getTemplates({ merk }),
     supabase.from("organizations").select("id, name").order("name").limit(500),
     supabase.from("profiles").select("id, full_name, email").eq("is_admin", true).order("full_name"),
   ]);

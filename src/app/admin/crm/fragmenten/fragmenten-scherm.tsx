@@ -250,10 +250,10 @@ export function FragmentenScherm({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader
-            title="Nieuw fragment"
-            description="De sneltoets vullen we zelf in als je hem leeg laat."
-          />
+          <details>
+            <summary className="cursor-pointer px-5 py-4 font-display text-base font-semibold">
+              Nieuw fragment
+            </summary>
           <CardBody>
             <ActionForm action={bewaarFragmentAction} submitLabel="Fragment opslaan">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -290,13 +290,14 @@ export function FragmentenScherm({
               </Field>
             </ActionForm>
           </CardBody>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader
-            title="Wat je kunt invullen"
-            description="Zet een token in de tekst en het wordt vervangen door de echte gegevens."
-          />
+          <details>
+            <summary className="cursor-pointer px-5 py-4 font-display text-base font-semibold">
+              Personalisatievelden
+            </summary>
           <CardBody>
             <p className="mb-3 text-sm text-muted">
               Ontbreekt een gegeven, dan blijft het token zichtbaar staan in plaats van dat er een
@@ -318,6 +319,7 @@ export function FragmentenScherm({
               ))}
             </dl>
           </CardBody>
+          </details>
         </Card>
       </div>
     </>

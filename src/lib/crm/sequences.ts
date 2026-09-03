@@ -4,6 +4,7 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
 import { vertaalFout, type Actor } from "@/lib/crm/mutations";
 import { isMerk, type Merk } from "@/lib/crm/merk";
+import { isValidEmail } from "@/lib/account";
 
 /**
  * Sequences: een reeks opvolgstappen die klaarzet wat er moet gebeuren.
@@ -63,6 +64,7 @@ export interface Stap {
   templateId: string | null;
   templateNaam: string | null;
   templateOnderwerp: string | null;
+  templateTekst: string | null;
   title: string | null;
   note: string | null;
 }
@@ -88,6 +90,7 @@ export interface Deelname {
   contactId: string;
   contactNaam: string;
   contactEmail: string | null;
+  dealId: string | null;
   status: DeelnameStand;
   nextStep: number;
   nextActionAt: string | null;
@@ -96,6 +99,22 @@ export interface Deelname {
   finishedAt: string | null;
   /** Hoeveel stappen de reeks heeft, zodat je voortgang kunt tonen. */
   aantalStappen: number;
+  /** De concrete stap die nu klaarstaat, niet alleen het volgnummer. */
+  volgendeStap: Stap | null;
+}
+
+export function blokkadeVoorSequenceStart(contact: {
+  full_name: string;
+  email: string | null;
+  is_unsubscribed: boolean;
+}): string | null {
+  if (contact.is_unsubscribed) {
+    return `${contact.full_name} heeft zich afgemeld voor commerciële mail.`;
+  }
+  if (!isValidEmail(contact.email)) {
+    return `${contact.full_name} heeft geen geldig e-mailadres.`;
+  }
+  return null;
 }
 
 /**
@@ -146,7 +165,7 @@ export async function getSequences(merk?: Merk): Promise<Sequence[]> {
     await Promise.all([
       supabase.from("crm_sequence_steps").select("*").in("sequence_id", ids).order("position"),
       supabase.from("crm_sequence_enrollments").select("sequence_id, status").in("sequence_id", ids),
-      supabase.from("crm_templates").select("id, name, subject"),
+      supabase.from("crm_templates").select("id, name, subject, body"),
       supabase.from("profiles").select("id, full_name, email"),
     ]);
 
@@ -174,6 +193,7 @@ export async function getSequences(merk?: Merk): Promise<Sequence[]> {
           templateId: stap.template_id,
           templateNaam: template?.name ?? null,
           templateOnderwerp: template?.subject ?? null,
+          templateTekst: template?.body ?? null,
           title: stap.title,
           note: stap.note,
         };
@@ -205,21 +225,39 @@ export async function getDeelnames(sequenceId?: string): Promise<Deelname[]> {
   const contactIds = [...new Set(rijen.map((r) => r.contact_id))];
   const sequenceIds = [...new Set(rijen.map((r) => r.sequence_id))];
 
-  const [{ data: contacten }, { data: reeksen }, { data: stappen }] = await Promise.all([
+  const [{ data: contacten }, { data: reeksen }, { data: stappen }, { data: templates }] = await Promise.all([
     supabase.from("crm_contacts").select("id, full_name, email").in("id", contactIds),
     supabase.from("crm_sequences").select("id, name").in("id", sequenceIds),
-    supabase.from("crm_sequence_steps").select("sequence_id").in("sequence_id", sequenceIds),
+    supabase.from("crm_sequence_steps").select("*").in("sequence_id", sequenceIds).order("position"),
+    supabase.from("crm_templates").select("id, name, subject, body"),
   ]);
 
   const contactPerId = new Map((contacten ?? []).map((c) => [c.id, c]));
   const reeksPerId = new Map((reeksen ?? []).map((r) => [r.id, r.name]));
-  const stappenPerReeks = new Map<string, number>();
-  for (const stap of stappen ?? []) {
-    stappenPerReeks.set(stap.sequence_id, (stappenPerReeks.get(stap.sequence_id) ?? 0) + 1);
+  const templatePerId = new Map((templates ?? []).map((template) => [template.id, template]));
+  const stappenPerReeks = new Map<string, Stap[]>();
+  for (const rij of (stappen ?? []) as StapRij[]) {
+    const template = rij.template_id ? templatePerId.get(rij.template_id) : null;
+    const stap: Stap = {
+      id: rij.id,
+      position: rij.position,
+      waitDays: rij.wait_days,
+      kind: isStapSoort(rij.kind) ? rij.kind : "taak",
+      templateId: rij.template_id,
+      templateNaam: template?.name ?? null,
+      templateOnderwerp: template?.subject ?? null,
+      templateTekst: template?.body ?? null,
+      title: rij.title,
+      note: rij.note,
+    };
+    const lijst = stappenPerReeks.get(rij.sequence_id) ?? [];
+    lijst.push(stap);
+    stappenPerReeks.set(rij.sequence_id, lijst);
   }
 
   return rijen.map((rij) => {
     const contact = contactPerId.get(rij.contact_id);
+    const eigenStappen = stappenPerReeks.get(rij.sequence_id) ?? [];
     return {
       id: rij.id,
       sequenceId: rij.sequence_id,
@@ -227,13 +265,15 @@ export async function getDeelnames(sequenceId?: string): Promise<Deelname[]> {
       contactId: rij.contact_id,
       contactNaam: contact?.full_name ?? "onbekend contact",
       contactEmail: contact?.email ?? null,
+      dealId: rij.deal_id,
       status: (rij.status as DeelnameStand) ?? "actief",
       nextStep: rij.next_step,
       nextActionAt: rij.next_action_at,
       stopReason: rij.stop_reason,
       startedAt: rij.started_at,
       finishedAt: rij.finished_at,
-      aantalStappen: stappenPerReeks.get(rij.sequence_id) ?? 0,
+      aantalStappen: eigenStappen.length,
+      volgendeStap: eigenStappen[rij.next_step - 1] ?? null,
     };
   });
 }
@@ -256,6 +296,17 @@ export async function bewaarSequence(invoer: SequenceInvoer, actor: Actor): Prom
 
   const naam = invoer.name.trim();
   if (naam.length < 2) throw new Error("Geef de reeks een naam.");
+
+  if (invoer.isActive) {
+    if (!invoer.id) {
+      throw new Error("Maak de reeks eerst aan en voeg stappen toe voordat je hem activeert.");
+    }
+    const { count } = await supabase
+      .from("crm_sequence_steps")
+      .select("id", { count: "exact", head: true })
+      .eq("sequence_id", invoer.id);
+    if (!count) throw new Error("Voeg minstens één stap toe voordat je de reeks activeert.");
+  }
 
   const velden = {
     brand: invoer.brand,
@@ -296,9 +347,31 @@ export interface StapInvoer {
   note: string | null;
 }
 
+async function verzekerBewerkbareStappen(sequenceId: string): Promise<void> {
+  const supabase = createServiceSupabase();
+  const { count, error } = await supabase
+    .from("crm_sequence_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("sequence_id", sequenceId)
+    .in("status", ["actief", "gepauzeerd"]);
+  if (error) throw new Error(vertaalFout(error));
+  if (count) {
+    throw new Error("De stappen kunnen niet wijzigen zolang er contacten in deze reeks lopen.");
+  }
+}
+
 /** Een stap onderaan de reeks. De plek bepaalt het systeem, niet de invoerder. */
 export async function voegStapToe(invoer: StapInvoer, actor: Actor): Promise<void> {
   const supabase = createServiceSupabase();
+  await verzekerBewerkbareStappen(invoer.sequenceId);
+
+  const { data: reeks, error: reeksFout } = await supabase
+    .from("crm_sequences")
+    .select("brand")
+    .eq("id", invoer.sequenceId)
+    .maybeSingle();
+  if (reeksFout) throw new Error(vertaalFout(reeksFout));
+  if (!reeks) throw new Error("Deze reeks bestaat niet meer.");
 
   const { data: bestaand } = await supabase
     .from("crm_sequence_steps")
@@ -311,6 +384,20 @@ export async function voegStapToe(invoer: StapInvoer, actor: Actor): Promise<voi
 
   if (invoer.kind === "email" && !invoer.templateId) {
     throw new Error("Kies een template voor deze e-mailstap.");
+  }
+  if (invoer.kind === "email" && invoer.templateId) {
+    const { data: template, error: templateFout } = await supabase
+      .from("crm_templates")
+      .select("brand, is_archived")
+      .eq("id", invoer.templateId)
+      .maybeSingle();
+    if (templateFout) throw new Error(vertaalFout(templateFout));
+    if (!template || template.is_archived) {
+      throw new Error("Dit template is niet meer beschikbaar.");
+    }
+    if (template.brand !== null && template.brand !== reeks.brand) {
+      throw new Error("Dit template hoort bij een ander merk dan de reeks.");
+    }
   }
   if (invoer.kind !== "email" && (invoer.title?.trim().length ?? 0) < 2) {
     throw new Error("Zeg wat er bij deze stap moet gebeuren.");
@@ -345,7 +432,11 @@ export async function voegStapToe(invoer: StapInvoer, actor: Actor): Promise<voi
  * niet even dezelfde plek delen. Daarom gaat het ruilen via een tijdelijke
  * negatieve plek: eerst eentje opzij, dan de ander, dan terug.
  */
-export async function verplaatsStap(stapId: string, richting: "omhoog" | "omlaag"): Promise<void> {
+export async function verplaatsStap(
+  stapId: string,
+  richting: "omhoog" | "omlaag",
+  actor: Actor
+): Promise<void> {
   const supabase = createServiceSupabase();
 
   const { data: stap } = await supabase
@@ -354,6 +445,7 @@ export async function verplaatsStap(stapId: string, richting: "omhoog" | "omlaag
     .eq("id", stapId)
     .maybeSingle();
   if (!stap) throw new Error("Deze stap bestaat niet.");
+  await verzekerBewerkbareStappen(stap.sequence_id);
 
   const { data: buur } = await supabase
     .from("crm_sequence_steps")
@@ -366,15 +458,62 @@ export async function verplaatsStap(stapId: string, richting: "omhoog" | "omlaag
   const ander = buur?.[0];
   if (!ander) return; // Al bovenaan of onderaan; niets te doen.
 
-  await supabase.from("crm_sequence_steps").update({ position: -1 }).eq("id", stap.id);
-  await supabase.from("crm_sequence_steps").update({ position: stap.position }).eq("id", ander.id);
-  await supabase.from("crm_sequence_steps").update({ position: ander.position }).eq("id", stap.id);
+  const tijdelijkePositie = Math.min(stap.position, ander.position, 0) - 1;
+  const eerste = await supabase
+    .from("crm_sequence_steps")
+    .update({ position: tijdelijkePositie })
+    .eq("id", stap.id);
+  if (eerste.error) throw new Error(vertaalFout(eerste.error));
+
+  const tweede = await supabase
+    .from("crm_sequence_steps")
+    .update({ position: stap.position })
+    .eq("id", ander.id);
+  if (tweede.error) {
+    await supabase.from("crm_sequence_steps").update({ position: stap.position }).eq("id", stap.id);
+    throw new Error(vertaalFout(tweede.error));
+  }
+
+  const derde = await supabase
+    .from("crm_sequence_steps")
+    .update({ position: ander.position })
+    .eq("id", stap.id);
+  if (derde.error) {
+    await supabase.from("crm_sequence_steps").update({ position: ander.position }).eq("id", ander.id);
+    await supabase.from("crm_sequence_steps").update({ position: stap.position }).eq("id", stap.id);
+    throw new Error(vertaalFout(derde.error));
+  }
+
+  await recordAudit({
+    actorId: actor.userId,
+    actorEmail: actor.email,
+    action: "crm.sequence.stap_verplaatst",
+    entityType: "crm_sequence",
+    entityId: stap.sequence_id,
+    after: { stap_id: stap.id, richting },
+  });
 }
 
-export async function verwijderStap(stapId: string): Promise<void> {
+export async function verwijderStap(stapId: string, actor: Actor): Promise<void> {
   const supabase = createServiceSupabase();
+  const { data: stap } = await supabase
+    .from("crm_sequence_steps")
+    .select("id, sequence_id")
+    .eq("id", stapId)
+    .maybeSingle();
+  if (!stap) throw new Error("Deze stap bestaat niet.");
+  await verzekerBewerkbareStappen(stap.sequence_id);
   const { error } = await supabase.from("crm_sequence_steps").delete().eq("id", stapId);
   if (error) throw new Error(vertaalFout(error));
+
+  await recordAudit({
+    actorId: actor.userId,
+    actorEmail: actor.email,
+    action: "crm.sequence.stap_verwijderd",
+    entityType: "crm_sequence",
+    entityId: stap.sequence_id,
+    after: { stap_id: stapId },
+  });
 }
 
 /**
@@ -394,18 +533,22 @@ export async function meldAan(
 ): Promise<void> {
   const supabase = createServiceSupabase();
 
+  const { data: sequence } = await supabase
+    .from("crm_sequences")
+    .select("id, is_active")
+    .eq("id", sequenceId)
+    .maybeSingle();
+  if (!sequence) throw new Error("Deze reeks bestaat niet.");
+  if (!sequence.is_active) throw new Error("Zet de reeks eerst aan voordat je een contact toevoegt.");
+
   const { data: contact } = await supabase
     .from("crm_contacts")
     .select("id, full_name, email, is_unsubscribed")
     .eq("id", contactId)
     .maybeSingle();
   if (!contact) throw new Error("Dit contact bestaat niet.");
-  if (contact.is_unsubscribed) {
-    throw new Error(`${contact.full_name} heeft zich afgemeld voor commerciele mail.`);
-  }
-  if (!contact.email) {
-    throw new Error(`${contact.full_name} heeft geen e-mailadres.`);
-  }
+  const blokkade = blokkadeVoorSequenceStart(contact);
+  if (blokkade) throw new Error(blokkade);
 
   const { data: stappen } = await supabase
     .from("crm_sequence_steps")

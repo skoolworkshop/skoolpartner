@@ -118,13 +118,11 @@ export default async function SequencesPagina() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Meteen aanzetten" htmlFor="reeks-actief">
-                <Select id="reeks-actief" name="isActive" defaultValue="nee">
-                  <option value="nee">Nee, eerst stappen toevoegen</option>
-                  <option value="ja">Ja</option>
-                </Select>
-              </Field>
+              <div className="rounded-card bg-surface-2 px-4 py-3 text-sm text-muted">
+                Nieuwe reeksen beginnen uit. Voeg eerst de stappen toe en zet de reeks daarna aan.
+              </div>
             </div>
+            <input type="hidden" name="isActive" value="nee" />
             <Field label="Waar is deze reeks voor" htmlFor="reeks-omschrijving">
               <Textarea id="reeks-omschrijving" name="description" rows={2} />
             </Field>

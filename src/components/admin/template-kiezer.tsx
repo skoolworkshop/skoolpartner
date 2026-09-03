@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Copy, Mail } from "lucide-react";
 
 import { vulFragment, type TokenContext } from "@/lib/crm/fragment-tekst";
@@ -39,14 +39,20 @@ export function TemplateKiezer({
   templates,
   context,
   naarEmail,
+  standaardTemplateId = "",
+  toonKeuze = true,
 }: {
   templates: KiesbaarTemplate[];
   context: TokenContext;
   /** Het adres van dit contact, als dat bekend is. */
   naarEmail?: string | null;
+  /** Handig bij een sequence: daar ligt het template al vast in de stap. */
+  standaardTemplateId?: string;
+  toonKeuze?: boolean;
 }) {
-  const [gekozenId, setGekozenId] = useState<string>("");
+  const [gekozenId, setGekozenId] = useState<string>(standaardTemplateId);
   const [gekopieerd, setGekopieerd] = useState(false);
+  const keuzeId = useId();
 
   const gekozen = templates.find((t) => t.id === gekozenId) ?? null;
 
@@ -58,6 +64,7 @@ export function TemplateKiezer({
       onderwerp: onderwerp.tekst,
       tekst: tekst.tekst,
       ontbrekend: [...new Set([...onderwerp.ontbrekend, ...tekst.ontbrekend])],
+      onbekend: [...new Set([...onderwerp.onbekend, ...tekst.onbekend])],
     };
   }, [gekozen, context]);
 
@@ -78,26 +85,30 @@ export function TemplateKiezer({
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-semibold" htmlFor="template-keuze">
-        Welk bericht
-      </label>
-      <select
-        id="template-keuze"
-        value={gekozenId}
-        onChange={(event) => {
-          setGekozenId(event.target.value);
-          setGekopieerd(false);
-        }}
-        className="h-11 w-full rounded-card border border-line bg-white px-3 text-sm"
-      >
-        <option value="">Kies een template</option>
-        {templates.map((template) => (
-          <option key={template.id} value={template.id}>
-            {template.naam}
-            {template.categorie ? ` · ${template.categorie}` : ""}
-          </option>
-        ))}
-      </select>
+      {toonKeuze ? (
+        <>
+          <label className="block text-sm font-semibold" htmlFor={keuzeId}>
+            Welk bericht
+          </label>
+          <select
+            id={keuzeId}
+            value={gekozenId}
+            onChange={(event) => {
+              setGekozenId(event.target.value);
+              setGekopieerd(false);
+            }}
+            className="h-11 w-full rounded-card border border-line bg-white px-3 text-sm"
+          >
+            <option value="">Kies een template</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.naam}
+                {template.categorie ? ` · ${template.categorie}` : ""}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : null}
 
       {gevuld ? (
         <>
@@ -105,6 +116,13 @@ export function TemplateKiezer({
             <p className="rounded-card bg-warning-wash px-3 py-2 text-xs font-semibold text-warning">
               Nog niet ingevuld: {gevuld.ontbrekend.map((naam) => `{{${naam}}}`).join(", ")}. Die
               staan zo ook in het bericht, dus vul ze aan voordat je verstuurt.
+            </p>
+          ) : null}
+
+          {gevuld.onbekend.length > 0 ? (
+            <p className="rounded-card bg-danger-wash px-3 py-2 text-xs font-semibold text-danger">
+              Onbekend personalisatieveld: {gevuld.onbekend.map((naam) => `{{${naam}}}`).join(", ")}.
+              Corrigeer het template voordat je dit bericht gebruikt.
             </p>
           ) : null}
 

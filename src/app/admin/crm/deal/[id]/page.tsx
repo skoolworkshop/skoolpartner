@@ -9,8 +9,10 @@ import { Alert } from "@/components/ui/feedback";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
+import { TemplateKiezer } from "@/components/admin/template-kiezer";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
+import { getTemplates } from "@/lib/crm/templates";
 import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { getDeal } from "@/lib/crm/pijplijn";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
@@ -36,14 +38,15 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
   if (detail.deal.brand === "suri_impact") redirect(`/admin/crm/suri/deelnemer/${id}`);
 
   const supabase = createServiceSupabase();
-  const [tijdlijn, taken, { data: beheerders }, { data: contacten }] = await Promise.all([
+  const [tijdlijn, taken, templates, { data: beheerders }, { data: contacten }] = await Promise.all([
     getTijdlijn({ dealId: id, organizationId: detail.deal.organization_id }),
     getTakenVoor({ dealId: id }),
+    getTemplates({ merk: detail.deal.brand }),
     supabase.from("profiles").select("id, full_name, email").eq("is_admin", true).order("full_name"),
     detail.deal.organization_id
       ? supabase
           .from("crm_contacts")
-          .select("id, full_name")
+          .select("id, full_name, email")
           .eq("organization_id", detail.deal.organization_id)
           .order("full_name")
       : Promise.resolve({ data: [] }),
@@ -64,6 +67,7 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
   const afsprakenIndeling = deelIn(await getAfspraken({ dealId: deal.id, organizationId: deal.organization_id }), new Date().toISOString());
   const alleFases = [...fases.lopend, fases.gewonnen, fases.verloren].filter((f) => f !== null);
   const euro = (centen: number) => (centen / 100).toFixed(2).replace(".", ",");
+  const contactEmail = (contacten ?? []).find((contact) => contact.id === deal.contact_id)?.email ?? null;
 
   return (
     <>
@@ -266,6 +270,23 @@ export default async function DealPagina({ params }: { params: Promise<{ id: str
           fragmenten={fragmentHulp.fragmenten}
           fragmentContext={fragmentHulp.context}
         />
+
+        <Card>
+          <CardHeader title="Template gebruiken" />
+          <CardBody>
+            <TemplateKiezer
+              templates={templates.map((template) => ({
+                id: template.id,
+                naam: template.name,
+                onderwerp: template.subject,
+                tekst: template.body,
+                categorie: template.category,
+              }))}
+              context={fragmentHulp.context}
+              naarEmail={contactEmail}
+            />
+          </CardBody>
+        </Card>
 
         <TakenBlok
           onderwerp={{ dealId: deal.id, organizationId: deal.organization_id }}

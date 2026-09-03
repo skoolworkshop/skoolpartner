@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ActionForm } from "@/components/admin/action-form";
+import { FragmentKiezer } from "@/components/admin/fragment-kiezer";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
@@ -8,7 +9,8 @@ import { requireAdmin } from "@/lib/auth/session";
 import { hasServiceRole } from "@/lib/env";
 import { getActiefMerk } from "@/lib/crm/actief-merk";
 import { getTemplates, type Template } from "@/lib/crm/templates";
-import { TOKENS } from "@/lib/crm/fragment-tekst";
+import { filterFragmenten, getFragmenten } from "@/lib/crm/fragmenten";
+import { TOKENS, type KiesbaarFragment } from "@/lib/crm/fragment-tekst";
 import { MERKEN, merkLabel } from "@/lib/crm/merk";
 import { archiveerTemplateAction, bewaarTemplateAction } from "@/app/admin/crm/actions";
 
@@ -25,7 +27,13 @@ export const metadata: Metadata = { title: "Templates" };
  * dit scherm begint met wat je hebt en niet met wat je zou kunnen maken.
  */
 
-function Velden({ template }: { template?: Template }) {
+function Velden({
+  template,
+  fragmenten,
+}: {
+  template?: Template;
+  fragmenten: KiesbaarFragment[];
+}) {
   const id = template?.id ?? "nieuw";
   return (
     <>
@@ -67,6 +75,14 @@ function Velden({ template }: { template?: Template }) {
       <Field label="Bericht" htmlFor={`tekst-${id}`} required showOptional={false}>
         <Textarea id={`tekst-${id}`} name="body" rows={8} required defaultValue={template?.body} />
       </Field>
+      <FragmentKiezer
+        fragmenten={fragmenten}
+        context={{}}
+        doelId={`tekst-${id}`}
+        onderwerp={{}}
+        label="Fragment invoegen"
+        gebruikVastleggen={false}
+      />
 
       <Field label="Categorie" htmlFor={`categorie-${id}`}>
         <Input
@@ -99,8 +115,18 @@ export default async function TemplatesPagina({
   }
 
   const toonArchief = archief === "ja";
-  const templates = await getTemplates({ merk, zoek, metGearchiveerde: toonArchief });
+  const [templates, alleFragmenten] = await Promise.all([
+    getTemplates({ merk, zoek, metGearchiveerde: toonArchief }),
+    getFragmenten(),
+  ]);
   const zichtbaar = toonArchief ? templates.filter((t) => t.isArchived) : templates;
+  const fragmenten = filterFragmenten(alleFragmenten, { merk }).map((fragment) => ({
+    id: fragment.id,
+    naam: fragment.name,
+    sneltoets: fragment.shortcut,
+    categorie: fragment.category,
+    tekst: fragment.body,
+  }));
 
   return (
     <>
@@ -172,7 +198,7 @@ export default async function TemplatesPagina({
                   </summary>
                   <CardBody className="pt-0">
                     <ActionForm action={bewaarTemplateAction} submitLabel="Opslaan" variant="secondary">
-                      <Velden template={template} />
+                      <Velden template={template} fragmenten={fragmenten} />
                     </ActionForm>
                     <div className="mt-4 border-t border-line-soft pt-4">
                       <ActionForm
@@ -203,7 +229,7 @@ export default async function TemplatesPagina({
         </summary>
         <CardBody className="pt-0">
           <ActionForm action={bewaarTemplateAction} submitLabel="Template opslaan">
-            <Velden />
+            <Velden fragmenten={fragmenten} />
           </ActionForm>
         </CardBody>
       </details>
