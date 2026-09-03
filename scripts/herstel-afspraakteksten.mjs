@@ -79,13 +79,18 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   als in het importscript, en om dezelfde reden.
 */
 let platteTekst;
+/* Als esbuild eraan te pas komt, start dat een apart proces. Dat moet weer uit;
+   zie de uitleg onderaan bij het afsluiten. */
+let stopEsbuild = null;
 try {
   ({ platteTekst } = await import(
     pathToFileURL(path.join(root, "src/lib/crm/afspraak-tekst.ts")).href
   ));
 } catch (eersteFout) {
   try {
-    const { build } = await import("esbuild");
+    const esbuild = await import("esbuild");
+    const { build } = esbuild;
+    stopEsbuild = esbuild.stop ?? null;
     const uit = path.join(root, ".hubspot-import", "afspraak-tekst.cjs");
     mkdirSync(path.dirname(uit), { recursive: true });
     await build({
@@ -148,29 +153,59 @@ for (const rij of teDoen.slice(0, 3)) {
   console.log("    na:   %s", rij.na.replace(/\s+/g, " ").slice(0, 120));
 }
 
+/*
+  ============================================================================
+  WAAROM HIER GEEN process.exit STAAT
+  ============================================================================
+
+  Dat stond er eerst wel, en op Windows liep het script daarop stuk met:
+
+    Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c
+
+  process.exit trekt het proces onderuit terwijl er nog dingen open staan: de
+  verbindingen die supabase-js openhoudt, en het losse proces dat esbuild start.
+  Op Windows valt libuv daar precies dan over, nadat al het werk al klaar is. De
+  melding kwam dus na een geslaagde proefdraai, en zei niets over de gegevens.
+
+  De oplossing is niet harder afsluiten maar netter: zeg wat de afloopcode moet
+  worden, ruim op wat wij zelf hebben gestart, en laat Node zelf eindigen zodra
+  er niets meer te doen is. Dan gaat er ook niets verloren wat nog onderweg was.
+*/
+async function ruimOp() {
+  if (stopEsbuild) {
+    try {
+      await stopEsbuild();
+    } catch {
+      // Al gestopt, of nooit gestart. Geen reden om het script te laten vallen.
+    }
+  }
+}
+
 if (!SCHRIJVEN) {
   console.log("");
   console.log("  Proefdraai: er is niets veranderd. Draai met --schrijf als dit klopt.");
   console.log("");
-  process.exit(0);
-}
-
-console.log("");
-let gedaan = 0;
-for (const rij of teDoen) {
-  const { error: schrijfFout } = await supabase
-    .from("crm_meetings")
-    .update({ note: rij.na })
-    .eq("id", rij.id);
-  if (schrijfFout) {
-    console.error("  FOUT bij %s: %s", rij.titel, schrijfFout.message);
-    process.exitCode = 1;
-    break;
+  await ruimOp();
+  process.exitCode = 0;
+} else {
+  console.log("");
+  let gedaan = 0;
+  for (const rij of teDoen) {
+    const { error: schrijfFout } = await supabase
+      .from("crm_meetings")
+      .update({ note: rij.na })
+      .eq("id", rij.id);
+    if (schrijfFout) {
+      console.error("  FOUT bij %s: %s", rij.titel, schrijfFout.message);
+      process.exitCode = 1;
+      break;
+    }
+    gedaan += 1;
+    process.stdout.write(`\r  ${gedaan} / ${teDoen.length}`);
   }
-  gedaan += 1;
-  process.stdout.write(`\r  ${gedaan} / ${teDoen.length}`);
-}
 
-console.log("");
-console.log("  Klaar. De oorspronkelijke teksten staan nog in het JSON-bestand hierboven.");
-console.log("");
+  console.log("");
+  console.log("  Klaar. De oorspronkelijke teksten staan nog in het JSON-bestand hierboven.");
+  console.log("");
+  await ruimOp();
+}

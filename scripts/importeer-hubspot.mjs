@@ -119,11 +119,16 @@ mkdirSync(cache, { recursive: true });
   vanuit een Linux-schil gebruiken loopt daarop stuk. Vandaar de volgorde.
 */
 let omzetting;
+/* Als esbuild eraan te pas komt, start dat een apart proces dat later weer uit
+   moet; zie ruimOp hieronder. */
+let stopEsbuild = null;
 try {
   omzetting = await import(pathToFileURL(path.join(root, "src/lib/crm/hubspot-import.ts")).href);
 } catch (eersteFout) {
   try {
-    const { build } = await import("esbuild");
+    const esbuild = await import("esbuild");
+    const { build } = esbuild;
+    stopEsbuild = esbuild.stop ?? null;
     await build({
       entryPoints: [path.join(root, "src/lib/crm/hubspot-import.ts")],
       bundle: true,
@@ -471,10 +476,30 @@ if (sluitNiet.length) {
 console.log("");
 console.log("Plan geschreven naar .hubspot-import/plan.json");
 
+/*
+  Afsluiten zonder process.exit.
+
+  Dat trekt het proces onderuit terwijl de verbindingen van supabase-js en het
+  losse proces van esbuild nog openstaan, en op Windows valt libuv daarover met
+  "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)". Dat gebeurt nadat al
+  het werk klaar is, dus het zegt niets over de gegevens, maar het ziet er
+  alarmerend uit en dat hoort niet aan het eind van een geslaagde draai.
+*/
+async function ruimOp() {
+  if (stopEsbuild) {
+    try {
+      await stopEsbuild();
+    } catch {
+      // Al gestopt, of nooit gestart.
+    }
+  }
+}
+
 if (!SCHRIJVEN) {
   console.log("Proefdraai: er is niets in de database veranderd. Draai met --schrijf als dit klopt.");
-  process.exit(0);
-}
+  await ruimOp();
+  process.exitCode = 0;
+} else {
 
 /* -------------------------------------------------------------------------- */
 /* Wegschrijven                                                                */
@@ -665,3 +690,6 @@ console.log(
   notitieRijen.length
 );
 console.log("HubSpot is niet aangepast en niet uitgezet. Controleer eerst in SkoolPartner of alles klopt.");
+
+await ruimOp();
+}

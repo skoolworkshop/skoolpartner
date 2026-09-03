@@ -120,6 +120,7 @@ export default async function PijplijnPagina() {
       waardeCents: regel.deal.value_cents,
       datum: regel.deal.expected_date,
       eigenaar: regel.ownerNaam,
+      dagenInFase: regel.dagenInFase,
       volgendeTaak: regel.volgendeTaak,
       href: `/admin/crm/deal/${regel.deal.id}`,
       }))

@@ -2,6 +2,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ContactTypeBadge } from "@/components/admin/contact-badges";
 import { LifecycleBadge } from "@/components/admin/crm-badges";
 import { DetailIndeling } from "@/components/admin/detail-indeling";
+import { TemplateKiezer } from "@/components/admin/template-kiezer";
 
 /**
  * De nieuwe indeling van een contactpagina.
@@ -102,6 +103,27 @@ export function Harness() {
         }
         rechts={
           <>
+            <details className="rounded-card border border-line-soft bg-white shadow-card" open>
+              <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+                Template gebruiken
+              </summary>
+              <div className="px-5 pb-5">
+                <TemplateKiezer
+                  templates={[
+                    {
+                      id: "t1",
+                      naam: "Offerte nabellen",
+                      onderwerp: "Je offerte voor {{organisatie}}",
+                      tekst: "Beste {{voornaam}},\n\nIk zie dat onze offerte nog openstaat.",
+                      categorie: "Offerte",
+                    },
+                  ]}
+                  context={{ voornaam: "Nora", organisatie: "Markenhage College" }}
+                  naarEmail="n.bakker@markenhage.nl"
+                />
+              </div>
+            </details>
+
             <Card>
               <CardHeader title="Deals (2)" description="Verkoopkansen waar deze persoon bij betrokken is." />
               <ul>

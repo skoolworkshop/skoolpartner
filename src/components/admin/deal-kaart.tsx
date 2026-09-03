@@ -1,3 +1,4 @@
+import type { DragEventHandler } from "react";
 import Link from "next/link";
 import { Building2, CalendarDays, CircleUser, Clock } from "lucide-react";
 
@@ -46,13 +47,37 @@ function faseToon(dagen: number | null): { toon: string; tekst: string } | null 
   };
 }
 
-export function DealKaart({ deal }: { deal: DealKaartGegevens }) {
+export function DealKaart({
+  deal,
+  sleepbaar = false,
+  bezig = false,
+  onSleepStart,
+  onSleepEinde,
+}: {
+  deal: DealKaartGegevens;
+  sleepbaar?: boolean;
+  bezig?: boolean;
+  onSleepStart?: DragEventHandler<HTMLLIElement>;
+  onSleepEinde?: DragEventHandler<HTMLLIElement>;
+}) {
   const fase = faseToon(deal.dagenInFase);
 
   return (
-    <li>
+    <li
+      draggable={sleepbaar && !bezig}
+      onDragStart={onSleepStart}
+      onDragEnd={onSleepEinde}
+      aria-busy={bezig || undefined}
+      className={cn(
+        sleepbaar && !bezig && "cursor-grab active:cursor-grabbing",
+        bezig && "pointer-events-none opacity-60"
+      )}
+    >
       <Link
         href={deal.href}
+        // De kaart zelf wordt gesleept. Zonder dit probeert de browser de link
+        // als adres naar een ander tabblad te slepen.
+        draggable={false}
         className="block rounded-card border border-line-soft bg-white p-3 shadow-card transition-colors hover:border-ink"
       >
         <p className="truncate font-semibold text-ink">{deal.titel}</p>

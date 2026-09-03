@@ -11,8 +11,10 @@ import { LifecycleBadge, StilteBadge } from "@/components/admin/crm-badges";
 import { TakenBlok, TijdlijnBlok } from "@/components/admin/tijdlijn-blok";
 import { AfsprakenBlok } from "@/components/admin/afspraak-blok";
 import { DetailIndeling } from "@/components/admin/detail-indeling";
+import { TemplateKiezer } from "@/components/admin/template-kiezer";
 import { requireAdmin } from "@/lib/auth/session";
 import { getFragmentHulp } from "@/lib/crm/fragmenten";
+import { getTemplates } from "@/lib/crm/templates";
 import { deelIn, getAfspraken } from "@/lib/crm/afspraken";
 import { CONTACT_TYPE_LABELS, getContact } from "@/lib/crm/contacten";
 import { getTakenVoor, getTijdlijn } from "@/lib/crm/tijdlijn";
@@ -42,9 +44,10 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
   const afsprakenIndeling = deelIn(await getAfspraken({ contactId: contact.id, organizationId: contact.organization_id }), new Date().toISOString());
 
   const supabase = createServiceSupabase();
-  const [tijdlijn, taken, { data: organisaties }, { data: beheerders }] = await Promise.all([
+  const [tijdlijn, taken, templates, { data: organisaties }, { data: beheerders }] = await Promise.all([
     getTijdlijn({ contactId: id, organizationId: contact.organization_id }),
     getTakenVoor({ contactId: id }),
+    getTemplates(),
     supabase.from("organizations").select("id, name").order("name").limit(500),
     supabase.from("profiles").select("id, full_name, email").eq("is_admin", true).order("full_name"),
   ]);
@@ -239,6 +242,30 @@ export default async function ContactPagina({ params }: { params: Promise<{ id: 
         }
         rechts={
           <>
+            {/*
+              Een template gebruiken vanaf dit contact. Ingeklapt, want je doet
+              het niet elke keer, en het vult zich met de gegevens die hiernaast
+              al op het scherm staan.
+            */}
+            <details className="rounded-card border border-line-soft bg-white shadow-card">
+              <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+                Template gebruiken
+              </summary>
+              <div className="px-5 pb-5">
+                <TemplateKiezer
+                  templates={templates.map((t) => ({
+                    id: t.id,
+                    naam: t.name,
+                    onderwerp: t.subject,
+                    tekst: t.body,
+                    categorie: t.category,
+                  }))}
+                  context={fragmentHulp.context}
+                  naarEmail={contact.email}
+                />
+              </div>
+            </details>
+
             <Card>
               <CardHeader
                 title={`Deals (${deals.length})`}

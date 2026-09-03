@@ -114,6 +114,22 @@ const TAKEN: Taak[] = [
   }),
 ];
 
+// Genoeg kaarten in één fase om de eigen verticale scrollzone, vaste kop en
+// vaste footer daadwerkelijk zichtbaar te kunnen controleren.
+const EXTRA_PIPELINE_DEALS = Array.from({ length: 7 }, (_, index) => ({
+  id: `extra-${index}`,
+  stageId: "f3",
+  titel: `Workshopaanvraag ${index + 1} voor verticale scrollcontrole`,
+  organisatie: `Testschool ${index + 1}`,
+  contact: null,
+  waardeCents: 125_000 + index * 10_000,
+  datum: "2026-11-18",
+  eigenaar: index % 2 === 0 ? "Clinten" : "Collega",
+  dagenInFase: 8 + index,
+  volgendeTaak: null,
+  href: "#",
+}));
+
 
 function Scherm({ titel, children }: { titel: string; children: React.ReactNode }) {
   return (
@@ -134,13 +150,8 @@ export function Harness() {
             { id: "f2", key: "contact_gelegd", label: "In behandeling", isWon: false, isLost: false },
             { id: "f3", key: "offerte_verstuurd", label: "Offerte verstuurd", isWon: false, isLost: false },
             { id: "f4", key: "opvolging", label: "Opvolging", isWon: false, isLost: false },
-            { id: "f5", key: "akkoord", label: "Klant bevestigd", isWon: false, isLost: false },
-            { id: "f6", key: "facturatie", label: "Facturatie", isWon: false, isLost: false },
-            { id: "f7", key: "ingepland", label: "Agenda en planning", isWon: false, isLost: false },
-            { id: "f8", key: "uitgevoerd", label: "Uitgevoerd", isWon: false, isLost: false },
-            { id: "f9", key: "evaluatie", label: "Evaluatie", isWon: false, isLost: false },
-            { id: "f10", key: "afgerond", label: "Afgerond", isWon: true, isLost: false },
-            { id: "f11", key: "verloren", label: "Niet doorgegaan", isWon: false, isLost: true },
+            { id: "f5", key: "akkoord", label: "Klant bevestigd / Planning", isWon: false, isLost: false },
+            { id: "f6", key: "afgerond", label: "Afgerond", isWon: true, isLost: false },
           ]}
           deals={[
             {
@@ -152,6 +163,7 @@ export function Harness() {
               waardeCents: 88352,
               datum: null,
               eigenaar: null,
+              dagenInFase: 4,
               volgendeTaak: null,
               href: "#",
             },
@@ -164,6 +176,7 @@ export function Harness() {
               waardeCents: 0,
               datum: null,
               eigenaar: null,
+              dagenInFase: 22,
               volgendeTaak: { titel: "Offerte nabellen", dueOn: "2026-08-18", teLaat: true },
               href: "#",
             },
@@ -176,9 +189,11 @@ export function Harness() {
               waardeCents: 205644,
               datum: "2024-12-12",
               eigenaar: "Clinten",
+              dagenInFase: 37,
               volgendeTaak: null,
               href: "#",
             },
+            ...EXTRA_PIPELINE_DEALS,
           ]}
         />
       </Scherm>
