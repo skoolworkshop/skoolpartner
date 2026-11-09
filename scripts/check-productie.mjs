@@ -155,13 +155,15 @@ regel("ok", "GMAIL_MAILBOX", mailbox);
 // De schakelaar voor de leerlingenpagina
 // ---------------------------------------------------------------------------
 console.log("");
-const publiek = (env.PUBLIEKE_INSCHRIJVING ?? "aan").toLowerCase();
-const uit = ["uit", "off", "false", "0", "nee"].includes(publiek);
+const publiek = (env.PUBLIEKE_INSCHRIJVING ?? "").toLowerCase();
+const uit = publiek === "" || ["uit", "off", "false", "0", "nee"].includes(publiek);
 regel(
   "ok",
   "PUBLIEKE_INSCHRIJVING",
   uit
-    ? "uit: leerlingen komen niet op /inschrijven, ook niet met een geldige link"
+    ? publiek === ""
+      ? "niet ingevuld: in productie betekent dat DICHT. Zet hem op 'aan' als leerlingen erin mogen."
+      : "uit: leerlingen komen niet op /inschrijven, ook niet met een geldige link"
     : "aan: leerlingen kunnen zich inschrijven zodra een dag open staat",
 );
 

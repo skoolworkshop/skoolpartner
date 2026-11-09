@@ -104,26 +104,38 @@ describe("supabaseConfigFout", () => {
  * ook echt heeft gevraagd, en dat een ontbrekende variabele niets verandert.
  */
 describe("publiekeInschrijvingAan", () => {
-  async function aan(waarde: string | undefined): Promise<boolean> {
+  async function aan(waarde: string | undefined, omgeving = "development"): Promise<boolean> {
     vi.resetModules();
     const oud = { ...process.env };
     if (waarde === undefined) delete process.env.PUBLIEKE_INSCHRIJVING;
     else process.env.PUBLIEKE_INSCHRIJVING = waarde;
+    // NODE_ENV is in TypeScript alleen-lezen, vandaar stubEnv.
+    vi.stubEnv("NODE_ENV", omgeving);
     const { publiekeInschrijvingAan } = await import("@/lib/env");
     const uitkomst = publiekeInschrijvingAan();
+    vi.unstubAllEnvs();
     process.env = oud;
     return uitkomst;
   }
 
-  it("staat aan als de variabele niet is ingevuld", async () => {
+  it("staat lokaal aan zonder dat je iets hoeft in te vullen", async () => {
     expect(await aan(undefined)).toBe(true);
     expect(await aan("")).toBe(true);
     expect(await aan("aan")).toBe(true);
   });
 
+  it("staat in productie uit tot je hem aanzet", async () => {
+    // Vergeten in te vullen mag nooit betekenen dat de hele school er al op
+    // kan terwijl wij nog testen.
+    expect(await aan(undefined, "production")).toBe(false);
+    expect(await aan("", "production")).toBe(false);
+    expect(await aan("aan", "production")).toBe(true);
+  });
+
   it("gaat uit bij elke manier waarop iemand dat opschrijft", async () => {
     for (const waarde of ["uit", "UIT", "off", "false", "0", "nee"]) {
       expect(await aan(waarde)).toBe(false);
+      expect(await aan(waarde, "production")).toBe(false);
     }
   });
 });

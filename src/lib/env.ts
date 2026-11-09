@@ -67,18 +67,33 @@ export const serverEnv = {
    * Staat de inschrijfpagina voor leerlingen aan?
    *
    * Zet PUBLIEKE_INSCHRIJVING op 'uit' en niemand komt op /inschrijven, ook
-   * niet met een geldige link van een dag die open staat. Bedoeld voor de
-   * periode dat het beheer al live is maar de leerlingen nog niet mogen.
-   *
-   * Ontbreekt de variabele, dan staat het gewoon aan. Zo verandert er niets
-   * voor wie lokaal werkt of hem nooit heeft ingevuld.
+   * niet met een geldige link van een dag die open staat.
    */
-  publiekeInschrijving: (optional("PUBLIEKE_INSCHRIJVING") ?? "aan").toLowerCase(),
+  publiekeInschrijving: optional("PUBLIEKE_INSCHRIJVING")?.toLowerCase() ?? null,
 };
 
-/** Mogen leerlingen zich nu inschrijven? */
+/**
+ * Mogen leerlingen zich nu inschrijven?
+ *
+ * IN PRODUCTIE STAAT HET UIT TOT JE HET AANZET
+ *
+ *   Vergeten een variabele in te vullen gebeurt, en bij deze knop is dat het
+ *   verschil tussen "de leerlingen kunnen nog niet" en "de hele school staat
+ *   er al op terwijl wij nog testen". Daarom is de veilige kant de
+ *   standaardkant: ontbreekt de variabele in productie, dan blijft de pagina
+ *   dicht. Je zet hem aan met PUBLIEKE_INSCHRIJVING=aan.
+ *
+ *   Lokaal werkt het andersom: daar hoef je niets in te vullen om te kunnen
+ *   ontwikkelen en testen.
+ */
 export function publiekeInschrijvingAan(): boolean {
-  return !["uit", "off", "false", "0", "nee"].includes(serverEnv.publiekeInschrijving);
+  const waarde = serverEnv.publiekeInschrijving;
+
+  if (waarde === null || waarde === "") {
+    return process.env.NODE_ENV !== "production";
+  }
+
+  return !["uit", "off", "false", "0", "nee"].includes(waarde);
 }
 
 export function isSupabaseConfigured(): boolean {
