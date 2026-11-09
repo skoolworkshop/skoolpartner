@@ -50,18 +50,6 @@ export type WebhookStatus = "received" | "processed" | "failed" | "ignored";
 export type ResultStatus = "concept" | "published" | "expired";
 export type ResultItemKind = "file" | "link";
 
-/**
- * De twee merken. Zie src/lib/crm/merk.ts voor wat ze betekenen en waarom het
- * merk aan de deal hangt en niet aan de organisatie.
- */
-export type CrmBrand = "skool_workshop" | "suri_impact";
-/**
- * De commerciele relatie met een organisatie.
- *
- * Bewust iets anders dan OrganizationStatus. Die stuurt toegang aan
- * (actief, geblokkeerd, gearchiveerd) en mag hier nooit voor gebruikt worden.
- */
-export type CrmLifecycle = "prospect" | "lead" | "klant" | "oud_klant";
 
 export type ProfileRow = {
   id: string;
@@ -565,366 +553,199 @@ export type CjpCreditTransactionRow = {
   updated_at: string;
 };
 
-export type CrmPipelineStageRow = {
-  id: string;
-  brand: CrmBrand;
-  key: string;
-  label: string;
-  description: string | null;
-  position: number;
-  is_won: boolean;
-  is_lost: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
 /**
- * Een persoon die je kent.
- *
- * organization_id mag leeg zijn: een deelnemer aan het Suri Impact Breekjaar
- * hoort bij geen enkele school. Deze tabel staat bewust naast
- * organization_contacts en verandert nooit iets aan wat een klant mag zien.
+ * Een inschrijfdag: een cultuurdag, CKV-dag, workshopdag of een dag bij een
+ * zakelijke klant. audience bepaalt alleen de woorden op het scherm: bij een
+ * school heet een groep een klas, bij een organisatie een team.
  */
-export type CrmContactType =
-  | "docent"
-  | "cultuurcoordinator"
-  | "decaan"
-  | "administratie"
-  | "directie"
-  | "ouder"
-  | "deelnemer"
-  | "opdrachtgever"
-  | "leverancier"
-  | "overig";
+export type EnrollmentAudience = "school" | "organisatie";
+export type EnrollmentStatus = "concept" | "open" | "gesloten" | "afgerond";
 
-export type CrmContactRow = {
+export type EnrollmentEventRow = {
   id: string;
-  organization_id: string | null;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
-  job_title: string | null;
-  note: string | null;
-  is_unsubscribed: boolean;
-  owner_id: string | null;
-  linked_contact_id: string | null;
-  contact_type: CrmContactType | null;
-  lifecycle: CrmLifecycle | null;
-  city: string | null;
-  /**
-   * Alleen gevuld als deze persoon aantoonbaar een klantportaalaccount heeft.
-   * Wordt nooit automatisch gezet: een gelijk e-mailadres is een aanwijzing,
-   * geen bewijs.
-   */
-  portal_user_id: string | null;
-  last_contact_at: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type CrmDealRow = {
-  id: string;
-  brand: CrmBrand;
-  title: string;
-  stage_id: string;
-  /** Precies een van deze twee is gevuld; de database bewaakt dat. */
-  organization_id: string | null;
-  contact_id: string | null;
-  value_cents: number;
-  expected_date: string | null;
-  owner_id: string | null;
-  source: string | null;
-  note: string | null;
-  /** Alleen bij Suri. */
-  edition_id: string | null;
-  /** Alleen bij Skool Workshop. */
+  organization_id: string;
   booking_id: string | null;
-  closed_at: string | null;
-  /** Sinds wanneer deze deal in de huidige fase staat. */
-  stage_since: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type CrmDealEventRow = {
-  id: string;
-  deal_id: string;
-  from_stage_id: string | null;
-  to_stage_id: string | null;
-  actor_id: string | null;
-  note: string | null;
-  created_at: string;
-};
-
-export type CrmSuriEditionStatus = "concept" | "open" | "gesloten" | "afgerond";
-
-export type CrmSuriEditionRow = {
-  id: string;
   name: string;
-  starts_on: string;
-  ends_on: string;
-  capacity: number;
-  price_cents: number;
-  status: CrmSuriEditionStatus;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Aanvullende gegevens van een deelnemer.
- *
- * Bewust alleen verkoop- en planningsgegevens. Medische gegevens, dieetwensen
- * en paspoortgegevens horen hier niet in; zie de migratie voor de reden.
- */
-export type CrmSuriProfileRow = {
-  contact_id: string;
-  birth_date: string | null;
-  education_level: string | null;
-  interest: string | null;
-  guardian_name: string | null;
-  guardian_email: string | null;
-  guardian_phone: string | null;
-  together_with: string | null;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type CrmSuriPaymentKind = "aanbetaling" | "restant" | "correctie" | "terugbetaling";
-
-export type CrmSuriPaymentRow = {
-  id: string;
-  deal_id: string;
-  kind: CrmSuriPaymentKind;
-  amount_cents: number;
-  received_on: string;
-  note: string | null;
-  external_reference: string | null;
-  created_by: string | null;
-  created_at: string;
-};
-
-export type CrmActivityKind = "notitie" | "gesprek" | "telefoon" | "email" | "afspraak" | "systeem";
-
-/**
- * Een gebeurtenis op de tijdlijn.
- *
- * Mag aan meerdere dingen tegelijk hangen: een gesprek met een contactpersoon
- * over een lopende deal hoort bij de relatie, de persoon en de deal.
- */
-export type CrmActivityRow = {
-  id: string;
-  kind: CrmActivityKind;
-  summary: string;
-  body: string | null;
-  occurred_at: string;
-  organization_id: string | null;
-  contact_id: string | null;
-  deal_id: string | null;
-  actor_id: string | null;
-  is_system: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-/** Een opvolgactie. Mag los staan van een relatie. */
-export type CrmTaskRow = {
-  id: string;
-  title: string;
-  note: string | null;
-  due_on: string | null;
-  owner_id: string | null;
-  organization_id: string | null;
-  contact_id: string | null;
-  deal_id: string | null;
-  done_at: string | null;
-  done_by: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-/** Een openbaar te boeken soort afspraak. */
-export type CrmBookingLinkRow = {
-  id: string;
-  slug: string;
-  name: string;
-  intro: string | null;
-  brand: CrmBrand;
-  meeting_kind: string;
-  meeting_form: string;
+  event_date: string;
   location: string | null;
-  owner_id: string | null;
-  duration_minutes: number;
-  buffer_before_minutes: number;
-  buffer_after_minutes: number;
-  notice_hours: number;
-  horizon_days: number;
-  slot_step_minutes: number;
-  timezone: string;
-  is_active: boolean;
-  max_per_day: number;
+  audience: EnrollmentAudience;
+  status: EnrollmentStatus;
+  slug: string;
+  opens_at: string | null;
+  closes_at: string | null;
+  allow_repeat: boolean;
+  /**
+   * Hoe een leerling zich meldt. 'code' is de standaard: een persoonlijke
+   * inschrijfcode. 'naam' is de oude manier, alleen de eigen naam opzoeken.
+   * Die laat je alleen aanzetten als een school geen codes kan uitdelen.
+   */
+  access_mode: "code" | "naam";
+  contact_name: string | null;
+  contact_email: string | null;
+  purge_after: string | null;
+  note: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
 };
 
-/** Werktijden per weekdag, in minuten na middernacht in de tijdzone van de link. */
-export type CrmBookingAvailabilityRow = {
+/** Een klas of een team. De naam is die van de school zelf: Groep 3/4, K3E. */
+export type EnrollmentGroupRow = {
   id: string;
-  link_id: string;
-  weekday: number;
-  start_minute: number;
-  end_minute: number;
+  event_id: string;
+  name: string;
+  position: number;
   created_at: string;
 };
 
-/** Een afspraak. Ligt voor je en heeft een begin en een eind; een activiteit ligt achter je. */
-export type CrmMeetingRow = {
+export type EnrollmentRoundKind = "workshop" | "pauze";
+
+export type EnrollmentRoundRow = {
   id: string;
-  title: string;
-  kind: string;
-  form: string;
+  event_id: string;
+  position: number;
+  label: string;
   starts_at: string;
   ends_at: string;
-  location: string | null;
-  status: string;
-  outcome: string | null;
-  note: string | null;
-  organization_id: string | null;
-  contact_id: string | null;
-  deal_id: string | null;
-  owner_id: string | null;
-  source: string;
-  calendar_event_id: string | null;
-  booking_link_id: string | null;
-  guest_name: string | null;
-  guest_email: string | null;
-  guest_phone: string | null;
-  guest_company: string | null;
-  guest_extra_emails: string[];
-  created_by: string | null;
+  /** Een pauze staat wel op het rooster, maar er valt niets te kiezen. */
+  kind: EnrollmentRoundKind;
   created_at: string;
-  updated_at: string;
 };
 
-/** Een herbruikbaar tekstblok met personalisatie. brand leeg betekent: beide merken. */
-/**
- * Templates en sequences (migratie 038).
- *
- * Met de hand bijgehouden tot `npm run db:types` weer wordt gedraaid tegen een
- * database waar migratie 038 in staat. Dat is bewust: zonder deze regels kan de
- * code die de schermen bouwt niet typecheckt worden voordat de migratie is
- * toegepast, en dan zou je hem pas na het pushen kunnen controleren.
- */
-export type CrmTemplateRow = {
+/** Een workshop hoort bij de dag. Wat er in een ronde draait is een uitvoering. */
+export type EnrollmentWorkshopRow = {
   id: string;
-  brand: CrmBrand | null;
+  event_id: string;
   name: string;
-  subject: string;
-  body: string;
-  category: string | null;
-  is_archived: boolean;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type CrmSequenceRow = {
-  id: string;
-  brand: CrmBrand;
-  name: string;
-  description: string | null;
-  sender_id: string | null;
-  is_active: boolean;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type CrmSequenceStepRow = {
-  id: string;
-  sequence_id: string;
+  default_capacity: number;
   position: number;
-  wait_days: number;
-  kind: string;
-  template_id: string | null;
-  title: string | null;
-  note: string | null;
+  /**
+   * Wat een leerling vooraf moet regelen. De links moeten naar de officiele
+   * winkels wijzen; de database weigert iets anders.
+   */
+  app_required: boolean;
+  app_name: string | null;
+  app_android_url: string | null;
+  app_ios_url: string | null;
+  app_web_url: string | null;
+  app_instructions: string | null;
+  materials: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type CrmSequenceEnrollmentRow = {
+/**
+ * Een uitvoering: deze workshop, in deze ronde. Dit is wat een leerling kiest,
+ * en waar de capaciteit aan hangt. Twee uitvoeringen van dezelfde workshop in
+ * dezelfde ronde krijgen elk een eigen label, bijvoorbeeld Groep A en Groep B.
+ */
+export type EnrollmentSessionRow = {
   id: string;
-  sequence_id: string;
-  contact_id: string;
-  deal_id: string | null;
-  status: string;
-  next_step: number;
-  next_action_at: string | null;
-  stop_reason: string | null;
-  started_by: string | null;
-  started_at: string;
-  finished_at: string | null;
+  event_id: string;
+  workshop_id: string;
+  round_id: string;
+  label: string | null;
+  capacity: number;
+  room: string | null;
+  teacher: string | null;
+  is_active: boolean;
+  position: number;
   created_at: string;
   updated_at: string;
 };
 
-export type CrmSnippetRow = {
+/** Welke klassen in een uitvoering mogen. Geen enkele rij betekent: allemaal. */
+export type EnrollmentSessionGroupRow = {
+  session_id: string;
+  group_id: string;
+  event_id: string;
+  created_at: string;
+};
+
+/**
+ * search_key en flat_key komen uit src/lib/inschrijving/naam.ts. Daarmee
+ * wordt "lissa v/d velde" dezelfde persoon als "Lissa van der Velde".
+ */
+export type EnrollmentParticipantRow = {
   id: string;
-  brand: CrmBrand | null;
-  shortcut: string;
-  name: string;
-  body: string;
-  category: string | null;
-  is_archived: boolean;
+  event_id: string;
+  group_id: string;
+  display_name: string;
+  search_key: string;
+  flat_key: string;
+  email: string | null;
+  /** Doet niet mee: wordt niet ingedeeld en telt niet mee in de controles. */
+  exempt: boolean;
+  /** Het bewijs dat de deelnemer zelf achter het scherm zit. Nooit tonen. */
+  claim_token: string;
+  /**
+   * De persoonlijke inschrijfcode. Staat op de uitdeellijst van de mentor en
+   * verder nergens: niet in de klassenlijst met de indeling, niet in de mail
+   * naar de klant en niet in de klantomgeving.
+   */
+  access_code: string;
+  /**
+   * Het leerjaar zoals de school het aanlevert. Nooit hetzelfde als de klas:
+   * een school met negentien klassen heeft vaak maar twee leerjaren.
+   */
+  year_level: string | null;
+  confirmation_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Een keuze per ronde. Opnieuw kiezen wijzigt deze rij, het voegt niets toe. */
+export type EnrollmentChoiceSource = "deelnemer" | "automatisch" | "beheer";
+
+export type EnrollmentChoiceRow = {
+  id: string;
+  participant_id: string;
+  round_id: string;
+  session_id: string;
+  source: EnrollmentChoiceSource;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Tijdelijke toegang voor de school. Alleen de versleutelde vorm staat erin. */
+export type EnrollmentAccessRow = {
+  id: string;
+  event_id: string;
+  label: string;
+  token_hash: string;
+  code_hash: string;
+  expires_at: string;
+  revoked_at: string | null;
+  last_seen_at: string | null;
   created_by: string | null;
   created_at: string;
-  updated_at: string;
 };
 
-/** Een regel per keer dat een fragment is gebruikt. Het aantal wordt hieruit geteld. */
-export type CrmSnippetUseRow = {
+/** Logboek: welke lijsten zijn wanneer naar wie gestuurd. */
+export type EnrollmentDeliveryRow = {
   id: string;
-  snippet_id: string;
-  organization_id: string | null;
-  contact_id: string | null;
-  deal_id: string | null;
-  actor_id: string | null;
-  used_at: string;
-};
-
-/** Altijd berekend uit de deals en de betalingen, nooit uit een losse kolom. */
-export type CrmSuriEditionCapacityRow = {
-  edition_id: string;
-  name: string;
-  starts_on: string;
-  ends_on: string;
-  status: CrmSuriEditionStatus;
-  capacity: number;
-  price_cents: number;
-  aangemeld: number;
-  volledig_betaald: number;
-  afgehaakt: number;
-  vrij: number;
-  ontvangen_cents: number;
-};
-
-/** Interne gegevens over een organisatie. Nooit zichtbaar voor de klant zelf. */
-export type CrmOrganizationProfileRow = {
-  organization_id: string;
-  lifecycle: CrmLifecycle;
-  owner_id: string | null;
-  source: string | null;
-  last_contact_at: string | null;
-  next_action_at: string | null;
+  event_id: string;
+  to_email: string;
+  to_name: string | null;
+  formats: string[];
   note: string | null;
-  created_at: string;
-  updated_at: string;
+  message_id: string | null;
+  sent_by: string | null;
+  sent_at: string;
+};
+
+/** Altijd berekend uit de keuzes, nooit uit een losse teller. */
+export type EnrollmentSessionOccupancyRow = {
+  session_id: string;
+  event_id: string;
+  round_id: string;
+  workshop_id: string;
+  workshop_name: string;
+  label: string | null;
+  capacity: number;
+  is_active: boolean;
+  bezet: number;
+  vrij: number;
 };
 
 /** Altijd berekend uit het grootboek, nooit uit een losse kolom. */
@@ -1046,32 +867,31 @@ export type Database = {
       workshop_result_files: TableDef<WorkshopResultFileRow>;
       cjp_parking_requests: TableDef<CjpParkingRequestRow>;
       cjp_credit_transactions: TableDef<CjpCreditTransactionRow>;
-      crm_pipeline_stages: TableDef<CrmPipelineStageRow>;
-      crm_contacts: TableDef<CrmContactRow>;
-      crm_organization_profiles: TableDef<CrmOrganizationProfileRow>;
-      crm_deals: TableDef<CrmDealRow>;
-      crm_deal_events: TableDef<CrmDealEventRow>;
-      crm_suri_editions: TableDef<CrmSuriEditionRow>;
-      crm_suri_profiles: TableDef<CrmSuriProfileRow>;
-      crm_suri_payments: TableDef<CrmSuriPaymentRow>;
-      crm_activities: TableDef<CrmActivityRow>;
-      crm_tasks: TableDef<CrmTaskRow>;
-      crm_snippets: TableDef<CrmSnippetRow>;
-      crm_snippet_uses: TableDef<CrmSnippetUseRow>;
-      crm_meetings: TableDef<CrmMeetingRow>;
-      crm_booking_links: TableDef<CrmBookingLinkRow>;
-      crm_booking_availability: TableDef<CrmBookingAvailabilityRow>;
-      crm_templates: TableDef<CrmTemplateRow>;
-      crm_sequences: TableDef<CrmSequenceRow>;
-      crm_sequence_steps: TableDef<CrmSequenceStepRow>;
-      crm_sequence_enrollments: TableDef<CrmSequenceEnrollmentRow>;
+      enrollment_events: TableDef<EnrollmentEventRow>;
+      enrollment_groups: TableDef<EnrollmentGroupRow>;
+      enrollment_rounds: TableDef<EnrollmentRoundRow>;
+      enrollment_workshops: TableDef<EnrollmentWorkshopRow>;
+      enrollment_sessions: TableDef<EnrollmentSessionRow>;
+      enrollment_session_groups: TableDef<EnrollmentSessionGroupRow>;
+      enrollment_participants: TableDef<EnrollmentParticipantRow>;
+      enrollment_choices: TableDef<EnrollmentChoiceRow>;
+      enrollment_access: TableDef<EnrollmentAccessRow>;
+      enrollment_deliveries: TableDef<EnrollmentDeliveryRow>;
     };
     Views: {
       loyalty_balances: ViewDef<LoyaltyBalanceRow>;
       cjp_credit_balances: ViewDef<CjpCreditBalanceRow>;
-      crm_suri_edition_capacity: ViewDef<CrmSuriEditionCapacityRow>;
+      enrollment_session_occupancy: ViewDef<EnrollmentSessionOccupancyRow>;
     };
     Functions: {
+      enrollment_choose: {
+        Args: {
+          p_participant: string;
+          p_session: string;
+          p_source?: EnrollmentChoiceSource;
+        };
+        Returns: EnrollmentChoiceRow;
+      };
       request_redemption: {
         Args: {
           p_org: string;

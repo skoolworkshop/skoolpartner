@@ -52,3 +52,6 @@ next-env.d.ts
 
 # Proefdraaien van de HubSpot-import
 .hubspot-import/
+
+# Back-ups van code en data, nooit in Git
+_backup/

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { isSupabaseConfigured } from "@/lib/env";
+import { supabaseConfigFout } from "@/lib/env";
 import { resolveSiteUrl } from "@/lib/site-url";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -17,6 +17,15 @@ export interface AuthFormState {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * Draaien we lokaal?
+ *
+ * Op een openbare inlogpagina hoort geen technische melding: daarmee vertel je
+ * een vreemde hoe je systeem in elkaar zit. Tijdens het ontwikkelen is precies
+ * het omgekeerde waar, want daar kost een vage melding alleen maar tijd.
+ */
+const inOntwikkeling = process.env.NODE_ENV !== "production";
 
 function sanitizeNext(value: FormDataEntryValue | null): string {
   const raw = typeof value === "string" ? value : "";
@@ -53,27 +62,49 @@ export async function sendLoginLink(
   if (allowSignUp && (firstName.length < 2 || lastName.length < 2)) {
     return { status: "error", message: "Vul uw voor- en achternaam in.", ...common };
   }
-  if (!isSupabaseConfigured()) {
+  // Klopt de configuratie wel? Een .env.local met voorbeeldwaarden erin levert
+  // anders een onverklaarbare "versturen is niet gelukt" op.
+  const configFout = supabaseConfigFout();
+  if (configFout) {
+    console.error("[inloggen] configuratie klopt niet:", configFout);
     return {
       status: "error",
-      message:
-        "De verbinding met de database is nog niet ingesteld. Neem contact op met Skool Workshop.",
+      message: inOntwikkeling
+        ? `De verbinding met Supabase klopt niet: ${configFout}`
+        : "De verbinding met de database is nog niet ingesteld. Neem contact op met Skool Workshop.",
       ...common,
     };
   }
 
   const siteUrl = await resolveSiteUrl();
   const supabase = await createServerSupabase();
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: allowSignUp,
-      emailRedirectTo: `${siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}&kanaal=${encodeURIComponent(channel)}`,
-      data: allowSignUp
-        ? { full_name: fullName, first_name: firstName, last_name: lastName }
-        : undefined,
-    },
-  });
+
+  // Lukt het verzoek zelf niet, bijvoorbeeld omdat het adres niet bestaat of
+  // het netwerk eruit ligt, dan gooit de bibliotheek. Zonder dit zou de
+  // serveractie klappen en zie je in de browser alleen een lege foutmelding.
+  let error: { status?: number; code?: string; name?: string; message: string } | null = null;
+  try {
+    ({ error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: allowSignUp,
+        emailRedirectTo: `${siteUrl}/auth/callback?volgende=${encodeURIComponent(next)}&kanaal=${encodeURIComponent(channel)}`,
+        data: allowSignUp
+          ? { full_name: fullName, first_name: firstName, last_name: lastName }
+          : undefined,
+      },
+    }));
+  } catch (onverwacht) {
+    const melding = onverwacht instanceof Error ? onverwacht.message : String(onverwacht);
+    console.error("[inloggen] verzoek naar Supabase mislukte", melding);
+    return {
+      status: "error",
+      message: inOntwikkeling
+        ? `Supabase is niet bereikbaar: ${melding}`
+        : "Versturen is niet gelukt. Probeer het opnieuw.",
+      ...common,
+    };
+  }
 
   if (error) {
     // Bewust neutraal: we bevestigen nooit of een adres wel of niet bestaat.
@@ -96,11 +127,15 @@ export async function sendLoginLink(
     // in de serverlog. Zo is een SMTP-probleem terug te vinden in Vercel.
     console.error("[inloggen] versturen mislukt", {
       status: error.status,
+      code: error.code,
+      name: error.name,
       message: error.message,
     });
     return {
       status: "error",
-      message: "Versturen is niet gelukt. Probeer het opnieuw.",
+      message: inOntwikkeling
+        ? `Versturen is niet gelukt. Supabase zegt: ${error.message}${error.status ? ` (http ${error.status})` : ""}`
+        : "Versturen is niet gelukt. Probeer het opnieuw.",
       ...common,
     };
   }
@@ -125,9 +160,15 @@ export async function verifyLoginCode(
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
 
   if (error) {
+    console.error("[inloggen] code controleren mislukt", {
+      status: error.status,
+      message: error.message,
+    });
     return {
       status: "error",
-      message: "Deze code klopt niet of is verlopen. Vraag een nieuwe aan.",
+      message: inOntwikkeling
+        ? `Deze code klopt niet of is verlopen. Supabase zegt: ${error.message}`
+        : "Deze code klopt niet of is verlopen. Vraag een nieuwe aan.",
       email,
     };
   }

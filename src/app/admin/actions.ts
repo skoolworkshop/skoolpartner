@@ -50,6 +50,11 @@ export interface AdminState {
   message?: string;
   inviteUrl?: string;
   resultId?: string;
+  /**
+   * De actie is tegengehouden omdat hij bestaande inschrijvingen raakt. Het
+   * bericht legt uit wat er gebeurt; pas na bevestigen gaat hij door.
+   */
+  bevestig?: boolean;
 }
 
 /** Open het klantportaal van een gewone klant als beheerder. */

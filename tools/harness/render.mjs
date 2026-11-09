@@ -30,10 +30,11 @@ await build({
   conditions: ["import", "module", "default"],
   loader: { ".css": "empty" },
   alias: {
-    "@/app/admin/crm/actions": path.join(root, "tools/harness/stub-actions.ts"),
     "server-only": path.join(root, "tools/harness/empty.ts"),
     "next/link": path.join(root, "tools/harness/link.tsx"),
     "next/navigation": path.join(root, "tools/harness/navigation.ts"),
+    "@/app/admin/inschrijvingen/actions": path.join(root, "tools/harness/stub-actions.ts"),
+    "@/app/inschrijven/[slug]/actions": path.join(root, "tools/harness/stub-inschrijven.ts"),
   },
   define: { "process.env.NODE_ENV": '"production"', "process.env.HARNESS": JSON.stringify(keuze) },
   // Alles uit next dat niet met de opmaak te maken heeft, vervangen wij door

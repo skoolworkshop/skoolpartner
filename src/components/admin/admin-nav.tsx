@@ -8,18 +8,13 @@ import { cn } from "@/lib/utils";
 /**
  * De navigatie van het beheerportaal.
  *
- * Vier groepen, elk met een eigen vraag:
+ * Vijf groepen, elk met een eigen vraag:
  *
- *   CRM          Met wie doen wij zaken, en wat loopt er?
+ *   Inschrijvingen Wie komt er, en wie kiest welke workshop?
  *   Uitvoering   Wat is er afgesproken en moet gebeuren?
  *   SkoolPartner Het loyaliteitsprogramma.
  *   Klantportaal Wie kan er inloggen, en namens welke organisatie?
- *
- * Er is geen enkel onderdeel weggehaald en geen enkele link veranderd. Wat wel
- * is veranderd: /admin/organisaties heet nu Organisatiebeheer en staat onder
- * Klantportaal, want dat scherm gaat over toegang, verificatie en verwijderen.
- * Het commerciele overzicht van dezelfde scholen staat onder CRM. Ze linken
- * naar dezelfde detailpagina.
+ *   Systeem      Koppelingen, instellingen en wie wat deed.
  */
 
 interface Item {
@@ -35,20 +30,8 @@ interface Groep {
 
 const groepen: Groep[] = [
   {
-    titel: "CRM",
-    items: [
-      { href: "/admin/crm", label: "Overzicht", exact: true },
-      { href: "/admin/crm/contacten", label: "Contacten" },
-      { href: "/admin/crm/organisaties", label: "Organisaties" },
-      { href: "/admin/crm/pijplijn", label: "Deals" },
-      { href: "/admin/crm/suri", label: "Reisperiodes" },
-      { href: "/admin/crm/taken", label: "Taken" },
-      { href: "/admin/crm/afspraken", label: "Afspraken" },
-      { href: "/admin/crm/boekingslinks", label: "Boekingslinks" },
-      { href: "/admin/crm/fragmenten", label: "Fragmenten" },
-      { href: "/admin/crm/templates", label: "Templates" },
-      { href: "/admin/crm/sequences", label: "Sequences" },
-    ],
+    titel: "Inschrijvingen",
+    items: [{ href: "/admin/inschrijvingen", label: "Inschrijfdagen" }],
   },
   {
     titel: "Uitvoering",

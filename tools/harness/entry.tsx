@@ -2,45 +2,28 @@ import { renderToStaticMarkup } from "react-dom/server";
 import "@/app/globals.css";
 
 import { Harness as Diagnose } from "./diagnose-harness";
-import { Harness as Crm } from "./crm-harness";
-import { Harness as CrmSuri } from "./crm-suri-harness";
-import { Harness as CrmPijplijn } from "./crm-pijplijn-harness";
-import { Harness as CrmContacten } from "./crm-contacten-harness";
-import { Harness as CrmDashboard } from "./crm-dashboard-harness";
-import { Harness as CrmFragmenten } from "./crm-fragmenten-harness";
-import { Harness as CrmAfspraken } from "./crm-afspraken-harness";
-import { Harness as CrmBoeking } from "./crm-boeking-harness";
-import { Harness as CrmContact } from "./crm-contact-harness";
-import { Harness as CrmOrganisatie } from "./crm-organisatie-harness";
+import { Harness as Inschrijving } from "./inschrijving-harness";
+import { Harness as Klant } from "./klant-harness";
+import { Harness as Leerling } from "./leerling-harness";
 
 /**
  * Welke harness gerenderd wordt, kies je met de omgevingsvariabele HARNESS.
- * Zonder die variabele blijft het de diagnoseharness, precies zoals eerst.
+ * Zonder die variabele blijft het de diagnoseharness.
  *
  *   npm run visueel               de diagnose
- *   npm run visueel:crm           het CRM-fundament
- *   npm run visueel:suri          de reisperiodes en het relatieblok
- *   npm run visueel:pijplijn      de pijplijn, de taken en de tijdlijn
- *   npm run visueel:contacten     de contacten en de dealkaarten
- *   npm run visueel:dashboard     het commerciele dashboard
- *   npm run visueel:fragmenten    de fragmenten en de keuzelijst
- *   npm run visueel:afspraken     de afspraken
- *   npm run visueel:boeking       de openbare boekingspagina
- *   npm run visueel:contact      de indeling van een contactpagina
- *   npm run visueel:organisatie  de CRM-pagina van een organisatie
+ *   npm run visueel:inschrijving  het scherm van een inschrijfdag
+ *   npm run visueel:leerling      de inschrijfpagina voor een leerling
+ *   npm run visueel:klant         de online indeling voor de school
+ *
+ * De CRM-harnessen zijn weg omdat de CRM zelf weg is. Nieuwe schermen krijgen
+ * hier hun eigen harness, zodat je ze op 1280 en 390 pixels kunt bekijken
+ * zonder de hele app te starten.
  */
 const harnessen = {
   diagnose: Diagnose,
-  crm: Crm,
-  suri: CrmSuri,
-  pijplijn: CrmPijplijn,
-  contacten: CrmContacten,
-  dashboard: CrmDashboard,
-  fragmenten: CrmFragmenten,
-  afspraken: CrmAfspraken,
-  boeking: CrmBoeking,
-  contact: CrmContact,
-  organisatie: CrmOrganisatie,
+  inschrijving: Inschrijving,
+  leerling: Leerling,
+  klant: Klant,
 };
 const gekozen = (process.env.HARNESS ?? "diagnose") as keyof typeof harnessen;
 const Harness = harnessen[gekozen] ?? Diagnose;

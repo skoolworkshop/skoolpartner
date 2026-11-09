@@ -21,9 +21,6 @@ import { pointsToCents } from "@/lib/loyalty/calc";
 import { getSettings } from "@/lib/settings";
 import { OrgLogo } from "@/components/portal/org-logo";
 
-import { getRelatieProfiel } from "@/lib/crm/relaties";
-import { LifecycleBadge } from "@/components/admin/crm-badges";
-import type { Lifecycle } from "@/lib/crm/regels";
 import {
   clearOrganizationLogoAction,
   fetchOrganizationLogoAction,
@@ -57,11 +54,10 @@ export default async function OrganizationDetailPage({
   const detail = await getOrganizationDetail(id);
   if (!detail) notFound();
 
-  const [settings, tegoed, tegoedMutaties, relatie] = await Promise.all([
+  const [settings, tegoed, tegoedMutaties] = await Promise.all([
     getSettings(),
     getCreditBalanceForAdmin(id),
     getCreditTransactionsForAdmin(id, 25),
-    getRelatieProfiel(id),
   ]);
   const members = detail.members as unknown as MemberRow[];
   const mbContacten = detail.moneybirdContacts as unknown as {
@@ -400,45 +396,6 @@ export default async function OrganizationDetailPage({
                 <Input id="domain" name="domain" placeholder="goudsewaarden.nl" required />
               </Field>
             </ActionForm>
-          </CardBody>
-        </Card>
-
-        {/*
-          HIER STOND HET COMMERCIELE DEEL
-
-          De levensfase, de eigenaar, de personen in het CRM, de deals, de
-          tijdlijn, de taken en de afspraken stonden tussen de punten, het
-          tegoed, de domeinen en de knop om deze organisatie te verwijderen.
-          Twee verschillende soorten werk op een scherm.
-
-          Ze zijn niet weg, ze staan op de CRM-pagina van dezelfde organisatie.
-          Er is niets aan die blokken veranderd; alleen waar ze staan.
-        */}
-        <Card>
-          <CardHeader
-            title="Commercieel"
-            description="Levensfase, eigenaar, personen, deals, tijdlijn, taken en afspraken staan in het CRM."
-          />
-          <CardBody className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <LifecycleBadge waarde={(relatie.profiel?.lifecycle ?? "klant") as Lifecycle} />
-              {relatie.eigenaarNaam ? (
-                <span className="rounded-pill bg-surface-3 px-2.5 py-1 text-xs font-semibold text-muted">
-                  Eigenaar {relatie.eigenaarNaam}
-                </span>
-              ) : null}
-              {relatie.deals.length > 0 ? (
-                <span className="rounded-pill bg-surface-3 px-2.5 py-1 text-xs font-semibold text-muted">
-                  {relatie.deals.length} {relatie.deals.length === 1 ? "deal" : "deals"}
-                </span>
-              ) : null}
-            </div>
-            <Link
-              href={`/admin/crm/organisaties/${id}`}
-              className="inline-flex min-h-9 items-center rounded-pill border border-line bg-white px-3.5 text-sm font-semibold text-ink hover:bg-surface-2"
-            >
-              Commercieel overzicht openen
-            </Link>
           </CardBody>
         </Card>
 

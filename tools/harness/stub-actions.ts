@@ -36,3 +36,44 @@ export const zetBoekingsLinkAanAction = niets;
 // Slepen in de pijplijn. In de visuele controle draait er geen server, dus dit
 // zegt altijd dat het goed ging; de kaart blijft liggen waar je hem laat vallen.
 export const verplaatsDealAction = async () => ({ ok: true as const });
+
+// De serveracties van het inschrijfbeheer.
+export const maakDagAction = niets;
+export const bewaarDagAction = niets;
+export const zetStatusAction = niets;
+export const voegRondeToeAction = niets;
+export const verwijderRondeAction = niets;
+export const voegWorkshopToeAction = niets;
+export const bewaarWorkshopAction = niets;
+export const verwijderWorkshopAction = niets;
+export const voegGroepenToeAction = niets;
+export const verwijderGroepAction = niets;
+export const bewaarLijstAction = niets;
+export const bewaarRondeAction = niets;
+export const kopieerRondeAction = niets;
+export const bewaarUitvoeringAction = niets;
+export const zetUitvoeringAction = niets;
+export const voegUitvoeringToeAction = niets;
+export const verwijderUitvoeringAction = niets;
+export const zetKlassenAction = niets;
+
+// Het inschrijfsysteem: één deelnemer opzoeken en bijwerken.
+export const zoekDeelnemersAction = async () => [];
+export const zetVrijstellingAction = niets;
+export const nieuweCodeAction = niets;
+export const verwijderDeelnemerAction = niets;
+
+// Afronden: indelen, lijsten, toegang en bevestigingen.
+export const bewaarAppInfoAction = niets;
+export const bekijkIndelingAction = async () => null;
+export const bevestigIndelingAction = niets;
+export const bekijkMailAction = async () => null;
+export const verstuurLijstenAction = niets;
+export const maakToegangAction = niets;
+export const trekToegangInAction = niets;
+export const verstuurBevestigingenAction = niets;
+
+// Het rooster in één keer aanmaken.
+export const genereerRondesAction = niets;
+export const voegWorkshopsToeAction = niets;
+export const nieuweLinkAction = niets;
