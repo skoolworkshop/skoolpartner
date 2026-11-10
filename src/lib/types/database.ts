@@ -575,11 +575,20 @@ export type EnrollmentEventRow = {
   closes_at: string | null;
   allow_repeat: boolean;
   /**
-   * Hoe een leerling zich meldt. 'code' is de standaard: een persoonlijke
-   * inschrijfcode. 'naam' is de oude manier, alleen de eigen naam opzoeken.
-   * Die laat je alleen aanzetten als een school geen codes kan uitdelen.
+   * Hoe een leerling zich bekendmaakt, nadat hij de gedeelde code van de dag
+   * heeft ingevuld. 'code' is de standaard: de persoonlijke inschrijfcode van
+   * de mentor. 'schoolmail' stuurt een cijfercode naar het adres dat de school
+   * heeft aangeleverd. 'naam' is alleen de eigen naam opzoeken, en staat
+   * standaard uit: een klasgenoot die jouw naam kent kan dan jouw keuzes doen.
    */
-  access_mode: "code" | "naam";
+  access_mode: "code" | "schoolmail" | "naam";
+  /**
+   * De gedeelde toegangscode van deze dag. De school deelt hem samen met de
+   * link. Hij geeft toegang tot de dag en bewijst niet wie iemand is.
+   */
+  shared_code: string | null;
+  shared_code_active: boolean;
+  shared_code_changed_at: string | null;
   contact_name: string | null;
   contact_email: string | null;
   purge_after: string | null;
@@ -689,8 +698,35 @@ export type EnrollmentParticipantRow = {
    * een school met negentien klassen heeft vaak maar twee leerjaren.
    */
   year_level: string | null;
+  /**
+   * Het adres waarmee deze inschrijving is bevestigd. Altijd het adres dat de
+   * school heeft aangeleverd, nooit een adres dat iemand zelf intypt.
+   */
+  claim_email: string | null;
+  claimed_at: string | null;
   confirmation_sent_at: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+/** Een eenmalige verificatiecode per mail. Alleen de versleutelde vorm. */
+export type EnrollmentVerificationRow = {
+  id: string;
+  participant_id: string;
+  code_hash: string;
+  sent_to: string;
+  expires_at: string;
+  attempts: number;
+  used_at: string | null;
+  created_at: string;
+};
+
+/** De pogingenteller. Telt op een versleuteld kenmerk, nooit op een adres. */
+export type EnrollmentAttemptRow = {
+  event_id: string;
+  bucket: string;
+  window_start: string;
+  aantal: number;
   updated_at: string;
 };
 
@@ -874,6 +910,8 @@ export type Database = {
       enrollment_sessions: TableDef<EnrollmentSessionRow>;
       enrollment_session_groups: TableDef<EnrollmentSessionGroupRow>;
       enrollment_participants: TableDef<EnrollmentParticipantRow>;
+      enrollment_verifications: TableDef<EnrollmentVerificationRow>;
+      enrollment_attempts: TableDef<EnrollmentAttemptRow>;
       enrollment_choices: TableDef<EnrollmentChoiceRow>;
       enrollment_access: TableDef<EnrollmentAccessRow>;
       enrollment_deliveries: TableDef<EnrollmentDeliveryRow>;
@@ -891,6 +929,16 @@ export type Database = {
           p_source?: EnrollmentChoiceSource;
         };
         Returns: EnrollmentChoiceRow;
+      };
+      /** Eén poging tellen. Geeft false zodra het er te veel worden. */
+      enrollment_poging: {
+        Args: {
+          p_event: string;
+          p_bucket: string;
+          p_max: number;
+          p_seconden: number;
+        };
+        Returns: boolean;
       };
       request_redemption: {
         Args: {

@@ -8,30 +8,48 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { formatShortDate, formatTime } from "@/lib/format";
 import type { AanbodRonde, PubliekeDag } from "@/lib/inschrijving/publiek";
 import type { Stand } from "@/app/inschrijven/[slug]/actions";
-import { bevestigNaamAction, codeAction, kiesAction, standAction, zoekAction } from "@/app/inschrijven/[slug]/actions";
+import {
+  bevestigCodeAction,
+  bevestigNaamAction,
+  codeAction,
+  kiesAction,
+  mailZoekAction,
+  poortAction,
+  standAction,
+  vraagCodeAction,
+  zoekAction,
+} from "@/app/inschrijven/[slug]/actions";
 
 /**
  * De inschrijfpagina voor een leerling.
  *
- * DRIE STAPPEN, EEN SCHERM
+ * TWEE DEUREN, EEN SCHERM
  *
- *   Klas kiezen, je naam typen, en dan per ronde een workshop. Geen account,
- *   geen wachtwoord, geen mailtje om te bevestigen. Dit moet lukken op een
- *   telefoon, in de pauze, bij een leerling van tien.
+ *   Eerst de toegangscode van de dag. Die krijgt de hele klas van de docent,
+ *   samen met de link. Hij zegt alleen dat je bij deze dag hoort.
  *
- * JE EIGEN CODE
+ *   Daarna bewijzen wie je bent. Dat gaat op één van twee manieren, en welke
+ *   het is bepaalt de beheerder per dag:
  *
- *   Normaal meld je je met de persoonlijke code die je van je mentor hebt
- *   gekregen. Alleen een naam is namelijk geen bewijs: iedereen in de klas
- *   kent elkaars naam, en dan kan een klasgenoot jouw workshops omgooien.
- *   Met een code hoeft er ook geen klassenlijst op het scherm.
+ *     je persoonlijke code, die je van je mentor hebt gekregen, of
+ *     een cijfercode die naar je schoolmail gaat.
+ *
+ *   Alleen je naam aanklikken kan ook, maar dat staat standaard uit. Iedereen
+ *   in de klas kent namelijk elkaars naam, en dan kan een klasgenoot jouw
+ *   workshops omgooien.
  *
  * WAT ER NIET OP STAAT
  *
  *   De namen van klasgenoten. Op codes staat er helemaal geen naam op het
- *   scherm tot je je eigen code hebt ingevuld. Zoekt een school toch liever
- *   op naam, dan komen er hooguit vijf namen uit je eigen klas in beeld bij
- *   een typefout.
+ *   scherm tot je je eigen code hebt ingevuld. Gaat het via de schoolmail, dan
+ *   komen er hooguit vijf namen uit je eigen klas in beeld bij een typefout,
+ *   en daar komt niets achter vandaan zonder de code uit de mail.
+ *
+ * OP EEN TELEFOON
+ *
+ *   Eén veld per stap, grote knoppen, en het juiste toetsenbord: cijfers bij
+ *   een cijfercode. Dit moet lukken in de pauze, op een schoolplein, bij een
+ *   leerling van tien.
  *
  * VOL IS VOL
  *
@@ -40,16 +58,33 @@ import { bevestigNaamAction, codeAction, kiesAction, standAction, zoekAction } f
  *   gewoon eerder was.
  */
 
-type Stap = "wie" | "kiezen";
+type Stap = "poort" | "wie" | "mailcode" | "kiezen";
 
-export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag }) {
-  const [stap, setStap] = useState<Stap>("wie");
+export function InschrijfFlow({
+  slug,
+  dag,
+  beginStap = "poort",
+}: {
+  slug: string;
+  dag: PubliekeDag;
+  /**
+   * Alleen voor de visuele controle in tools/harness: daarmee is elke stap op
+   * 390 pixels te bekijken zonder dat er een echte code ingevuld hoeft te
+   * worden. In de app begint het altijd bij de toegangscode van de dag.
+   */
+  beginStap?: Stap;
+}) {
+  const [stap, setStap] = useState<Stap>(beginStap);
+  const [toegang, setToegang] = useState("");
+  const [poortCode, setPoortCode] = useState("");
   const [groepId, setGroepId] = useState("");
   const [groepNaam, setGroepNaam] = useState("");
   const [code, setCode] = useState("");
   const [naam, setNaam] = useState("");
   const [melding, setMelding] = useState<string | null>(null);
   const [suggesties, setSuggesties] = useState<{ id: string; naam: string }[]>([]);
+  const [wachtOpMail, setWachtOpMail] = useState<{ id: string; naam: string; adres: string } | null>(null);
+  const [mailCode, setMailCode] = useState("");
   const [deelnemer, setDeelnemer] = useState<{ id: string; claim: string; naam: string } | null>(null);
   const [stand, setStand] = useState<Stand | null>(null);
   const [bezig, start] = useTransition();
@@ -59,9 +94,129 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
     setDeelnemer(null);
     setStand(null);
     setSuggesties([]);
+    setWachtOpMail(null);
+    setMailCode("");
     setMelding(null);
     setNaam("");
     setCode("");
+  }
+
+  /**
+   * De toegangscode van de dag.
+   *
+   * Eén code voor de hele school. Hij wordt bij elke volgende stap opnieuw
+   * meegestuurd en opnieuw gecontroleerd, dus hij blijft hier staan.
+   */
+  async function doePoort() {
+    setMelding(null);
+    const uitkomst = await poortAction({ slug, code: poortCode });
+
+    if (uitkomst.ok) {
+      setToegang(poortCode);
+      setStap("wie");
+      return;
+    }
+
+    if (uitkomst.reden === "tevaak") {
+      setMelding("Even wachten. Er zijn te veel pogingen gedaan. Probeer het over tien minuten opnieuw.");
+      return;
+    }
+    if (uitkomst.reden === "uit") {
+      setMelding("Voor deze dag staat nog geen toegangscode klaar. Vraag je docent om hem op te vragen bij ons.");
+      return;
+    }
+    if (uitkomst.reden === "dicht") {
+      setMelding("De inschrijving is inmiddels gesloten.");
+      return;
+    }
+    setMelding("Deze toegangscode klopt niet. Kijk hem nog een keer na bij je docent.");
+  }
+
+  /** De naam opzoeken om een cijfercode naar de schoolmail te sturen. */
+  async function zoekVoorMail() {
+    setMelding(null);
+    setSuggesties([]);
+
+    const uitkomst = await mailZoekAction({ slug, toegang, groepId, naam });
+
+    if (uitkomst.soort === "verificatie") {
+      await vraagMailCode(uitkomst.deelnemerId, uitkomst.naam);
+      return;
+    }
+
+    if (uitkomst.soort === "bijna" || uitkomst.soort === "meerdere") {
+      setSuggesties(uitkomst.kandidaten);
+      setMelding(
+        uitkomst.soort === "meerdere"
+          ? "Er staan meerdere leerlingen met deze naam in je klas. Vraag je docent welke jij bent."
+          : "Bedoel je dit?",
+      );
+      return;
+    }
+
+    if (uitkomst.soort === "geen-adres") {
+      setMelding("Van jou staat geen e-mailadres in de lijst. Vraag je docent om je in te schrijven.");
+      return;
+    }
+
+    if (uitkomst.soort === "vrijgesteld") {
+      setMelding(`${uitkomst.naam} hoeft zich niet in te schrijven voor deze dag.`);
+      return;
+    }
+
+    if (uitkomst.soort === "tevaak") {
+      setMelding("Even wachten. Er zijn te veel pogingen gedaan. Probeer het over tien minuten opnieuw.");
+      return;
+    }
+
+    if (uitkomst.soort === "dicht" || uitkomst.soort === "poort") {
+      setMelding("De inschrijving is inmiddels gesloten.");
+      return;
+    }
+
+    setMelding(
+      "Deze naam staat niet in de lijst van deze klas. Typ je naam zoals hij op school bekend is, of vraag je docent.",
+    );
+  }
+
+  /** De cijfercode laten versturen naar het adres dat de school van je heeft. */
+  async function vraagMailCode(id: string, wie: string) {
+    setMelding(null);
+    const uitkomst = await vraagCodeAction({ slug, toegang, deelnemerId: id });
+
+    if (!uitkomst.ok) {
+      setMelding(uitkomst.reden);
+      return;
+    }
+
+    setSuggesties([]);
+    setWachtOpMail({ id, naam: wie, adres: uitkomst.adres });
+    setMailCode("");
+    setStap("mailcode");
+  }
+
+  /** De cijfercode uit de mail controleren. */
+  async function bevestigMailCode() {
+    if (!wachtOpMail) return;
+    setMelding(null);
+
+    const uitkomst = await bevestigCodeAction({
+      slug,
+      toegang,
+      deelnemerId: wachtOpMail.id,
+      code: mailCode,
+    });
+
+    if (!uitkomst.ok) {
+      setMelding(uitkomst.reden);
+      return;
+    }
+
+    setDeelnemer({ id: uitkomst.deelnemerId, claim: uitkomst.claim, naam: uitkomst.naam });
+    setGroepNaam(uitkomst.groepNaam);
+    setWachtOpMail(null);
+    setStap("kiezen");
+    await haalStand(uitkomst.deelnemerId, uitkomst.claim);
   }
 
   /**
@@ -73,7 +228,7 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
   async function meldAanMetCode() {
     setMelding(null);
 
-    const uitkomst = await codeAction({ slug, code });
+    const uitkomst = await codeAction({ slug, toegang, code });
 
     if (uitkomst.soort === "gevonden") {
       setDeelnemer({ id: uitkomst.deelnemerId, claim: uitkomst.claim, naam: uitkomst.naam });
@@ -90,11 +245,11 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
     }
 
     if (uitkomst.soort === "tevaak") {
-      setMelding("Even wachten. Er zijn te veel pogingen gedaan. Probeer het over een minuut opnieuw.");
+      setMelding("Even wachten. Er zijn te veel pogingen gedaan. Probeer het over tien minuten opnieuw.");
       return;
     }
 
-    if (uitkomst.soort === "dicht") {
+    if (uitkomst.soort === "dicht" || uitkomst.soort === "poort") {
       setMelding("De inschrijving is inmiddels gesloten.");
       return;
     }
@@ -103,14 +258,14 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
   }
 
   async function haalStand(id: string, claim: string) {
-    setStand(await standAction({ slug, deelnemerId: id, claim }));
+    setStand(await standAction({ slug, toegang, deelnemerId: id, claim }));
   }
 
   async function zoek() {
     setMelding(null);
     setSuggesties([]);
 
-    const uitkomst = await zoekAction({ slug, groepId, naam });
+    const uitkomst = await zoekAction({ slug, toegang, groepId, naam });
 
     if (uitkomst.soort === "gevonden") {
       setDeelnemer({ id: uitkomst.deelnemerId, claim: uitkomst.claim, naam: uitkomst.naam });
@@ -135,7 +290,12 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
       return;
     }
 
-    if (uitkomst.soort === "dicht") {
+    if (uitkomst.soort === "tevaak") {
+      setMelding("Even wachten. Er zijn te veel pogingen gedaan. Probeer het over tien minuten opnieuw.");
+      return;
+    }
+
+    if (uitkomst.soort === "dicht" || uitkomst.soort === "poort") {
       setMelding("De inschrijving is inmiddels gesloten.");
       return;
     }
@@ -146,7 +306,7 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
   }
 
   async function kiesNaam(id: string) {
-    const uitkomst = await bevestigNaamAction({ slug, groepId, deelnemerId: id });
+    const uitkomst = await bevestigNaamAction({ slug, toegang, groepId, deelnemerId: id });
     if (!uitkomst.ok) {
       setMelding("Dat lukte niet. Probeer het opnieuw.");
       return;
@@ -162,16 +322,81 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
   async function kies(sessieId: string) {
     if (!deelnemer) return;
     setMelding(null);
-    const uitkomst = await kiesAction({ slug, deelnemerId: deelnemer.id, claim: deelnemer.claim, sessieId });
+    const uitkomst = await kiesAction({
+      slug,
+      toegang,
+      deelnemerId: deelnemer.id,
+      claim: deelnemer.claim,
+      sessieId,
+    });
     if (uitkomst.stand) setStand(uitkomst.stand);
     if (!uitkomst.ok) setMelding(uitkomst.fout ?? "Dat lukte niet.");
   }
 
   const klaar = stand?.bevestiging ? stand.bevestiging.openRondes === 0 : false;
 
+  const opNaam = dag.toegangswijze === "naam" || dag.toegangswijze === "schoolmail";
+
   return (
     <div className="space-y-5">
-      {stap === "wie" && dag.codeModus ? (
+      {stap === "poort" ? (
+        <section className="rounded-card border border-line-soft bg-white p-5 shadow-card">
+          {dag.gedeeldeCodeNodig ? (
+            <>
+              <h2 className="text-[22px]">Toegangscode van de dag</h2>
+              <p className="mt-1 text-sm text-muted">
+                Deze code heeft je docent gekregen. Hij is voor je hele klas hetzelfde.
+              </p>
+
+              <div className="mt-4 space-y-3">
+                <Field label="Toegangscode" htmlFor="poort" required>
+                  <Input
+                    id="poort"
+                    value={poortCode}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    className="max-w-56 font-mono text-lg uppercase tracking-[0.2em]"
+                    placeholder="ABCD-2345"
+                    onChange={(event) => setPoortCode(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && poortCode.trim().length >= 6) {
+                        event.preventDefault();
+                        start(() => void doePoort());
+                      }
+                    }}
+                  />
+                </Field>
+
+                <Button
+                  type="button"
+                  variant="ink"
+                  disabled={bezig || poortCode.trim().length < 6}
+                  onClick={() => start(() => void doePoort())}
+                >
+                  {bezig ? "Bezig…" : "Verder"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-[22px]">Nog even wachten</h2>
+              <p className="mt-1 text-sm text-muted">
+                Voor deze dag staat nog geen toegangscode klaar. Je docent krijgt hem van ons, samen met deze
+                link.
+              </p>
+            </>
+          )}
+
+          {melding ? (
+            <Alert tone="warning" className="mt-4">
+              {melding}
+            </Alert>
+          ) : null}
+        </section>
+      ) : null}
+
+      {stap === "wie" && dag.toegangswijze === "code" ? (
         <section className="rounded-card border border-line-soft bg-white p-5 shadow-card">
           <h2 className="text-[22px]">Vul je code in</h2>
           <p className="mt-1 text-sm text-muted">
@@ -222,11 +447,14 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
         </section>
       ) : null}
 
-      {stap === "wie" && !dag.codeModus ? (
+      {stap === "wie" && opNaam ? (
         <section className="rounded-card border border-line-soft bg-white p-5 shadow-card">
           <h2 className="text-[22px]">Wie ben je?</h2>
           <p className="mt-1 text-sm text-muted">
             Kies je klas en typ je naam zoals hij op school bekend is.
+            {dag.toegangswijze === "schoolmail"
+              ? " Je krijgt daarna een cijfercode op je schoolmail."
+              : ""}
           </p>
 
           <div className="mt-4 space-y-3">
@@ -251,7 +479,7 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && groepId && naam.trim().length >= 2) {
                     event.preventDefault();
-                    start(() => void zoek());
+                    start(() => void (dag.toegangswijze === "schoolmail" ? zoekVoorMail() : zoek()));
                   }
                 }}
               />
@@ -261,7 +489,7 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
               type="button"
               variant="ink"
               disabled={bezig || !groepId || naam.trim().length < 2}
-              onClick={() => start(() => void zoek())}
+              onClick={() => start(() => void (dag.toegangswijze === "schoolmail" ? zoekVoorMail() : zoek()))}
             >
               {bezig ? "Bezig…" : "Verder"}
             </Button>
@@ -281,7 +509,13 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
                     type="button"
                     variant="secondary"
                     disabled={bezig}
-                    onClick={() => start(() => void kiesNaam(suggestie.id))}
+                    onClick={() =>
+                      start(() =>
+                        void (dag.toegangswijze === "schoolmail"
+                          ? vraagMailCode(suggestie.id, suggestie.naam)
+                          : kiesNaam(suggestie.id)),
+                      )
+                    }
                   >
                     {suggestie.naam}
                   </Button>
@@ -289,7 +523,80 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
               ))}
             </ul>
           ) : null}
+
+          {/*
+            De achtervang.
+
+            Niet iedereen komt bij zijn schoolmail: een vergeten wachtwoord, een
+            account dat nog niet werkt, een telefoon zonder mail erop. Dan kan
+            de mentor de persoonlijke code geven. Die is net zo veilig, want hij
+            hoort bij precies één leerling. Staat weggeklapt, zodat het scherm
+            voor de meeste leerlingen één vraag blijft.
+          */}
+          {dag.toegangswijze === "schoolmail" ? (
+            <details className="mt-4">
+              <summary className="cursor-pointer list-none text-sm font-semibold underline">
+                Ik kan niet bij mijn schoolmail
+              </summary>
+              <div className="mt-3 space-y-3 border-l-2 border-line-soft pl-3">
+                <p className="text-sm text-muted">
+                  Vraag je mentor om je persoonlijke code. Daarmee kun je ook naar binnen.
+                </p>
+                <Field label="Jouw persoonlijke code" htmlFor="eigen_code">
+                  <Input
+                    id="eigen_code"
+                    value={code}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    className="max-w-56 font-mono text-lg uppercase tracking-[0.2em]"
+                    placeholder="ABCD-2345"
+                    onChange={(event) => setCode(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && code.trim().length >= 6) {
+                        event.preventDefault();
+                        start(() => void meldAanMetCode());
+                      }
+                    }}
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={bezig || code.trim().length < 6}
+                  onClick={() => start(() => void meldAanMetCode())}
+                >
+                  {bezig ? "Bezig…" : "Verder met mijn code"}
+                </Button>
+              </div>
+            </details>
+          ) : null}
         </section>
+      ) : null}
+
+      {/*
+        De cijfercode uit de mail.
+
+        Zes cijfers, een cijfertoetsenbord, en het adres half verborgen erbij.
+        Dat laatste is belangrijk: zo ziet een leerling dat de mail naar zijn
+        eigen schooladres is gegaan en niet naar dat van een klasgenoot.
+      */}
+      {stap === "mailcode" && wachtOpMail ? (
+        <MailCodeKaart
+          adres={wachtOpMail.adres}
+          code={mailCode}
+          bezig={bezig}
+          melding={melding}
+          onCode={setMailCode}
+          onVerder={() => start(() => void bevestigMailCode())}
+          onNogmaals={() => start(() => void vraagMailCode(wachtOpMail.id, wachtOpMail.naam))}
+          onAnder={() => {
+            setWachtOpMail(null);
+            setMailCode("");
+            setMelding(null);
+            setStap("wie");
+          }}
+        />
       ) : null}
 
       {stap === "kiezen" && deelnemer ? (
@@ -339,6 +646,86 @@ export function InschrijfFlow({ slug, dag }: { slug: string; dag: PubliekeDag })
         </>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * De cijfercode uit de mail.
+ *
+ * Zes cijfers, een cijfertoetsenbord, en het adres half verborgen erbij. Dat
+ * laatste is belangrijk: zo ziet een leerling dat de mail naar zijn eigen
+ * schooladres is gegaan en niet naar dat van een klasgenoot.
+ *
+ * Los van de rest, zodat de visuele controle in tools/harness hem kan tonen
+ * zonder dat er een echte mail de deur uit hoeft.
+ */
+export function MailCodeKaart({
+  adres,
+  code,
+  bezig = false,
+  melding = null,
+  onCode,
+  onVerder,
+  onNogmaals,
+  onAnder,
+}: {
+  adres: string;
+  code: string;
+  bezig?: boolean;
+  melding?: string | null;
+  onCode: (waarde: string) => void;
+  onVerder: () => void;
+  onNogmaals: () => void;
+  onAnder: () => void;
+}) {
+  return (
+    <section className="rounded-card border border-line-soft bg-white p-5 shadow-card">
+      <h2 className="text-[22px]">Kijk in je mail</h2>
+      <p className="mt-1 text-sm text-muted">
+        We hebben een code van zes cijfers gestuurd naar {adres}. Hij is tien minuten geldig.
+      </p>
+
+      <div className="mt-4 space-y-3">
+        <Field label="Code uit de mail" htmlFor="mailcode" required>
+          <Input
+            id="mailcode"
+            value={code}
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            maxLength={6}
+            spellCheck={false}
+            className="max-w-40 font-mono text-2xl tracking-[0.3em]"
+            placeholder="123456"
+            onChange={(event) => onCode(event.target.value.replace(/\D/g, ""))}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && code.length === 6) {
+                event.preventDefault();
+                onVerder();
+              }
+            }}
+          />
+        </Field>
+
+        <Button type="button" variant="ink" disabled={bezig || code.length !== 6} onClick={onVerder}>
+          {bezig ? "Bezig…" : "Verder"}
+        </Button>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <button type="button" className="font-semibold underline" disabled={bezig} onClick={onNogmaals}>
+            Stuur de code nog een keer
+          </button>
+          <button type="button" className="text-muted underline" onClick={onAnder}>
+            Ik ben iemand anders
+          </button>
+        </div>
+      </div>
+
+      {melding ? (
+        <Alert tone="warning" className="mt-4">
+          {melding}
+        </Alert>
+      ) : null}
+    </section>
   );
 }
 

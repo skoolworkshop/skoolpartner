@@ -218,6 +218,45 @@ if (url && service && /^https:\/\//.test(url)) {
       "Migratie 042 (leerjaar)",
       leerjaarFout ? "kolom year_level ontbreekt, draai npm run db:push" : "uitgevoerd",
     );
+
+    const { error: toegangFout } = await supabase
+      .from("enrollment_events")
+      .select("shared_code, shared_code_active")
+      .limit(1);
+    regel(
+      toegangFout ? "fout" : "ok",
+      "Migratie 043 (toegangscode)",
+      toegangFout ? "kolom shared_code ontbreekt, draai npm run db:push" : "uitgevoerd",
+    );
+
+    if (!toegangFout) {
+      // Een dag die open staat zonder werkende toegangscode is een dag waar
+      // geen leerling binnenkomt. Dat wil je weten voordat de school belt.
+      const { data: open } = await supabase
+        .from("enrollment_events")
+        .select("name, event_date, shared_code, shared_code_active")
+        .eq("status", "open");
+
+      const zonder = (open ?? []).filter((dag) => !dag.shared_code || dag.shared_code_active === false);
+      regel(
+        zonder.length === 0 ? "ok" : "letop",
+        "Toegangscodes",
+        zonder.length === 0
+          ? `${(open ?? []).length} open dag(en), allemaal met werkende code`
+          : `${zonder.length} open dag(en) zonder werkende code: ${zonder
+              .map((dag) => `${dag.name} (${dag.event_date})`)
+              .join(", ")}`,
+      );
+
+      const { error: verificatieFout } = await supabase
+        .from("enrollment_verifications")
+        .select("id", { count: "exact", head: true });
+      regel(
+        verificatieFout ? "fout" : "ok",
+        "enrollment_verifications",
+        verificatieFout ? verificatieFout.message : "bereikbaar",
+      );
+    }
   } catch (fout) {
     regel("fout", "Supabase bereikbaar", fout.message);
   }

@@ -12,7 +12,9 @@ import {
   type Waarschuwing,
 } from "@/lib/inschrijving/rooster";
 import { staatErAl } from "@/lib/inschrijving/catalogus";
+import { toonCode } from "@/lib/inschrijving/codes";
 import { controleerTijden, type RoosterRegel } from "@/lib/inschrijving/rondes";
+import { maakGedeeldeCode } from "@/lib/inschrijving/toegang";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import type {
   EnrollmentAudience,
@@ -370,6 +372,11 @@ export async function maakDag(params: {
       audience: params.audience,
       status: "concept",
       slug: maakSlug(naam, params.datum),
+      // De gedeelde toegangscode staat er meteen bij. Zo kan hij niet vergeten
+      // worden, en kan de school hem alvast doorgeven met de link.
+      shared_code: maakGedeeldeCode(),
+      shared_code_active: true,
+      shared_code_changed_at: new Date().toISOString(),
     })
     .select("id")
     .single();
@@ -397,8 +404,13 @@ export async function bewaarDag(params: {
   opmerking: string | null;
   sluitOp: string | null;
   herhalingToegestaan: boolean;
-  /** 'code' is de veilige standaard. 'naam' alleen als een school niet anders kan. */
-  toegangswijze: "code" | "naam";
+  /**
+   * 'code' is de veilige standaard: de persoonlijke code van de mentor.
+   * 'schoolmail' als de school adressen heeft aangeleverd.
+   * 'naam' alleen als een school niet anders kan, want dan kan een klasgenoot
+   * de inschrijving van iemand anders doen.
+   */
+  toegangswijze: "code" | "schoolmail" | "naam";
   contactNaam: string | null;
   contactEmail: string | null;
 }): Promise<Uitkomst> {
@@ -412,6 +424,25 @@ export async function bewaarDag(params: {
     return { ok: false, fout: "Dat e-mailadres klopt niet." };
   }
 
+  // Verificatie per schoolmail kan alleen als er adressen in de lijst staan.
+  // Zonder adressen zou niemand meer binnenkomen, en dat merk je pas als de
+  // eerste klas het probeert.
+  if (params.toegangswijze === "schoolmail") {
+    const { count } = await supabase
+      .from("enrollment_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", params.id)
+      .not("email", "is", null);
+
+    if ((count ?? 0) === 0) {
+      return {
+        ok: false,
+        fout:
+          "Bij deze dag staat van niemand een e-mailadres. Kies de persoonlijke codes, of lees eerst een lijst met adressen in.",
+      };
+    }
+  }
+
   const { error } = await supabase
     .from("enrollment_events")
     .update({
@@ -421,7 +452,8 @@ export async function bewaarDag(params: {
       note: params.opmerking?.trim() || null,
       closes_at: params.sluitOp || null,
       allow_repeat: params.herhalingToegestaan,
-      access_mode: params.toegangswijze === "naam" ? "naam" : "code",
+      access_mode:
+        params.toegangswijze === "naam" ? "naam" : params.toegangswijze === "schoolmail" ? "schoolmail" : "code",
       contact_name: params.contactNaam?.trim() || null,
       contact_email: email || null,
     })
@@ -484,12 +516,133 @@ export async function nieuweLink(params: { dagId: string; bevestigd?: boolean })
     : { ok: true, melding: "Er staat een nieuwe link klaar. De oude werkt niet meer." };
 }
 
+// -----------------------------------------------------------------------------
+// De gedeelde toegangscode
+// -----------------------------------------------------------------------------
+/**
+ * WAT DIT IS
+ *
+ *   Eén code per cultuurdag, die de school samen met de link aan alle
+ *   leerlingen geeft. Hij zegt alleen: jij hoort bij deze dag. Wie iemand is
+ *   wordt daarna apart vastgesteld, met de persoonlijke code of met een
+ *   cijfercode naar het schooladres.
+ *
+ * WAAROM HIJ GEWOON LEESBAAR OP HET SCHERM STAAT
+ *
+ *   Hij is bedoeld om gedeeld te worden met honderden leerlingen. Een code die
+ *   een hele school kent is geen geheim, en doen alsof dat wel zo is maakt het
+ *   alleen onhandig. De bescherming zit in het kunnen intrekken, in de
+ *   pogingenteller, en vooral in de tweede stap.
+ */
+
+/** Een nieuwe gedeelde code. De oude werkt daarna niet meer. */
+export async function nieuweGedeeldeCode(params: {
+  dagId: string;
+  bevestigd?: boolean;
+}): Promise<Uitkomst> {
+  const supabase = createServiceSupabase();
+
+  const { data: dag } = await supabase
+    .from("enrollment_events")
+    .select("id, status, shared_code")
+    .eq("id", params.dagId)
+    .maybeSingle();
+
+  if (!dag) return { ok: false, fout: "Deze inschrijfdag bestaat niet meer." };
+
+  // Staat de inschrijving open en is er al een code uitgedeeld, dan kan dit
+  // midden in een les een klas buitensluiten. Daar hoort een vraag voor.
+  if (dag.shared_code && dag.status === "open" && !params.bevestigd) {
+    return {
+      ok: false,
+      bevestig: true,
+      fout:
+        "De inschrijving staat open. Wie de huidige code heeft gekregen, komt er na het wisselen niet meer in tot de school de nieuwe code heeft gedeeld. Gemaakte keuzes blijven staan.",
+    };
+  }
+
+  const code = maakGedeeldeCode();
+  const { error } = await supabase
+    .from("enrollment_events")
+    .update({ shared_code: code, shared_code_active: true, shared_code_changed_at: new Date().toISOString() })
+    .eq("id", params.dagId);
+
+  return error
+    ? { ok: false, fout: error.message }
+    : { ok: true, melding: `De nieuwe toegangscode is ${toonCode(code)}. Deel hem met de school.` };
+}
+
+/**
+ * De gedeelde code aan- of uitzetten.
+ *
+ * Uitzetten is de noodrem: er komt dan niemand meer binnen, ook niet wie het
+ * scherm nog open heeft staan. Aan de gemaakte keuzes verandert niets.
+ */
+export async function zetGedeeldeCode(params: { dagId: string; actief: boolean }): Promise<Uitkomst> {
+  const supabase = createServiceSupabase();
+
+  const { data: dag } = await supabase
+    .from("enrollment_events")
+    .select("id, shared_code")
+    .eq("id", params.dagId)
+    .maybeSingle();
+
+  if (!dag) return { ok: false, fout: "Deze inschrijfdag bestaat niet meer." };
+  if (params.actief && !dag.shared_code) {
+    return { ok: false, fout: "Er staat nog geen code klaar. Maak er eerst een." };
+  }
+
+  const { error } = await supabase
+    .from("enrollment_events")
+    .update({ shared_code_active: params.actief })
+    .eq("id", params.dagId);
+
+  if (error) return { ok: false, fout: error.message };
+
+  return {
+    ok: true,
+    melding: params.actief
+      ? "De toegangscode werkt weer."
+      : "De toegangscode staat uit. Er kan nu niemand meer inschrijven of wijzigen.",
+  };
+}
+
 export async function zetStatus(id: string, status: EnrollmentStatus): Promise<Uitkomst> {
   const supabase = createServiceSupabase();
 
   if (status === "open") {
     const detail = await getInschrijfdag(id);
     if (!detail) return { ok: false, fout: "Deze inschrijfdag bestaat niet meer." };
+
+    // Zonder werkende toegangscode komt er geen leerling binnen. Staat hij uit,
+    // dan is dat een keuze van de beheerder en zeggen we het gewoon. Is er nog
+    // geen code, dan zetten we er een klaar: dat kan niet misgaan en het scheelt
+    // een stap.
+    if (!detail.dag.shared_code) {
+      const nieuw = await nieuweGedeeldeCode({ dagId: id, bevestigd: true });
+      if (!nieuw.ok) return nieuw;
+    } else if (!detail.dag.shared_code_active) {
+      return {
+        ok: false,
+        fout: "De toegangscode van deze dag staat uit. Zet hem aan, anders komt er geen leerling binnen.",
+      };
+    }
+
+    if (detail.dag.access_mode === "schoolmail") {
+      const { count } = await supabase
+        .from("enrollment_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", id)
+        .not("email", "is", null);
+
+      if ((count ?? 0) === 0) {
+        return {
+          ok: false,
+          fout:
+            "Deze dag staat op verificatie per schoolmail, maar er staat van niemand een e-mailadres in de lijst. Zet hem op de persoonlijke codes of lees eerst de adressen in.",
+        };
+      }
+    }
 
     const taal = woorden(detail.dag.audience);
     if (detail.aantalWorkshopRondes === 0) {

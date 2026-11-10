@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/session";
 import {
   bewaarLijst,
+  maakClaimVrij,
   nieuweCodeVoor,
   type Vervangen,
   verwijderDeelnemer,
@@ -35,6 +36,7 @@ import {
   genereerRondes,
   kopieerRonde,
   maakDag,
+  nieuweGedeeldeCode,
   nieuweLink,
   verwijderGroep,
   verwijderRonde,
@@ -45,6 +47,7 @@ import {
   voegUitvoeringToe,
   voegWorkshopToe,
   voegWorkshopsToe,
+  zetGedeeldeCode,
   zetKlassen,
   zetStatus,
   zetUitvoering,
@@ -128,7 +131,7 @@ export async function bewaarDagAction(_prev: AdminState, formData: FormData): Pr
       opmerking: tekst(formData, "note") || null,
       sluitOp: tekst(formData, "closes_at") || null,
       herhalingToegestaan: formData.get("allow_repeat") === "ja",
-      toegangswijze: tekst(formData, "access_mode") === "naam" ? "naam" : "code",
+      toegangswijze: leesWijze(tekst(formData, "access_mode")),
       contactNaam: tekst(formData, "contact_name") || null,
       contactEmail: tekst(formData, "contact_email") || null,
     }),
@@ -137,11 +140,38 @@ export async function bewaarDagAction(_prev: AdminState, formData: FormData): Pr
   );
 }
 
+/** Welke manier van bekendmaken staat er in het formulier? */
+function leesWijze(waarde: string): "code" | "schoolmail" | "naam" {
+  return waarde === "schoolmail" || waarde === "naam" ? waarde : "code";
+}
+
 /** Een nieuwe inschrijflink. De oude vervalt daarmee. */
 export async function nieuweLinkAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   await requireAdmin();
   const dagId = tekst(formData, "event_id");
   return antwoord(await nieuweLink({ dagId, bevestigd: bevestigd(formData) }), dagId);
+}
+
+/**
+ * Een nieuwe gedeelde toegangscode voor deze dag.
+ *
+ * De oude werkt daarna niet meer, dus dit vraagt om bevestiging zolang de
+ * inschrijving open staat. Aan de gemaakte keuzes verandert niets.
+ */
+export async function nieuweGedeeldeCodeAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  await requireAdmin();
+  const dagId = tekst(formData, "event_id");
+  return antwoord(await nieuweGedeeldeCode({ dagId, bevestigd: bevestigd(formData) }), dagId);
+}
+
+/** De gedeelde toegangscode aan- of uitzetten. Uitzetten is de noodrem. */
+export async function zetGedeeldeCodeAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  await requireAdmin();
+  const dagId = tekst(formData, "event_id");
+  return antwoord(
+    await zetGedeeldeCode({ dagId, actief: formData.get("actief") === "ja" }),
+    dagId,
+  );
 }
 
 export async function zetStatusAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
@@ -635,6 +665,24 @@ export async function nieuweCodeAction(_prev: AdminState, formData: FormData): P
     status: "ok",
     message: `Nieuwe code voor ${uitkomst.naam}: ${uitkomst.code}. De oude werkt niet meer.`,
   };
+}
+
+/**
+ * Een verkeerd geclaimde naam vrijgeven.
+ *
+ * De bevestiging gaat eraf en het bewijs in de browser van wie het ook was
+ * wordt ongeldig. De gemaakte keuzes blijven staan: die weghalen is een eigen
+ * knop, zodat er nooit per ongeluk plekken vrijkomen.
+ */
+export async function maakClaimVrijAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  await requireAdmin();
+  const dagId = tekst(formData, "event_id");
+
+  const uitkomst = await maakClaimVrij(tekst(formData, "participant_id"));
+  if (!uitkomst.ok) return { status: "error", message: uitkomst.fout };
+
+  verversDag(dagId);
+  return { status: "ok", message: uitkomst.melding };
 }
 
 export async function verwijderDeelnemerAction(_prev: AdminState, formData: FormData): Promise<AdminState> {

@@ -27,7 +27,9 @@ import {
   bewaarAppInfoAction,
   bewaarDagAction,
   bewaarLijstAction,
+  maakClaimVrijAction,
   nieuweCodeAction,
+  nieuweGedeeldeCodeAction,
   nieuweLinkAction,
   verwijderDeelnemerAction,
   zetVrijstellingAction,
@@ -50,6 +52,7 @@ import {
   trekToegangInAction,
   verstuurBevestigingenAction,
   verstuurLijstenAction,
+  zetGedeeldeCodeAction,
   zetKlassenAction,
   zetStatusAction,
   zetUitvoeringAction,
@@ -213,7 +216,12 @@ export function DagScherm({ detail, extra }: { detail: DagDetail; extra: DagExtr
               link={extra.inschrijflink}
               open={open}
               woorden={{ deelnemer: taal.deelnemer, deelnemers: taal.deelnemers }}
+              gedeeldeCode={dag.shared_code}
+              codeActief={dag.shared_code_active}
+              toegangswijze={dag.access_mode}
               nieuweLink={nieuweLinkAction}
+              nieuweGedeeldeCode={nieuweGedeeldeCodeAction}
+              zetGedeeldeCode={zetGedeeldeCodeAction}
             />
           </CardBody>
         </Card>
@@ -516,6 +524,7 @@ export function DagScherm({ detail, extra }: { detail: DagDetail; extra: DagExtr
                 zoek={zoekDeelnemersAction}
                 zetVrijstelling={zetVrijstellingAction}
                 nieuweCode={nieuweCodeAction}
+                maakClaimVrij={maakClaimVrijAction}
                 verwijder={verwijderDeelnemerAction}
               />
             </CardBody>
@@ -616,7 +625,9 @@ export function DagScherm({ detail, extra }: { detail: DagDetail; extra: DagExtr
                 <p className="text-sm text-muted">
                   {dag.access_mode === "naam"
                     ? "Deze dag staat op inschrijven met naam. De codes bestaan wel, maar worden niet gevraagd. Zet het bij de gegevens van de dag om naar code als de school ze kan uitdelen."
-                    : `Een ${taal.deelnemer} heeft deze code nodig om zich in te schrijven. Wie hem kwijt is, zoek je op bij de ${taal.deelnemers}lijst hierboven; daar geef je ook een nieuwe code.`}
+                    : dag.access_mode === "schoolmail"
+                      ? `Deze dag staat op een cijfercode via het schooladres. De persoonlijke codes blijven de achtervang: komt een ${taal.deelnemer} niet bij zijn mail, dan geef je hem deze code. Op de inschrijfpagina staat daarvoor "Ik kan niet bij mijn schoolmail". De dag hoeft er niet voor omgezet te worden.`
+                      : `Een ${taal.deelnemer} heeft deze code nodig om zich in te schrijven. Wie hem kwijt is, zoek je op bij de ${taal.deelnemers}lijst hierboven; daar geef je ook een nieuwe code.`}
                 </p>
               </CardBody>
             </Card>
@@ -781,11 +792,12 @@ export function DagScherm({ detail, extra }: { detail: DagDetail; extra: DagExtr
                     label={`Hoe meldt een ${taal.deelnemer} zich aan`}
                     htmlFor="access_mode"
                     className="sm:col-span-2"
-                    hint="Met een code kan niemand de inschrijving van een ander wijzigen. Alleen omzetten naar naam als de school de codes echt niet kan uitdelen."
+                    hint="Dit komt ná de toegangscode van de dag. Met een persoonlijke code of een cijfercode op de schoolmail kan niemand de inschrijving van een ander doen. Alleen omzetten naar naam als het echt niet anders kan."
                   >
                     <Select id="access_mode" name="access_mode" defaultValue={dag.access_mode}>
                       <option value="code">Met een persoonlijke code (aanbevolen)</option>
-                      <option value="naam">Door de eigen naam op te zoeken</option>
+                      <option value="schoolmail">Met een cijfercode op het schooladres</option>
+                      <option value="naam">Door alleen de eigen naam op te zoeken</option>
                     </Select>
                   </Field>
                   <Field label="Interne opmerking" htmlFor="note" className="sm:col-span-2">

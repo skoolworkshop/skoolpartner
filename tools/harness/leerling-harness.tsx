@@ -1,4 +1,9 @@
-import { Bevestigingsblok, InschrijfFlow, RondeKaart } from "@/components/inschrijven/inschrijf-flow";
+import {
+  Bevestigingsblok,
+  InschrijfFlow,
+  MailCodeKaart,
+  RondeKaart,
+} from "@/components/inschrijven/inschrijf-flow";
 import type { AanbodRonde, Bevestiging, PubliekeDag } from "@/lib/inschrijving/publiek";
 
 /**
@@ -187,6 +192,8 @@ const dag: PubliekeDag = {
     { id: "g1", naam: "1 HAVO" },
     { id: "g2", naam: "2 VWO" },
   ],
+  toegangswijze: "code",
+  gedeeldeCodeNodig: true,
   codeModus: true,
 };
 
@@ -199,7 +206,35 @@ export function Harness() {
         <p className="text-[15px] text-muted">31 mei 2027 · Breda</p>
       </header>
 
+      {/* Stap 1: de gedeelde toegangscode van de dag. */}
       <InschrijfFlow slug="cultuurdag-2027-05-31-a71f3c9d" dag={dag} />
+
+      {/* Stap 2a: de persoonlijke code van de mentor. */}
+      <InschrijfFlow slug="cultuurdag-2027-05-31-a71f3c9d" dag={dag} beginStap="wie" />
+
+      {/* Stap 2b: klas en naam, als de school adressen heeft aangeleverd. */}
+      <InschrijfFlow
+        slug="cultuurdag-2027-05-31-a71f3c9d"
+        dag={{ ...dag, toegangswijze: "schoolmail", codeModus: false }}
+        beginStap="wie"
+      />
+
+      {/* Stap 3: de cijfercode uit de mail. */}
+      <MailCodeKaart
+        adres="li••••••@scholengemeenschap-de-rotonde.test"
+        code="12"
+        melding="Die code klopt niet. Kijk de mail nog een keer na."
+        onCode={() => {}}
+        onVerder={() => {}}
+        onNogmaals={() => {}}
+        onAnder={() => {}}
+      />
+
+      {/* En hoe het eruitziet als er nog geen toegangscode klaarstaat. */}
+      <InschrijfFlow
+        slug="cultuurdag-2027-05-31-a71f3c9d"
+        dag={{ ...dag, gedeeldeCodeNodig: false }}
+      />
 
       {rondes.map((regel) => (
         <RondeKaart key={regel.id} ronde={regel} onKies={() => {}} />

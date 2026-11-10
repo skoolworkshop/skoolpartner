@@ -76,4 +76,7 @@ export const verstuurBevestigingenAction = niets;
 // Het rooster in één keer aanmaken.
 export const genereerRondesAction = niets;
 export const voegWorkshopsToeAction = niets;
+export const nieuweGedeeldeCodeAction = niets;
+export const zetGedeeldeCodeAction = niets;
+export const maakClaimVrijAction = niets;
 export const nieuweLinkAction = niets;

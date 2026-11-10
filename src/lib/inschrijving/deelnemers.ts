@@ -290,7 +290,7 @@ export async function zoekDeelnemers(dagId: string, term: string): Promise<Deeln
   const code = leesCode(schoon);
 
   const velden =
-    "id, display_name, email, group_id, exempt, access_code, enrollment_groups ( name ), enrollment_choices ( id )";
+    "id, display_name, email, group_id, exempt, access_code, claim_email, claimed_at, enrollment_groups ( name ), enrollment_choices ( id )";
 
   // Ziet het eruit als een code, dan eerst daarop. Dat is de vraag die Anne
   // aan de telefoon heeft: "van wie is deze code?"
@@ -328,6 +328,13 @@ export interface DeelnemerRegel {
   /** De eigen code, leesbaar met streepje. Zodat je hem kunt voorlezen. */
   code: string;
   vrijgesteld: boolean;
+  /**
+   * Het adres waarmee deze inschrijving is bevestigd, en wanneer. Leeg zolang
+   * er niemand met de schoolmail heeft ingelogd. Hiermee kan Anne zien of een
+   * naam al geclaimd is, en door welk adres.
+   */
+  geclaimdDoor: string | null;
+  geclaimdOp: string | null;
 }
 
 function naarRegels(data: unknown): DeelnemerRegel[] {
@@ -338,6 +345,8 @@ function naarRegels(data: unknown): DeelnemerRegel[] {
     group_id: string;
     exempt?: boolean;
     access_code: string;
+    claim_email?: string | null;
+    claimed_at?: string | null;
     enrollment_groups: { name: string } | null;
     enrollment_choices: { id: string }[] | null;
   }[];
@@ -351,6 +360,8 @@ function naarRegels(data: unknown): DeelnemerRegel[] {
     gekozen: rij.enrollment_choices?.length ?? 0,
     code: toonCode(rij.access_code),
     vrijgesteld: rij.exempt ?? false,
+    geclaimdDoor: rij.claim_email ?? null,
+    geclaimdOp: rij.claimed_at ?? null,
   }));
 }
 
@@ -360,7 +371,7 @@ export async function getDeelnemers(dagId: string, groepId?: string): Promise<De
   let vraag = supabase
     .from("enrollment_participants")
     .select(
-      "id, display_name, email, group_id, exempt, access_code, enrollment_groups ( name ), enrollment_choices ( id )",
+      "id, display_name, email, group_id, exempt, access_code, claim_email, claimed_at, enrollment_groups ( name ), enrollment_choices ( id )",
     )
     .eq("event_id", dagId)
     .order("display_name")
@@ -437,6 +448,67 @@ export async function zetVrijstelling(params: {
 
   if (error) return { ok: false, fout: error.message };
   return { ok: true, melding: params.vrijgesteld ? "Staat op vrijgesteld." : "Doet weer mee." };
+}
+
+/**
+ * Een verkeerd geclaimde naam weer vrijgeven.
+ *
+ * WANNEER
+ *
+ *   Als blijkt dat iemand anders zich als deze leerling heeft ingeschreven, of
+ *   als een leerling per ongeluk de verkeerde naam heeft aangeklikt.
+ *
+ * WAT ER GEBEURT
+ *
+ *   De bevestiging gaat eraf, en het bewijs in de browser van wie het ook was
+ *   wordt ongeldig. Die moet zich dus opnieuw melden, en dat kan alleen nog met
+ *   het schooladres van deze leerling of met zijn persoonlijke code.
+ *
+ * WAT ER NIET GEBEURT
+ *
+ *   De gemaakte keuzes blijven staan. Het is namelijk maar de vraag wat er
+ *   verkeerd is: misschien heeft de echte leerling netjes gekozen en is alleen
+ *   het adres fout. Keuzes weghalen is een eigen knop, met een eigen
+ *   bevestiging, zodat er nooit per ongeluk plekken vrijkomen.
+ */
+export async function maakClaimVrij(
+  id: string,
+): Promise<{ ok: true; melding: string; naam: string } | { ok: false; fout: string }> {
+  const supabase = createServiceSupabase();
+
+  const { data: deelnemer } = await supabase
+    .from("enrollment_participants")
+    .select("id, display_name, claim_email")
+    .eq("id", id)
+    .maybeSingle();
+  if (!deelnemer) return { ok: false, fout: "Deze deelnemer bestaat niet meer." };
+
+  const { error } = await supabase
+    .from("enrollment_participants")
+    .update({
+      claim_email: null,
+      claimed_at: null,
+      // Een nieuw bewijs: wie nu nog een scherm open heeft staan, kan daarmee
+      // niets meer wijzigen.
+      claim_token: generateToken(24),
+    })
+    .eq("id", id);
+
+  if (error) return { ok: false, fout: error.message };
+
+  // Openstaande verificatiecodes vervallen ook, anders kan de verkeerde
+  // persoon er met een mail van een minuut oud alsnog in.
+  await supabase
+    .from("enrollment_verifications")
+    .update({ used_at: new Date().toISOString() })
+    .eq("participant_id", id)
+    .is("used_at", null);
+
+  return {
+    ok: true,
+    naam: deelnemer.display_name,
+    melding: `De inschrijving van ${deelnemer.display_name} is vrijgegeven. De gemaakte keuzes staan er nog.`,
+  };
 }
 
 /**

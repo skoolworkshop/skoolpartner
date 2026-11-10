@@ -3,6 +3,15 @@ import "server-only";
 import { isCode, leesCode } from "@/lib/inschrijving/codes";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { zoekDeelnemer, type Kandidaat } from "@/lib/inschrijving/naam";
+import {
+  POGINGEN_MAX,
+  POGINGEN_VENSTER_SECONDEN,
+  leesToegangswijze,
+  maskeer,
+  pogingSleutel,
+  vergelijkGedeeldeCode,
+  type Toegangswijze,
+} from "@/lib/inschrijving/toegang";
 import type {
   EnrollmentEventRow,
   EnrollmentRoundRow,
@@ -56,10 +65,21 @@ export interface PubliekeDag {
   rondes: PubliekeRonde[];
   groepen: { id: string; naam: string }[];
   /**
-   * Meldt een leerling zich met zijn persoonlijke code, of met zijn naam?
-   * Code is de standaard. Namen opzoeken staat alleen aan als een school de
-   * codes niet kan uitdelen, en dat zet jij per dag zelf aan.
+   * Hoe een leerling zich bekendmaakt, nadat hij de gedeelde code heeft
+   * ingevuld.
+   *
+   *   'code'        met zijn persoonlijke inschrijfcode van de mentor.
+   *   'schoolmail'  met een cijfercode naar het adres dat de school van hem
+   *                 heeft aangeleverd.
+   *   'naam'        met alleen zijn naam. Staat standaard uit.
    */
+  toegangswijze: Toegangswijze;
+  /**
+   * Staat er een gedeelde code klaar voor deze dag? Zonder actieve code kan
+   * er niemand in, ook niet met de link.
+   */
+  gedeeldeCodeNodig: boolean;
+  /** Oude naam voor toegangswijze !== 'naam'. Blijft voor de bestaande schermen. */
   codeModus: boolean;
 }
 
@@ -113,7 +133,9 @@ export async function getPubliekeDag(slug: string): Promise<PubliekeDag | null> 
       pauze: ronde.kind === "pauze",
     })),
     groepen: (groepen ?? []).map((groep) => ({ id: groep.id, naam: groep.name })),
-    codeModus: dag.access_mode !== "naam",
+    toegangswijze: leesToegangswijze(dag.access_mode),
+    gedeeldeCodeNodig: Boolean(dag.shared_code) && dag.shared_code_active !== false,
+    codeModus: leesToegangswijze(dag.access_mode) !== "naam",
   };
 }
 
@@ -128,34 +150,75 @@ export type CodeUitkomst =
   | { soort: "tevaak" };
 
 /**
- * Hoeveel pogingen heeft dit adres net gedaan?
+ * Eén mislukte poging tellen, en zeggen of er nog een mag.
  *
- * Acht tekens uit 32 zijn ruim duizend miljard codes, dus raden is al
- * hopeloos. Dit is de tweede deur: tien pogingen per minuut per adres. Een
- * leerling die zich vertypt merkt er niets van, een script wel.
+ * WAAROM DIT IN DE DATABASE STAAT
  *
- * Dit zit in het geheugen van de server. Draait de site op meerdere servers,
- * dan geldt het per server. Dat is bewust: geen extra dienst erbij voor iets
- * wat vooral een rem is.
+ *   Een teller in het geheugen van de server telt alleen wat die ene server
+ *   ziet. Op Vercel draaien er meerdere naast elkaar, dus dan heeft iemand die
+ *   codes zit te raden in de praktijk een veelvoud aan pogingen. Deze teller
+ *   staat op één plek en geldt voor alle servers tegelijk.
+ *
+ *   Er wordt geteld op een versleuteld kenmerk van de bezoeker, nooit op het
+ *   IP-adres zelf. Zo weten we wel dat het dezelfde bezoeker is, maar staat er
+ *   nergens iets dat naar een kind te herleiden is.
+ *
+ *   Gaat de telling onderuit, dan weigeren we. Liever iemand die even moet
+ *   wachten dan een rem die stilletjes niets meer tegenhoudt.
  */
-const pogingen = new Map<string, number[]>();
-const MAX_POGINGEN = 10;
-const VENSTER = 60_000;
+async function magNog(params: {
+  dagId: string;
+  soort: "gedeeld" | "code" | "naam" | "verificatie";
+  vanaf: string;
+}): Promise<boolean> {
+  const supabase = createServiceSupabase();
+  const { data, error } = await supabase.rpc("enrollment_poging", {
+    p_event: params.dagId,
+    p_bucket: pogingSleutel(params.soort, params.vanaf),
+    p_max: POGINGEN_MAX,
+    p_seconden: POGINGEN_VENSTER_SECONDEN,
+  });
 
-function tevaak(sleutel: string): boolean {
-  const nu = Date.now();
-  const recent = (pogingen.get(sleutel) ?? []).filter((moment) => nu - moment < VENSTER);
-  recent.push(nu);
-  pogingen.set(sleutel, recent);
-
-  // Het geheugen niet laten vollopen met adressen van gisteren.
-  if (pogingen.size > 5000) {
-    for (const [andere, momenten] of pogingen) {
-      if (momenten.every((moment) => nu - moment >= VENSTER)) pogingen.delete(andere);
-    }
+  if (error) {
+    console.error("[inschrijving] pogingenteller werkt niet", error.message);
+    return false;
   }
+  return data === true;
+}
 
-  return recent.length > MAX_POGINGEN;
+export type GedeeldeCodeUitkomst = { ok: true } | { ok: false; reden: "fout" | "uit" | "tevaak" };
+
+/**
+ * De gedeelde toegangscode van de dag controleren.
+ *
+ * Dit is de deur, niet het paspoort. Wie hem goed heeft weet alleen dat hij
+ * bij deze dag hoort; wie hij is wordt daarna apart vastgesteld. Een goede
+ * code kost geen poging, een foute wel.
+ */
+export async function controleerGedeeldeCode(params: {
+  dagId: string;
+  code: string;
+  vanaf: string;
+}): Promise<GedeeldeCodeUitkomst> {
+  const supabase = createServiceSupabase();
+  const { data } = await supabase
+    .from("enrollment_events")
+    .select("shared_code, shared_code_active")
+    .eq("id", params.dagId)
+    .maybeSingle();
+
+  if (!data) return { ok: false, reden: "uit" };
+
+  const oordeel = vergelijkGedeeldeCode(params.code, {
+    shared_code: data.shared_code,
+    shared_code_active: data.shared_code_active !== false,
+  });
+
+  if (oordeel === "ok") return { ok: true };
+  if (oordeel === "uit") return { ok: false, reden: "uit" };
+
+  const mag = await magNog({ dagId: params.dagId, soort: "gedeeld", vanaf: params.vanaf });
+  return { ok: false, reden: mag ? "fout" : "tevaak" };
 }
 
 /**
@@ -169,10 +232,13 @@ export async function zoekViaCode(params: {
   code: string;
   vanaf: string;
 }): Promise<CodeUitkomst> {
-  if (tevaak(`${params.dagId}:${params.vanaf}`)) return { soort: "tevaak" };
-
   const code = leesCode(params.code);
-  if (!isCode(code)) return { soort: "niets" };
+  if (!isCode(code)) {
+    // Ook iets wat niet eens op een code lijkt telt mee. Anders kan een script
+    // onbeperkt blijven kloppen met rommel om de teller te omzeilen.
+    const mag = await magNog({ dagId: params.dagId, soort: "code", vanaf: params.vanaf });
+    return mag ? { soort: "niets" } : { soort: "tevaak" };
+  }
 
   const supabase = createServiceSupabase();
   const { data } = await supabase
@@ -182,7 +248,10 @@ export async function zoekViaCode(params: {
     .eq("access_code", code)
     .maybeSingle();
 
-  if (!data) return { soort: "niets" };
+  if (!data) {
+    const mag = await magNog({ dagId: params.dagId, soort: "code", vanaf: params.vanaf });
+    return mag ? { soort: "niets" } : { soort: "tevaak" };
+  }
   const rij = data as unknown as {
     id: string;
     display_name: string;
@@ -211,34 +280,43 @@ export type ZoekUitkomst =
   | { soort: "vrijgesteld"; naam: string }
   | { soort: "niets" };
 
+interface GroepRij {
+  id: string;
+  display_name: string;
+  search_key: string;
+  flat_key: string;
+  exempt: boolean;
+  claim_token: string;
+  email: string | null;
+}
+
 /**
- * De deelnemer opzoeken binnen zijn eigen groep.
+ * De naam opzoeken binnen één groep.
  *
- * Alleen een zekere treffer levert het claim_token op. Bij twijfel komt er een
- * vraag terug, en pas na bevestigen van de juiste naam gaat het verder.
+ * Geeft de rij terug bij een zekere treffer, of de suggesties bij twijfel. Wat
+ * er daarna met die rij mag gebeuren hangt af van de toegangswijze, en dat
+ * staat in de twee functies hieronder. Zo kan er nooit per ongeluk een
+ * claim_token uitgedeeld worden in een modus die dat niet hoort te doen.
  */
-export async function zoekInGroep(params: {
+async function vindInGroep(params: {
   dagId: string;
   groepId: string;
   naam: string;
-}): Promise<ZoekUitkomst> {
+}): Promise<
+  | { soort: "gevonden"; rij: GroepRij }
+  | { soort: "bijna" | "meerdere"; kandidaten: { id: string; naam: string }[] }
+  | { soort: "niets" }
+> {
   const supabase = createServiceSupabase();
 
   const { data } = await supabase
     .from("enrollment_participants")
-    .select("id, display_name, search_key, flat_key, exempt, claim_token")
+    .select("id, display_name, search_key, flat_key, exempt, claim_token, email")
     .eq("event_id", params.dagId)
     .eq("group_id", params.groepId)
     .limit(500);
 
-  const rijen = (data ?? []) as unknown as {
-    id: string;
-    display_name: string;
-    search_key: string;
-    flat_key: string;
-    exempt: boolean;
-    claim_token: string;
-  }[];
+  const rijen = (data ?? []) as unknown as GroepRij[];
 
   const kandidaten: Kandidaat[] = rijen.map((rij) => ({
     id: rij.id,
@@ -251,9 +329,7 @@ export async function zoekInGroep(params: {
 
   if (uitkomst.soort === "gevonden") {
     const rij = rijen.find((kandidaat) => kandidaat.id === uitkomst.kandidaat.id);
-    if (!rij) return { soort: "niets" };
-    if (rij.exempt) return { soort: "vrijgesteld", naam: rij.display_name };
-    return { soort: "gevonden", deelnemerId: rij.id, claim: rij.claim_token, naam: rij.display_name };
+    return rij ? { soort: "gevonden", rij } : { soort: "niets" };
   }
 
   if (uitkomst.soort === "bijna" || uitkomst.soort === "meerdere") {
@@ -266,6 +342,70 @@ export async function zoekInGroep(params: {
   }
 
   return { soort: "niets" };
+}
+
+/**
+ * De deelnemer opzoeken binnen zijn eigen groep, alleen op naam.
+ *
+ * Dit is de lichtste manier en staat standaard uit. Alleen een zekere treffer
+ * levert het claim_token op. Bij twijfel komt er een vraag terug, en pas na
+ * bevestigen van de juiste naam gaat het verder.
+ */
+export async function zoekInGroep(params: {
+  dagId: string;
+  groepId: string;
+  naam: string;
+}): Promise<ZoekUitkomst> {
+  const uitkomst = await vindInGroep(params);
+
+  if (uitkomst.soort === "gevonden") {
+    const rij = uitkomst.rij;
+    if (rij.exempt) return { soort: "vrijgesteld", naam: rij.display_name };
+    return { soort: "gevonden", deelnemerId: rij.id, claim: rij.claim_token, naam: rij.display_name };
+  }
+
+  return uitkomst;
+}
+
+export type MailZoekUitkomst =
+  | { soort: "verificatie"; deelnemerId: string; naam: string; adres: string }
+  | { soort: "geen-adres"; naam: string }
+  | { soort: "bijna" | "meerdere"; kandidaten: { id: string; naam: string }[] }
+  | { soort: "vrijgesteld"; naam: string }
+  | { soort: "niets" };
+
+/**
+ * De deelnemer opzoeken om er een verificatiemail naartoe te sturen.
+ *
+ * WAT HIER NIET UITKOMT
+ *
+ *   Het claim_token. Een naam aanklikken is geen bewijs: iedereen in de klas
+ *   kent elkaars naam. Wat er wel uitkomt is het half verborgen adres, zodat
+ *   de leerling ziet dat de mail naar zijn eigen schooladres gaat en niet naar
+ *   dat van een klasgenoot.
+ *
+ *   Het adres komt altijd uit de lijst van de school. Een adres dat iemand
+ *   zelf intypt wordt nergens gebruikt, want dan kon je je als een klasgenoot
+ *   voordoen door je eigen adres in te vullen.
+ */
+export async function zoekVoorVerificatie(params: {
+  dagId: string;
+  groepId: string;
+  naam: string;
+}): Promise<MailZoekUitkomst> {
+  const uitkomst = await vindInGroep(params);
+  if (uitkomst.soort !== "gevonden") return uitkomst;
+
+  const rij = uitkomst.rij;
+  if (rij.exempt) return { soort: "vrijgesteld", naam: rij.display_name };
+  if (!rij.email) return { soort: "geen-adres", naam: rij.display_name };
+
+  return {
+    soort: "verificatie",
+    deelnemerId: rij.id,
+    naam: rij.display_name,
+    adres: maskeer(rij.email),
+  };
 }
 
 /** Controleert of dit bewijs echt bij deze deelnemer en deze dag hoort. */

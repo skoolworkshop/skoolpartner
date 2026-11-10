@@ -411,6 +411,182 @@ async function main() {
   }
   controles.push([nepLinkGeweigerd, 'een app-link buiten de officiele winkels wordt geweigerd']);
 
+  // ---------------------------------------------------------------------------
+  // Migratie 043: de gedeelde toegangscode, de verificatiecodes en de teller
+  // ---------------------------------------------------------------------------
+  const dag = '33333333-3333-3333-3333-333333333333';
+
+  const weigert = async (sql) => {
+    try {
+      await db.exec(sql);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
+  // De migratie geeft elke dag die al bestond een eigen code. Zonder dat zou
+  // een dag die nu open staat na de migratie voor iedereen dicht zitten. De
+  // dagen hierboven zijn ná de migratie aangemaakt, dus hier wordt dezelfde
+  // regel nog een keer gedraaid om te zien wat hij doet.
+  await db.exec(`
+    update public.enrollment_events
+       set shared_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
+           shared_code_changed_at = now()
+     where shared_code is null;
+  `);
+  const codes = await db.query(`
+    select id, shared_code from public.enrollment_events order by created_at
+  `);
+  controles.push([
+    codes.rows.every((rij) => /^[0-9A-HJKMNP-TV-Z]{6,12}$/.test(rij.shared_code ?? "")),
+    'elke bestaande dag heeft een gedeelde code gekregen',
+  ]);
+  controles.push([
+    new Set(codes.rows.map((rij) => rij.shared_code)).size === codes.rows.length,
+    'elke dag heeft zijn eigen code, niet allemaal dezelfde',
+  ]);
+
+  // De vorm van de gedeelde code. Zonder I, L, O en U, want die worden aan de
+  // telefoon verkeerd overgeschreven.
+  controles.push([
+    !(await weigert(`update public.enrollment_events set shared_code = 'KM7P4X2B' where id = '${dag}'`)),
+    'een gedeelde code van acht tekens wordt geaccepteerd',
+  ]);
+  controles.push([
+    await weigert(`update public.enrollment_events set shared_code = 'ABC' where id = '${dag}'`),
+    'een te korte gedeelde code wordt geweigerd',
+  ]);
+  controles.push([
+    await weigert(`update public.enrollment_events set shared_code = 'ABCDIJKL' where id = '${dag}'`),
+    'een gedeelde code met een I of een L wordt geweigerd',
+  ]);
+  controles.push([
+    await weigert(`update public.enrollment_events set shared_code = 'km7p4x2b' where id = '${dag}'`),
+    'een gedeelde code in kleine letters wordt geweigerd',
+  ]);
+
+  // De drie manieren van bekendmaken, en niets anders.
+  for (const wijze of ['code', 'schoolmail', 'naam']) {
+    controles.push([
+      !(await weigert(`update public.enrollment_events set access_mode = '${wijze}' where id = '${dag}'`)),
+      `toegangswijze '${wijze}' wordt geaccepteerd`,
+    ]);
+  }
+  controles.push([
+    await weigert(`update public.enrollment_events set access_mode = 'open' where id = '${dag}'`),
+    'een onbekende toegangswijze wordt geweigerd',
+  ]);
+  await db.exec(`update public.enrollment_events set access_mode = 'code' where id = '${dag}'`);
+
+  // Het adres waarmee bevestigd is, moet een adres zijn.
+  controles.push([
+    await weigert(`update public.enrollment_participants set claim_email = 'geen adres' where id = '${lissa}'`),
+    'een bevestigingsadres dat geen adres is wordt geweigerd',
+  ]);
+  controles.push([
+    !(await weigert(
+      `update public.enrollment_participants set claim_email = 'lissa@voorbeeld.test', claimed_at = now() where id = '${lissa}'`,
+    )),
+    'een geldig bevestigingsadres wordt bewaard',
+  ]);
+
+  // De pogingenteller: tien mogen er door, de elfde niet.
+  const poging = async (bucket, max = 10, seconden = 600) =>
+    (
+      await db.query(`select public.enrollment_poging($1::uuid, $2, $3, $4) as mag`, [dag, bucket, max, seconden])
+    ).rows[0].mag;
+
+  let doorgelaten = 0;
+  for (let i = 0; i < 12; i += 1) {
+    if (await poging('gedeeld:aaa')) doorgelaten += 1;
+  }
+  controles.push([doorgelaten === 10, `de teller laat precies tien pogingen door (nu ${doorgelaten})`]);
+
+  // Een andere bezoeker heeft zijn eigen teller: één die zit te raden sluit de
+  // rest van de school niet buiten.
+  controles.push([await poging('gedeeld:bbb'), 'een andere bezoeker heeft zijn eigen teller']);
+
+  // En een ander soort poging telt apart, zodat een foute toegangscode geen
+  // persoonlijke code opsnoept.
+  controles.push([await poging('code:aaa'), 'een ander soort poging telt apart']);
+
+  // Een nieuw tijdvak begint opnieuw te tellen.
+  await poging('kort:ccc', 1, 1);
+  const metenNa = await poging('kort:ccc', 1, 1);
+  await new Promise((klaar) => setTimeout(klaar, 1100));
+  const naWachten = await poging('kort:ccc', 1, 1);
+  controles.push([metenNa === false && naWachten === true, 'na het tijdvak begint de telling opnieuw']);
+
+  // Onzinnige grenzen moeten hard stuklopen, niet stilletjes alles doorlaten.
+  let onzinGeweigerd = false;
+  try {
+    await db.query(`select public.enrollment_poging($1::uuid, 'x', 0, 60)`, [dag]);
+  } catch {
+    onzinGeweigerd = true;
+  }
+  controles.push([onzinGeweigerd, 'de teller weigert onzinnige grenzen']);
+
+  // Verificatiecodes: niet meer dan tien pogingen per code, en de code zelf
+  // staat er nooit in, alleen de versleutelde vorm.
+  await db.exec(`
+    insert into public.enrollment_verifications (participant_id, code_hash, sent_to, expires_at)
+    values ('${lissa}', 'verzonnen-hash', 'lissa@voorbeeld.test', now() + interval '10 minutes');
+  `);
+  controles.push([
+    await weigert(`update public.enrollment_verifications set attempts = 11 where participant_id = '${lissa}'`),
+    'meer dan tien pogingen op één verificatiecode wordt geweigerd',
+  ]);
+  controles.push([
+    await weigert(`
+      insert into public.enrollment_verifications (participant_id, code_hash, sent_to, expires_at)
+      values ('${lissa}', 'hash', 'geen adres', now() + interval '10 minutes');
+    `),
+    'een verificatiecode naar iets dat geen adres is wordt geweigerd',
+  ]);
+
+  // Alles van een dag die weggaat, gaat mee. Zodat er nooit resten van een
+  // school blijven staan nadat de dag is opgeruimd.
+  await db.exec(`
+    insert into public.enrollment_events (id, organization_id, name, event_date, slug, shared_code)
+    values ('39999999-9999-9999-9999-999999999999', '22222222-2222-2222-2222-222222222222',
+            'Opruimdag', current_date + 30, 'opruimdag-test', 'ZZZZ9999');
+    insert into public.enrollment_groups (id, event_id, name)
+    values ('49999999-9999-9999-9999-999999999999', '39999999-9999-9999-9999-999999999999', '1A');
+    insert into public.enrollment_participants
+      (id, event_id, group_id, display_name, search_key, flat_key, claim_token, access_code)
+    values ('89999999-9999-9999-9999-999999999999', '39999999-9999-9999-9999-999999999999',
+            '49999999-9999-9999-9999-999999999999', 'Test Leerling', 'test leerling', 'testleerling',
+            'token-opruimen-01', 'ZZZZ1111');
+    insert into public.enrollment_verifications (participant_id, code_hash, sent_to, expires_at)
+    values ('89999999-9999-9999-9999-999999999999', 'hash', 'test@voorbeeld.test', now() + interval '10 minutes');
+  `);
+  await db.query(`select public.enrollment_poging($1::uuid, 'gedeeld:zzz', 10, 600)`, [
+    '39999999-9999-9999-9999-999999999999',
+  ]);
+  await db.exec(`delete from public.enrollment_events where id = '39999999-9999-9999-9999-999999999999'`);
+  const resten = (
+    await db.query(`
+      select (select count(*)::int from public.enrollment_verifications
+                where participant_id = '89999999-9999-9999-9999-999999999999') as codes,
+             (select count(*)::int from public.enrollment_attempts
+                where event_id = '39999999-9999-9999-9999-999999999999') as pogingen
+    `)
+  ).rows[0];
+  controles.push([
+    resten.codes === 0 && resten.pogingen === 0,
+    'met een verwijderde dag verdwijnen ook de verificatiecodes en de pogingen',
+  ]);
+
+  // De twee nieuwe instellingen staan klaar.
+  const nieuweInstellingen = (
+    await db.query(`
+      select count(*)::int as aantal from public.app_settings
+      where key in ('enrollment_shared_attempts', 'enrollment_verify_minutes')
+    `)
+  ).rows[0].aantal;
+  controles.push([nieuweInstellingen === 2, 'de instellingen voor pogingen en geldigheid staan klaar']);
+
   let alleGoed = true;
   for (const [goed, tekst] of controles) {
     console.log(goed ? `  Inschrijvingen: ${tekst}` : `  FOUT: ${tekst} ging niet goed`);

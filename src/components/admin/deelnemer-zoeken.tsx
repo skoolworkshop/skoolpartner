@@ -23,6 +23,12 @@ import type { AdminState } from "@/app/admin/actions";
  *   Een nieuwe code geven aan wie de zijne kwijt is, iemand vrijstellen die
  *   niet meedoet, en iemand weghalen die niet op de lijst hoort. Alle drie met
  *   een waarschuwing als er al keuzes aan hangen.
+ *
+ *   En: een inschrijving vrijgeven die door de verkeerde persoon is bevestigd.
+ *   Je ziet dan met welk adres dat gebeurd is. Vrijgeven haalt de bevestiging
+ *   eraf en maakt het bewijs in die browser ongeldig; de gemaakte keuzes
+ *   blijven staan. Zijn die ook fout, dan haal je ze apart weg, zodat er nooit
+ *   per ongeluk plekken vrijkomen.
  */
 
 export function DeelnemerZoeken({
@@ -31,6 +37,7 @@ export function DeelnemerZoeken({
   zoek,
   zetVrijstelling,
   nieuweCode,
+  maakClaimVrij,
   verwijder,
 }: {
   dagId: string;
@@ -38,6 +45,7 @@ export function DeelnemerZoeken({
   zoek: (input: { dagId: string; term: string }) => Promise<DeelnemerRegel[]>;
   zetVrijstelling: (prev: AdminState, formData: FormData) => Promise<AdminState>;
   nieuweCode: (prev: AdminState, formData: FormData) => Promise<AdminState>;
+  maakClaimVrij: (prev: AdminState, formData: FormData) => Promise<AdminState>;
   verwijder: (prev: AdminState, formData: FormData) => Promise<AdminState>;
 }) {
   const [term, setTerm] = useState("");
@@ -90,9 +98,20 @@ export function DeelnemerZoeken({
                   <code className="rounded-pill bg-surface-2 px-2.5 py-1 font-mono text-sm tracking-wider">
                     {regel.code}
                   </code>
+                  {regel.geclaimdDoor ? <Badge tone="info">Bevestigd</Badge> : null}
                   {regel.vrijgesteld ? <Badge tone="warning">Vrijgesteld</Badge> : null}
                 </div>
               </div>
+
+              {regel.geclaimdDoor ? (
+                <p className="text-xs text-muted">
+                  Bevestigd met {regel.geclaimdDoor}
+                  {regel.geclaimdOp ? ` op ${new Date(regel.geclaimdOp).toLocaleString("nl-NL")}` : ""}.
+                  {regel.email && regel.geclaimdDoor !== regel.email
+                    ? " Dit is niet het adres uit de lijst. Kijk dat na."
+                    : ""}
+                </p>
+              ) : null}
 
               <div className="flex flex-wrap items-start gap-2">
                 <BevestigForm action={nieuweCode} submitLabel="Nieuwe code" variant="secondary" inline>
@@ -111,6 +130,19 @@ export function DeelnemerZoeken({
                   <input type="hidden" name="participant_id" value={regel.id} />
                   <input type="hidden" name="exempt" value={regel.vrijgesteld ? "nee" : "ja"} />
                 </BevestigForm>
+
+                {regel.geclaimdDoor ? (
+                  <BevestigForm
+                    action={maakClaimVrij}
+                    submitLabel="Inschrijving vrijgeven"
+                    bevestigLabel="Ja, vrijgeven"
+                    variant="secondary"
+                    inline
+                  >
+                    <input type="hidden" name="event_id" value={dagId} />
+                    <input type="hidden" name="participant_id" value={regel.id} />
+                  </BevestigForm>
+                ) : null}
 
                 <BevestigForm
                   action={verwijder}
