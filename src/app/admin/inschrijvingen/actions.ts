@@ -134,6 +134,7 @@ export async function bewaarDagAction(_prev: AdminState, formData: FormData): Pr
       toegangswijze: leesWijze(tekst(formData, "access_mode")),
       contactNaam: tekst(formData, "contact_name") || null,
       contactEmail: tekst(formData, "contact_email") || null,
+      bewaarTot: tekst(formData, "purge_after") || null,
     }),
     id,
     "De gegevens zijn bijgewerkt.",

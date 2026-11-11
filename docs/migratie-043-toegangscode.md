@@ -163,3 +163,28 @@ Deelnemers, klassen, rondes, workshops en keuzes blijven ongemoeid.
 
 De code die bij deze migratie hoort, hoort dan ook terug. Draai die dus terug in
 dezelfde stap, anders zoekt de applicatie naar kolommen die er niet meer zijn.
+
+## Terugzetten uit een back-up
+
+Beproefd op 11 november 2026 met de back-up van 10 november, in een Postgres in
+het geheugen. De hele cultuurdag kwam er zonder één fout weer in: 1 dag, 19
+klassen, 3 rondes, 4 workshops, 12 uitvoeringen en 353 leerlingen, en daarna kon
+er gewoon weer gekozen worden. Drie dingen om te weten als je het echt een keer
+moet doen:
+
+1. **De volgorde telt.** Eerst `organizations`, dan de dag, dan klassen, rondes,
+   workshops, uitvoeringen, klasbeperkingen, leerlingen, en als laatste de
+   keuzes. In elke back-upmap van `dag:leegmaken` staat die volgorde ook in
+   `_overzicht.json`.
+2. **`app_settings` gaat niet zomaar terug.** De migraties zetten die rijen zelf
+   al klaar, dus de meeste botsen op hun sleutel. En de kolom `value` is jsonb:
+   die moet als JSON-tekst terug, niet als object. In de praktijk hoef je deze
+   tabel na een migratie nooit terug te zetten.
+3. **Een teruggezette dag heeft geen toegangscode.** De back-up is van vóór 043
+   en kent die kolom niet. Maak na het terugzetten een nieuwe code met de knop
+   in het dagscherm, en deel die opnieuw met de school.
+
+Wat deze back-up niet bevat: de accounts zelf. Die staan in het `auth`-schema
+van Supabase en niet in `public`. Voor dat soort herstel leun je op de back-up
+van Supabase zelf. Deze back-up is het vangnet voor de gegevens, niet voor de
+inlogs.

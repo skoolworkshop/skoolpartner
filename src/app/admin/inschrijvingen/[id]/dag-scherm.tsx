@@ -16,6 +16,7 @@ import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/form";
 import { formatShortDate, formatTime } from "@/lib/format";
 import type { ToegangRegel } from "@/lib/inschrijving/afronden";
+import { bewaarUitleg, standaardBewaardatum } from "@/lib/inschrijving/bewaartermijn";
 import type { Ontbrekend } from "@/lib/inschrijving/lijsten";
 import type { DagDetail } from "@/lib/inschrijving/dagen";
 import { aantalMet, woorden } from "@/lib/inschrijving/regels";
@@ -799,6 +800,19 @@ export function DagScherm({ detail, extra }: { detail: DagDetail; extra: DagExtr
                       <option value="schoolmail">Met een cijfercode op het schooladres</option>
                       <option value="naam">Door alleen de eigen naam op te zoeken</option>
                     </Select>
+                  </Field>
+                  <Field
+                    label="Leerlinggegevens bewaren tot"
+                    htmlFor="purge_after"
+                    className="sm:col-span-2"
+                    hint={`${bewaarUitleg(dag)} Leeg laten betekent dertig dagen na de dag. Een andere datum alleen als de school daar een reden voor heeft.`}
+                  >
+                    <Input
+                      id="purge_after"
+                      name="purge_after"
+                      type="date"
+                      defaultValue={dag.purge_after ?? standaardBewaardatum(dag.event_date)}
+                    />
                   </Field>
                   <Field label="Interne opmerking" htmlFor="note" className="sm:col-span-2">
                     <Textarea id="note" name="note" rows={3} defaultValue={dag.note ?? ""} />

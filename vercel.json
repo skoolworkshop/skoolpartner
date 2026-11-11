@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/opruimen-resultaten",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/opruimen-inschrijvingen",
+      "schedule": "30 4 * * *"
     }
   ]
 }

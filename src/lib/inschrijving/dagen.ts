@@ -12,6 +12,7 @@ import {
   type Waarschuwing,
 } from "@/lib/inschrijving/rooster";
 import { staatErAl } from "@/lib/inschrijving/catalogus";
+import { standaardBewaardatum } from "@/lib/inschrijving/bewaartermijn";
 import { toonCode } from "@/lib/inschrijving/codes";
 import { controleerTijden, type RoosterRegel } from "@/lib/inschrijving/rondes";
 import { maakGedeeldeCode } from "@/lib/inschrijving/toegang";
@@ -377,6 +378,9 @@ export async function maakDag(params: {
       shared_code: maakGedeeldeCode(),
       shared_code_active: true,
       shared_code_changed_at: new Date().toISOString(),
+      // Vanaf het begin staat vast tot wanneer de leerlinggegevens bewaard
+      // worden. Zo is er nooit een dag zonder termijn.
+      purge_after: standaardBewaardatum(params.datum),
     })
     .select("id")
     .single();
@@ -413,6 +417,11 @@ export async function bewaarDag(params: {
   toegangswijze: "code" | "schoolmail" | "naam";
   contactNaam: string | null;
   contactEmail: string | null;
+  /**
+   * Tot wanneer de leerlinggegevens van deze dag bewaard worden. Leeg laten
+   * betekent terug naar de standaard: dertig dagen na de cultuurdag.
+   */
+  bewaarTot: string | null;
 }): Promise<Uitkomst> {
   const supabase = createServiceSupabase();
   const naam = params.naam.trim();
@@ -443,6 +452,14 @@ export async function bewaarDag(params: {
     }
   }
 
+  const bewaarTot = (params.bewaarTot ?? "").trim() || standaardBewaardatum(params.datum);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(bewaarTot)) {
+    return { ok: false, fout: "De bewaardatum klopt niet." };
+  }
+  if (bewaarTot < params.datum) {
+    return { ok: false, fout: "De leerlinggegevens kunnen niet weg voordat de dag geweest is." };
+  }
+
   const { error } = await supabase
     .from("enrollment_events")
     .update({
@@ -456,6 +473,7 @@ export async function bewaarDag(params: {
         params.toegangswijze === "naam" ? "naam" : params.toegangswijze === "schoolmail" ? "schoolmail" : "code",
       contact_name: params.contactNaam?.trim() || null,
       contact_email: email || null,
+      purge_after: bewaarTot,
     })
     .eq("id", params.id);
 

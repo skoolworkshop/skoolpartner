@@ -116,7 +116,7 @@ const cron = env.CRON_SECRET;
 regel(
   cron ? "ok" : "letop",
   "CRON_SECRET",
-  cron ? toon("", cron, "geheim") : "ontbreekt: de drie dagelijkse taken geven dan 503",
+  cron ? toon("", cron, "geheim") : "ontbreekt: de vier dagelijkse taken geven dan 503",
 );
 
 const sleutel = env.APP_ENCRYPTION_KEY;
@@ -255,6 +255,43 @@ if (url && service && /^https:\/\//.test(url)) {
         verificatieFout ? "fout" : "ok",
         "enrollment_verifications",
         verificatieFout ? verificatieFout.message : "bereikbaar",
+      );
+    }
+
+    // ---------------------------------------------------------------------
+    // De bewaartermijn van leerlinggegevens
+    // ---------------------------------------------------------------------
+    const { data: alleDagen } = await supabase
+      .from("enrollment_events")
+      .select("name, event_date, purge_after");
+
+    if (alleDagen) {
+      const vandaag = new Date().toISOString().slice(0, 10);
+      const bewaartTot = (dag) => {
+        if (dag.purge_after) return String(dag.purge_after).slice(0, 10);
+        const moment = new Date(`${String(dag.event_date).slice(0, 10)}T00:00:00Z`);
+        moment.setUTCDate(moment.getUTCDate() + 30);
+        return moment.toISOString().slice(0, 10);
+      };
+
+      const teLang = alleDagen.filter((dag) => bewaartTot(dag) < vandaag);
+      regel(
+        teLang.length === 0 ? "ok" : "letop",
+        "Bewaartermijn leerlingen",
+        teLang.length === 0
+          ? `${alleDagen.length} dag(en), geen enkele over de termijn`
+          : `${teLang.length} dag(en) over de bewaartermijn: ${teLang
+              .map((dag) => `${dag.name} (${String(dag.event_date).slice(0, 10)})`)
+              .join(", ")}. De nachtelijke taak ruimt die op zodra hij draait.`,
+      );
+
+      const zonderDatum = alleDagen.filter((dag) => !dag.purge_after).length;
+      regel(
+        zonderDatum === 0 ? "ok" : "letop",
+        "purge_after ingevuld",
+        zonderDatum === 0
+          ? "op elke dag staat een bewaardatum"
+          : `${zonderDatum} dag(en) zonder eigen datum; die rekenen op dagdatum plus 30 dagen`,
       );
     }
   } catch (fout) {

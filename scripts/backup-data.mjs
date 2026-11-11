@@ -64,6 +64,18 @@ async function maakBackup() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  /**
+   * De vijf tabellen zonder eigen id-kolom, met het veld waarop we sorteren.
+   * Nagekeken tegen het schema: alle andere 38 tabellen hebben wel een id.
+   */
+  const ZONDER_ID = {
+    app_settings: "key",
+    cjp_bonus_awards: "organization_id",
+    enrollment_attempts: "event_id",
+    enrollment_session_groups: "session_id",
+    public_email_domains: "domain",
+  };
+
   const tabellen = [
     "app_settings",
     "audit_logs",
@@ -123,11 +135,18 @@ async function maakBackup() {
     let vanaf = 0;
     const stap = 1000;
     let fout = null;
+    // Bijna alles heeft een id. De paar tabellen zonder eigen id sorteren op
+    // iets anders dat wel in elke rij staat.
+    const sorteerVeld = ZONDER_ID[tabel] ?? "id";
 
     for (;;) {
+      // Een vaste volgorde is hier geen luxe: zonder order mag Postgres elke
+      // pagina anders teruggeven, en dan mist een tabel met meer dan duizend
+      // rijen er stilletjes een paar in de back-up.
       const { data, error } = await supabase
         .from(tabel)
         .select("*")
+        .order(sorteerVeld)
         .range(vanaf, vanaf + stap - 1);
       if (error) {
         fout = error.message;

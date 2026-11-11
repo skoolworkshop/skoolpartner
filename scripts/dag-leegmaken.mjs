@@ -104,9 +104,11 @@ async function haalPerDag(tabel, dagId) {
   const stap = 1000;
 
   for (;;) {
+    // Vaste volgorde, anders kan een pagina rijen overslaan bij een grote dag.
     const { data, error } = await supabase
       .from(tabel)
       .select("*")
+      .order(tabel === "enrollment_session_groups" ? "session_id" : "id")
       .eq("event_id", dagId)
       .range(vanaf, vanaf + stap - 1);
     if (error) throw new Error(`${tabel}: ${error.message}`);

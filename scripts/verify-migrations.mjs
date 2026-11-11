@@ -587,6 +587,67 @@ async function main() {
   ).rows[0].aantal;
   controles.push([nieuweInstellingen === 2, 'de instellingen voor pogingen en geldigheid staan klaar']);
 
+  // ---------------------------------------------------------------------------
+  // Wie mag wat: de rechten op de tabellen
+  // ---------------------------------------------------------------------------
+  // De inschrijvingstabellen horen voor niemand rechtstreeks leesbaar te zijn.
+  // Alles loopt via serveracties met de serviceclient, die zelf controleren wie
+  // wat mag. Gaat dat ooit per ongeluk open, dan hoort deze controle af te gaan.
+
+  const anonRechten = await db.query(`
+    select table_name from information_schema.role_table_grants
+    where table_schema = 'public' and grantee = 'anon'
+  `);
+  controles.push([anonRechten.rows.length === 0, 'de publieke sleutel (anon) heeft nergens rechten op']);
+
+  const anonFuncties = await db.query(`
+    select p.proname from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+    join pg_roles r on r.oid = a.grantee
+    where n.nspname = 'public' and r.rolname = 'anon' and a.privilege_type = 'EXECUTE'
+  `);
+  controles.push([anonFuncties.rows.length === 0, 'de publieke sleutel mag geen enkele functie aanroepen']);
+
+  const inschrijvingRechten = await db.query(`
+    select table_name, grantee from information_schema.role_table_grants
+    where table_schema = 'public' and table_name like 'enrollment%'
+      and grantee not in ('service_role', 'postgres')
+  `);
+  controles.push([
+    inschrijvingRechten.rows.length === 0,
+    'alleen de serviceclient komt bij de inschrijvingstabellen',
+  ]);
+
+  const zonderForce = await db.query(`
+    select c.relname from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'enrollment%'
+      and (c.relrowsecurity = false or c.relforcerowsecurity = false)
+  `);
+  controles.push([
+    zonderForce.rows.length === 0,
+    'op elke inschrijvingstabel staat Row Level Security hard aan',
+  ]);
+
+  const inschrijvingPolicies = await db.query(`
+    select policyname from pg_policies where schemaname = 'public' and tablename like 'enrollment%'
+  `);
+  controles.push([
+    inschrijvingPolicies.rows.length === 0,
+    'er staat geen enkele policy op de inschrijvingstabellen',
+  ]);
+
+  const zonderZoekpad = await db.query(`
+    select p.proname from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prosecdef and p.proconfig is null
+  `);
+  controles.push([
+    zonderZoekpad.rows.length === 0,
+    'elke functie met verhoogde rechten heeft een vast zoekpad',
+  ]);
+
   let alleGoed = true;
   for (const [goed, tekst] of controles) {
     console.log(goed ? `  Inschrijvingen: ${tekst}` : `  FOUT: ${tekst} ging niet goed`);
