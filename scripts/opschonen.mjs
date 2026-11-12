@@ -199,7 +199,8 @@ async function toonAlles() {
 }
 
 async function main() {
-  if (gevraagdeOrgs.length === 0) {
+  // Zonder --org en zonder losse onderdelen: alleen laten zien wat erin zit.
+  if (gevraagdeOrgs.length === 0 && !ookLosseFacturen && !ookIngelezenMails) {
     await toonAlles();
     return;
   }
@@ -220,6 +221,9 @@ async function main() {
   console.log("=".repeat(72));
 
   const plan = [];
+  if (organisaties.length === 0) {
+    console.log("\n  Geen organisaties gekozen: alleen de losse onderdelen hieronder.");
+  }
   for (const org of organisaties) {
     console.log(`\n  ${org.name}  (${org.slug})`);
     const onderdelen = [];

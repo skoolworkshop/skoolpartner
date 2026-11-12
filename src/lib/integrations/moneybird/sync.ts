@@ -20,29 +20,60 @@ import {
 } from "./matching";
 import type { InvoiceState } from "@/lib/types/database";
 
-/** Zoekt de organisatie die bij een Moneybird-contact hoort. */
-async function resolveOrganizationId(contactId: string | null): Promise<string | null> {
-  if (!contactId) return null;
+/**
+ * Bij welke schoollocatie hoort dit Moneybird-contact?
+ *
+ * DRIE ANTWOORDEN, EN DAT IS MET OPZET
+ *
+ *   'gevonden'   precies één locatie. Alleen dan halen we de factuur binnen.
+ *   'geen'       geen enkele locatie. Dan laten we de factuur staan waar hij
+ *                hoort: in Moneybird. Wij halen de administratie van iemand
+ *                die niet meedoet niet binnen.
+ *   'meerdere'   twee of meer locaties gebruiken hetzelfde factuurcontact.
+ *                Dan gokken we niet. De factuur komt binnen zonder locatie en
+ *                zonder punten, en wacht op een mens.
+ *
+ * Er wordt uitsluitend op het Moneybird-contact-ID gekoppeld. Nooit op naam,
+ * adres of e-mailadres: dan zou een factuur bij de verkeerde school kunnen
+ * belanden, en dat is het enige wat hier echt niet mag.
+ */
+export type Koppeling =
+  | { soort: "gevonden"; organisatieId: string }
+  | { soort: "geen" }
+  | { soort: "meerdere"; organisaties: string[] };
+
+/**
+ * De beslissing zelf, los van de database, zodat alle gevallen te testen zijn.
+ * Krijgt de locatie-ids die bij dit contact gevonden zijn.
+ */
+export function beoordeelKoppeling(organisatieIds: string[]): Koppeling {
+  const uniek = [...new Set(organisatieIds.filter(Boolean))];
+  if (uniek.length === 0) return { soort: "geen" };
+  if (uniek.length > 1) return { soort: "meerdere", organisaties: uniek };
+  return { soort: "gevonden", organisatieId: uniek[0] };
+}
+
+async function zoekKoppeling(contactId: string | null): Promise<Koppeling> {
+  if (!contactId) return { soort: "geen" };
   const supabase = createServiceSupabase();
 
-  const { data: mapping } = await supabase
-    .from("external_record_mappings")
-    .select("internal_id")
-    .eq("system", "moneybird")
-    .eq("entity_type", "contact")
-    .eq("external_id", contactId)
-    .maybeSingle();
+  const [{ data: mappings }, { data: contacten }] = await Promise.all([
+    supabase
+      .from("external_record_mappings")
+      .select("internal_id")
+      .eq("system", "moneybird")
+      .eq("entity_type", "contact")
+      .eq("external_id", contactId),
+    supabase
+      .from("organization_contacts")
+      .select("organization_id")
+      .eq("moneybird_contact_id", contactId),
+  ]);
 
-  if (mapping?.internal_id) return mapping.internal_id;
-
-  // Tweede kans: een geverifieerde contactpersoon met dit Moneybird-contact-ID.
-  const { data: contact } = await supabase
-    .from("organization_contacts")
-    .select("organization_id")
-    .eq("moneybird_contact_id", contactId)
-    .maybeSingle();
-
-  return contact?.organization_id ?? null;
+  return beoordeelKoppeling([
+    ...(mappings ?? []).map((rij) => rij.internal_id as string),
+    ...(contacten ?? []).map((rij) => rij.organization_id as string),
+  ]);
 }
 
 /**
@@ -55,9 +86,29 @@ async function resolveOrganizationId(contactId: string | null): Promise<string |
 export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
   invoiceId: string | null;
   releasedTransactions: number;
+  overgeslagen?: "geen-koppeling" | "voor-deelname";
 }> {
   const supabase = createServiceSupabase();
-  const organizationId = await resolveOrganizationId(invoice.contact_id);
+  const koppeling = await zoekKoppeling(invoice.contact_id);
+
+  /*
+    De harde regel: geen locatie, geen factuur.
+
+    SkoolPartner is geen tweede boekhouding. Wij tonen uitsluitend de financiële
+    gegevens van scholen die bij het loyaliteitsprogramma zijn aangesloten. Van
+    een Moneybird-contact dat bij geen enkele locatie hoort, halen we dus niets
+    binnen: niet als gekoppelde factuur en ook niet als losse factuur die later
+    "nog even nagekeken" moet worden. In Moneybird blijft alles gewoon staan.
+
+    Bestond er al wel een rij van deze factuur, bijvoorbeeld van vóór deze
+    regel, dan laten we die met rust. Opruimen is iets wat bewust gebeurt, niet
+    als bijwerking van een synchronisatie.
+  */
+  if (koppeling.soort === "geen") {
+    return { invoiceId: null, releasedTransactions: 0, overgeslagen: "geen-koppeling" };
+  }
+
+  const organizationId = koppeling.soort === "gevonden" ? koppeling.organisatieId : null;
 
   // Wij halen de bestaande administratie van een klant niet binnen. Hoort deze
   // factuur bij een organisatie die meedoet, en dateert zij van vóór haar
@@ -81,7 +132,7 @@ export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
         account?.enrolled_at &&
         !isWithinPartnerPeriod(invoice.invoice_date, account.enrolled_at)
       ) {
-        return { invoiceId: null, releasedTransactions: 0 };
+        return { invoiceId: null, releasedTransactions: 0, overgeslagen: "voor-deelname" };
       }
     }
   }
@@ -93,7 +144,13 @@ export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
   const fullyPaid = state === "paid" || (totalIncl > 0 && totalUnpaid <= 0 && totalPaid >= totalIncl);
 
   const reviewReasons: string[] = [];
-  if (!organizationId) reviewReasons.push("Geen organisatie gekoppeld aan dit Moneybird-contact");
+  if (koppeling.soort === "meerdere") {
+    // Twee locaties met hetzelfde factuurcontact. Raden mag hier niet, dus de
+    // factuur komt zonder locatie binnen en krijgt geen punten.
+    reviewReasons.push(
+      `Dit Moneybird-contact hoort bij ${koppeling.organisaties.length} schoollocaties. Wijs de juiste locatie zelf aan.`
+    );
+  }
 
   const { data: saved, error } = await supabase
     .from("invoices")
@@ -237,6 +294,19 @@ export async function syncMoneybirdInvoices(): Promise<SyncResult> {
     let invoices: MoneybirdSalesInvoice[];
 
     if (mode === "mock") {
+      /*
+        In productie nooit stilletjes verzonnen facturen.
+
+        Mockgegevens zijn bedoeld om lokaal te kunnen ontwikkelen zonder
+        Moneybird. Draaide dit in productie, dan zou een ontbrekend token
+        demo-facturen in de echte database zetten, en dat is precies hoe er
+        ooit vier demo-facturen zijn binnengekomen. Beter een duidelijke fout.
+      */
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "Moneybird is niet verbonden: MONEYBIRD_API_TOKEN of MONEYBIRD_ADMINISTRATION_ID ontbreekt."
+        );
+      }
       invoices = MOCK_INVOICES;
     } else {
       const client = MoneybirdClient.fromEnv();
@@ -248,8 +318,13 @@ export async function syncMoneybirdInvoices(): Promise<SyncResult> {
 
     let processed = 0;
     let released = 0;
+    let overgeslagen = 0;
     for (const invoice of invoices) {
       const result = await upsertInvoice(invoice);
+      if (result.overgeslagen) {
+        overgeslagen += 1;
+        continue;
+      }
       processed += 1;
       released += result.releasedTransactions;
     }
@@ -258,7 +333,7 @@ export async function syncMoneybirdInvoices(): Promise<SyncResult> {
     await markSyncSuccess("moneybird", {
       itemsProcessed: processed,
       cursor: mode === "mock" ? null : newCursor,
-      metadata: { mode, released_transactions: released },
+      metadata: { mode, released_transactions: released, overgeslagen_zonder_locatie: overgeslagen },
     });
 
     return {
@@ -266,7 +341,7 @@ export async function syncMoneybirdInvoices(): Promise<SyncResult> {
       ok: true,
       mode,
       itemsProcessed: processed,
-      details: { released_transactions: released },
+      details: { released_transactions: released, overgeslagen_zonder_locatie: overgeslagen },
     };
   } catch (error) {
     await markSyncError("moneybird", error);

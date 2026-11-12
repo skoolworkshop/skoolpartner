@@ -40,12 +40,23 @@ export async function getAdminOverview() {
   // Tweede ronde: de totalen die de beheerder in één oogopslag wil zien.
   const [bookings, invoices, threadsNeedingReview, unpaid, cjpRequests, cjpBalances] = await Promise.all([
     supabase.from("bookings").select("id", { count: "exact", head: true }),
-    supabase.from("invoices").select("id", { count: "exact", head: true }),
+    // Alleen facturen van een school die meedoet. Een factuur zonder locatie
+    // hoort niet in de totalen thuis: die staat er alleen om nagekeken te
+    // worden, en telt mee bij "ter controle".
+    supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .not("organization_id", "is", null),
     supabase
       .from("message_threads")
       .select("id", { count: "exact", head: true })
       .eq("visibility", "needs_review"),
-    supabase.from("invoices").select("total_unpaid_cents").eq("fully_paid", false).limit(1000),
+    supabase
+      .from("invoices")
+      .select("total_unpaid_cents")
+      .eq("fully_paid", false)
+      .not("organization_id", "is", null)
+      .limit(1000),
     supabase
       .from("cjp_parking_requests")
       .select("id", { count: "exact", head: true })

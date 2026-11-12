@@ -262,6 +262,13 @@ export async function syncGmail(): Promise<SyncResult> {
     let emails: NormalizedEmail[] = [];
 
     if (mode === "mock") {
+      // Zelfde regel als bij Moneybird: in productie nooit stilletjes
+      // verzonnen gegevens in de echte database. Liever een duidelijke fout.
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "Gmail is niet verbonden: GOOGLE_CLIENT_ID of GOOGLE_CLIENT_SECRET ontbreekt."
+        );
+      }
       emails = MOCK_GMAIL_MESSAGES.map((message) => ({
         messageId: message.messageId,
         gmailMessageId: message.messageId,

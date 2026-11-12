@@ -7,6 +7,55 @@ code per mail, je vult die in, en je bent binnen. Een wachtwoord is er niet.
 
 ---
 
+## Een schoollocatie toevoegen
+
+Dit doe je één keer per locatie, voordat er iets anders kan.
+
+**Organisaties → Nieuwe organisatie.** Vul de naam van de **locatie** in, niet
+die van het bestuur. Heeft een stichting drie scholen, dan maak je er drie aan:
+"Stichting Zuidwest, locatie Noord", "locatie Zuid", enzovoort.
+
+Dat is geen administratieve haarkloverij. SkoolPoints worden per locatie
+opgebouwd. Elke locatie heeft een eigen saldo, een eigen deelname en een eigen
+contactpersoon. Twee locaties van hetzelfde bestuur delen dus nooit punten, en
+dat is precies de bedoeling: de school die boekt, spaart.
+
+### De contactpersoon
+
+Bij de organisatie voeg je de contactpersoon toe: naam en e-mailadres. Dat is
+de persoon die bij ons boekt. Eén contactpersoon hoort bij één locatie.
+
+### De Moneybird-koppeling controleren
+
+Bij de contactpersoon staat een veld voor het **Moneybird-contact**. Zolang dat
+leeg is, haalt SkoolPartner geen enkele factuur van deze school binnen. Dat is
+met opzet: wij tonen alleen de financiële gegevens van scholen die meedoen.
+
+Zoek het contact op in Moneybird, neem het contact-ID over, en vul het in. Let
+op twee dingen:
+
+- **Eén Moneybird-contact hoort bij één locatie.** Probeer je hetzelfde contact
+  bij een tweede locatie te zetten, dan weigert het systeem dat. Terecht: anders
+  weet niemand bij welke school een factuur hoort.
+- **Factureert een bestuur centraal voor meerdere locaties?** Dan kun je dat ene
+  contact maar aan één locatie koppelen. Facturen die binnenkomen worden dan
+  niet automatisch verdeeld; die komen bij "Facturen ter controle" te staan en
+  wijs je zelf toe. Vraag in dat geval of de school per locatie gefactureerd kan
+  worden, dat scheelt iedereen werk.
+
+Na het koppelen haalt de volgende synchronisatie alleen de facturen van dát
+contact op. Facturen van vóór de deelname leveren geen punten op; de
+deelnamedatum bepaalt vanaf wanneer er gespaard wordt.
+
+### Hoe je ziet dat het klopt
+
+Op het dashboard staat **Facturen zonder koppeling**. Dat getal hoort nul te
+zijn. Staat er iets, dan is er een factuur binnengekomen waarvan het systeem
+niet zeker wist bij welke locatie hij hoort. Klik erop en wijs de juiste locatie
+aan.
+
+---
+
 ## 1. De dag klaarzetten
 
 **Inschrijvingen → Nieuwe dag.** Kies de school, geef de dag een naam
@@ -147,6 +196,10 @@ gewone taal wanneer het gaat gebeuren.
 | Een leerling zegt: mijn code werkt niet | Zoek hem op bij Leerling zoeken. Staat hij er niet, dan ontbreekt hij op de lijst van de school. |
 | "Even wachten, er zijn te veel pogingen gedaan" | Iemand heeft te vaak een foute code ingetypt. Na tien minuten mag het weer. |
 | Een leerling krijgt geen mail | Kijk of er een adres bij hem staat. Zo niet, geef hem zijn persoonlijke code. |
+| Een factuur wordt niet herkend | Kijk of de contactpersoon van die locatie een Moneybird-contact heeft. Zonder koppeling halen we niets op. |
+| Een factuur staat bij de verkeerde school | Dat kan niet automatisch gebeuren: we koppelen alleen op het Moneybird-contact-ID. Staat hij er toch, dan is het contact bij de verkeerde locatie ingevuld. |
+| Punten worden niet toegekend | Drie gebruikelijke redenen: de contactpersoon heeft nog geen account, de boeking dateert van vóór de deelname, of de factuur is nog niet volledig betaald. |
+| Een klant kan niet inloggen | Kijk of hij een actieve uitnodiging heeft en of zijn e-mailadres klopt. Een uitnodiging verloopt na veertien dagen. |
 
 Kom je er niet uit, bel Clinten. Er gaat niets stuk: alles wat ingrijpend is
 vraagt eerst om een bevestiging, en gemaakte keuzes worden nooit zomaar
