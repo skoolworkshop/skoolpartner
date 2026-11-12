@@ -109,7 +109,14 @@ export async function POST(request: NextRequest) {
       .eq("provider", "moneybird")
       .eq("external_event_id", idempotencyKey);
 
-    return NextResponse.json({ ok: true, released: result.releasedTransactions });
+    // Een factuur van een contact dat bij geen enkele schoollocatie hoort, komt
+    // niet binnen. De webhook is daarmee wel netjes afgehandeld: we hebben hem
+    // gezien, we doen er bewust niets mee.
+    return NextResponse.json({
+      ok: true,
+      released: result.releasedTransactions,
+      ...(result.overgeslagen ? { overgeslagen: result.overgeslagen } : {}),
+    });
   } catch (error) {
     return safeErrorResponse(error);
   }
