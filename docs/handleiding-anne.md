@@ -1,6 +1,7 @@
-# Een cultuurdag beheren in SkoolPartner
+# SkoolPartner beheren
 
-Voor Anne. Geen technische handelingen nodig, alleen de schermen.
+Voor Anne. Geen technische handelingen nodig, alleen de schermen. Eerst de
+schoollocatie en de punten, daarna de cultuurdag van begin tot eind.
 
 Inloggen doe je op **mijn.skoolworkshop.nl** met je e-mailadres. Je krijgt een
 code per mail, je vult die in, en je bent binnen. Een wachtwoord is er niet.
@@ -11,54 +12,140 @@ code per mail, je vult die in, en je bent binnen. Een wachtwoord is er niet.
 
 Dit doe je één keer per locatie, voordat er iets anders kan.
 
-**Organisaties → Nieuwe organisatie.** Vul de naam van de **locatie** in, niet
-die van het bestuur. Heeft een stichting drie scholen, dan maak je er drie aan:
-"Stichting Zuidwest, locatie Noord", "locatie Zuid", enzovoort.
+**Organisatiebeheer → Schoollocatie toevoegen.** Vul de naam van de **locatie**
+in, niet die van het bestuur, en de plaats. Heeft een stichting drie scholen,
+dan maak je er drie aan: "Stichting Zuidwest, locatie Noord", "locatie Zuid",
+enzovoort. Twee keer dezelfde naam weigert het systeem.
 
 Dat is geen administratieve haarkloverij. SkoolPoints worden per locatie
-opgebouwd. Elke locatie heeft een eigen saldo, een eigen deelname en een eigen
-contactpersoon. Twee locaties van hetzelfde bestuur delen dus nooit punten, en
-dat is precies de bedoeling: de school die boekt, spaart.
+opgebouwd. Elke locatie heeft één eigen saldo. Twee locaties van hetzelfde
+bestuur delen dus nooit punten, en dat is precies de bedoeling: de school die
+boekt, spaart.
 
-### De contactpersoon
+Een school kan zich ook zelf aanmelden op mijn.skoolworkshop.nl. Die verschijnt
+dan bovenaan Organisatiebeheer onder "nieuw aangemeld". Kijk of het klopt en
+klik op **Gecontroleerd**.
 
-Bij de organisatie voeg je de contactpersoon toe: naam en e-mailadres. Dat is
-de persoon die bij ons boekt. Eén contactpersoon hoort bij één locatie.
+### Contactpersonen
 
-### De Moneybird-koppeling controleren
+Open de locatie en ga naar **Gebruikers**. Vul het e-mailadres van de
+contactpersoon in en klik op **Uitnodiging aanmaken**. Die persoon krijgt een
+link, meldt zich aan en hoort vanaf dat moment bij de locatie. Een uitnodiging
+is veertien dagen geldig.
 
-Bij de contactpersoon staat een veld voor het **Moneybird-contact**. Zolang dat
-leeg is, haalt SkoolPartner geen enkele factuur van deze school binnen. Dat is
-met opzet: wij tonen alleen de financiële gegevens van scholen die meedoen.
+Een locatie mag meerdere contactpersonen hebben. Ze sparen samen voor hetzelfde
+saldo en zien allemaal hetzelfde: het saldo, de geschiedenis en de lopende
+inwisselverzoeken van hun locatie. Van een andere locatie zien ze niets, ook
+niet als die bij hetzelfde bestuur hoort.
 
-Zoek het contact op in Moneybird, neem het contact-ID over, en vul het in. Let
-op twee dingen:
+De locatie doet mee aan SkoolPartner vanaf het moment dat de eerste
+contactpersoon zich heeft aangemeld. Dat is het startmoment: boekingen en
+facturen van daarvoor tellen niet mee.
+
+### De Moneybird-koppeling
+
+Open de locatie en ga naar het blok **Moneybird**. Vul het contact-ID uit
+Moneybird in, of zoek op naam, en klik op **Koppelen**. Vind je op naam meer dan
+één contact, dan krijg je de lijst terug met de ID's erbij en kies je de juiste.
+
+Zolang er geen koppeling is, haalt SkoolPartner van deze locatie geen enkele
+factuur binnen. Dat is met opzet: wij tonen alleen de financiële gegevens van
+scholen die meedoen. In Moneybird zelf verandert er nooit iets.
+
+Drie regels om te onthouden:
 
 - **Eén Moneybird-contact hoort bij één locatie.** Probeer je hetzelfde contact
-  bij een tweede locatie te zetten, dan weigert het systeem dat. Terecht: anders
-  weet niemand bij welke school een factuur hoort.
+  bij een tweede locatie te zetten, dan weigert het systeem dat en zegt het bij
+  welke locatie het contact al hangt.
 - **Factureert een bestuur centraal voor meerdere locaties?** Dan kun je dat ene
-  contact maar aan één locatie koppelen. Facturen die binnenkomen worden dan
-  niet automatisch verdeeld; die komen bij "Facturen ter controle" te staan en
-  wijs je zelf toe. Vraag in dat geval of de school per locatie gefactureerd kan
-  worden, dat scheelt iedereen werk.
+  contact maar aan één locatie koppelen. De facturen komen dan allemaal bij die
+  ene locatie terecht. Vraag in dat geval of er per locatie gefactureerd kan
+  worden, anders klopt de puntenopbouw per locatie niet.
+- **Alleen facturen van na het startmoment komen binnen.** Oude facturen halen
+  wij niet op. Een locatie die wel gekoppeld is maar nog geen contactpersoon
+  heeft die zich heeft aangemeld, krijgt nog niets binnen.
 
-Na het koppelen haalt de volgende synchronisatie alleen de facturen van dát
-contact op. Facturen van vóór de deelname leveren geen punten op; de
-deelnamedatum bepaalt vanaf wanneer er gespaard wordt.
+Na het koppelen: **Integraties → Moneybird → Nu synchroniseren**.
 
 ### Hoe je ziet dat het klopt
 
 Op het dashboard staat **Facturen zonder koppeling**. Dat getal hoort nul te
-zijn. Staat er iets, dan is er een factuur binnengekomen waarvan het systeem
-niet zeker wist bij welke locatie hij hoort. Klik erop en wijs de juiste locatie
-aan.
+zijn en te blijven. Een factuur die niet bij precies één locatie hoort, komt
+niet binnen. Onder Integraties zie je bij de laatste synchronisatie hoeveel
+facturen zijn overgeslagen en waarom.
+
+---
+
+## SkoolPoints
+
+### Van wie zijn de punten
+
+Van de locatie. Niet van de docent die boekte. Boeken twee collega's van
+dezelfde school, dan telt het op bij één saldo. Bij elke regel in de
+geschiedenis blijft wel staan welke contactpersoon erbij betrokken was.
+
+### Wanneer komen er punten bij
+
+- **Welkomstbonus**: één keer per locatie, als de eerste contactpersoon zich
+  aanmeldt. Een tweede collega levert geen tweede bonus op.
+- **Na een workshop**: zodra de boeking is bevestigd staan de punten op "in
+  behandeling". Ze worden beschikbaar als de factuur volledig is betaald.
+- **Na een review**: als jij de review hebt gecontroleerd.
+- **CJP-bonus**: één keer per locatie, bij minimaal € 1.000 geparkeerd tegoed.
+
+Punten zijn 24 maanden geldig. Daarna vervallen ze vanzelf; de geschiedenis
+blijft staan.
+
+### Een inwisselverzoek afhandelen
+
+Een contactpersoon vraagt in het klantportaal aan om punten te gebruiken voor
+een bevestigde workshop die nog moet komen. Op dat moment worden de punten
+**gereserveerd**: ze zijn nog niet weg, maar een collega kan ze niet nog een
+keer aanvragen. Er gebeurt verder niets tot jij beslist.
+
+**Inwisselen** in het menu. Bij elk verzoek kies je:
+
+- **Goedkeuren**: akkoord, de korting moet nog op de factuur.
+- **Verwerkt op de factuur**: de korting staat erop. Vul het factuurnummer in;
+  zonder nummer gaat het niet door. Pas nu zijn de punten echt gebruikt.
+- **Afwijzen**: de punten komen terug op het saldo.
+
+Een klant kan een verzoek zelf intrekken zolang het nog niet verwerkt is. Dat
+mag ook een collega van dezelfde locatie doen.
+
+### Een correctie
+
+Open de locatie, blok **SkoolPoints**, onderaan **Handmatige correctie**. Vul
+het aantal punten in (negatief mag) en een reden. De reden is verplicht en komt
+in het logboek. Een contactpersoon erbij kiezen mag, maar hoeft niet: de
+correctie gaat altijd op het saldo van de locatie.
+
+Een regel helemaal terugdraaien doe je onder **SkoolPoints** in het menu, met de
+knop **Terugdraaien** achter de regel. De regel blijft zichtbaar in de
+geschiedenis maar telt niet meer mee.
+
+### Een contactpersoon vertrekt
+
+De punten blijven bij de school. Twee manieren:
+
+- De contactpersoon stapt zelf uit via het klantportaal (Account → organisatie
+  verlaten).
+- Jij blokkeert of verwijdert de gebruiker onder **Gebruikers**.
+
+Vanaf dat moment ziet die persoon het saldo niet meer en kan hij er geen verzoek
+meer op indienen. Een nieuwe collega die je uitnodigt, ziet het hele saldo.
+
+**Let op bij de laatste contactpersoon.** Verwijder je een gebruiker definitief
+terwijl hij de enige van zijn locatie is, dan verwijdert het systeem de hele
+locatie mee, inclusief de punten. Nodig daarom eerst de opvolger uit en wacht
+tot die zich heeft aangemeld. Daarna pas de oude verwijderen.
 
 ---
 
 ## 1. De dag klaarzetten
 
-**Inschrijvingen → Nieuwe dag.** Kies de school, geef de dag een naam
+**Inschrijfdagen → Nieuwe inschrijfdag.** Kies de school (die moet eerst als
+locatie bestaan, zie hierboven), geef de dag een naam
 (bijvoorbeeld Cultuurdag of CKV Dag), vul de datum en de locatie in.
 
 De dag staat nu op **concept**. Dat betekent: alleen jij ziet hem, en de
@@ -196,9 +283,11 @@ gewone taal wanneer het gaat gebeuren.
 | Een leerling zegt: mijn code werkt niet | Zoek hem op bij Leerling zoeken. Staat hij er niet, dan ontbreekt hij op de lijst van de school. |
 | "Even wachten, er zijn te veel pogingen gedaan" | Iemand heeft te vaak een foute code ingetypt. Na tien minuten mag het weer. |
 | Een leerling krijgt geen mail | Kijk of er een adres bij hem staat. Zo niet, geef hem zijn persoonlijke code. |
-| Een factuur wordt niet herkend | Kijk of de contactpersoon van die locatie een Moneybird-contact heeft. Zonder koppeling halen we niets op. |
-| Een factuur staat bij de verkeerde school | Dat kan niet automatisch gebeuren: we koppelen alleen op het Moneybird-contact-ID. Staat hij er toch, dan is het contact bij de verkeerde locatie ingevuld. |
-| Punten worden niet toegekend | Drie gebruikelijke redenen: de contactpersoon heeft nog geen account, de boeking dateert van vóór de deelname, of de factuur is nog niet volledig betaald. |
+| Een factuur komt niet binnen | Vier mogelijke redenen, en bij de synchronisatie staat welke: de locatie heeft geen Moneybird-koppeling, het contact hangt aan twee locaties, de locatie doet nog niet mee, of de factuur is van vóór het startmoment. |
+| Een factuur staat bij de verkeerde school | Dat kan niet automatisch gebeuren: we koppelen alleen op het Moneybird-contact-ID. Staat hij er toch, dan is het contact bij de verkeerde locatie gekoppeld. Ontkoppel het daar en koppel het bij de juiste. |
+| Punten worden niet toegekend | Vier gebruikelijke redenen: de contactpersoon van de boeking heeft nog geen account, hij is geen actief lid van die locatie, de boeking dateert van vóór het startmoment van de locatie, of de factuur is nog niet volledig betaald (dan staan ze op "in behandeling"). |
+| Een contactpersoon ziet minder punten dan verwacht | Kijk bij Inwisselen of er een verzoek openstaat. Die punten zijn gereserveerd tot je het verzoek afhandelt. |
+| "Onvoldoende saldo" bij een verzoek | Een collega van dezelfde locatie heeft al een verzoek lopen. Het saldo is van de locatie, dus dat telt mee. |
 | Een klant kan niet inloggen | Kijk of hij een actieve uitnodiging heeft en of zijn e-mailadres klopt. Een uitnodiging verloopt na veertien dagen. |
 
 Kom je er niet uit, bel Clinten. Er gaat niets stuk: alles wat ingrijpend is

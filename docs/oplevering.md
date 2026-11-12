@@ -1,151 +1,119 @@
 # Oplevering van SkoolPartner
 
-De volgorde waarin het live gaat, met per stap wie hem doet en hoe je ziet dat
-het goed is gegaan.
+De volgorde waarin het live gaat, wie welke stap doet, en hoe je ziet dat het
+goed is gegaan. Bijgewerkt op 12 november 2026.
 
-## Waarom sommige stappen niet vanuit de assistent kunnen
-
-Drie dingen zijn alleen vanaf jouw Windows-omgeving te doen:
+## Wat alleen vanaf jouw computer kan
 
 | Stap | Waarom |
 | --- | --- |
-| `npm run db:push` | Supabase is niet bereikbaar vanuit de omgeving waarin de assistent draait: er is daar geen DNS voor `*.supabase.co`. |
-| `git push` | De inloggegevens voor GitHub zitten in GitHub Desktop op Windows, niet in de Linux-omgeving. Lezen lukt wel, pushen niet. |
-| Vercel-instellingen | `api.vercel.com` is onbereikbaar en de browser van de assistent is niet ingelogd op Vercel. |
+| Back-up en migraties | Supabase is niet bereikbaar vanuit de omgeving van de assistent, en een terminal op jouw computer mag de assistent alleen bekijken, niet bedienen. |
+| `git push` | De inloggegevens voor GitHub staan op jouw computer. |
+| Geheime waarden op Vercel | Een geheim zoals `CRON_SECRET` vult de assistent nooit zelf in. |
 
-De rest kan wel: controleren, testen, documenteren, en na afloop de live
-omgeving in de browser nalopen.
+Wat de assistent wel kan, via jouw ingelogde Chrome: de live database
+uitlezen in het Supabase-dashboard, het beheer van SkoolPartner bedienen, en de
+Vercel-deployment nakijken.
 
 ---
 
-## Stap 1. Back-up (jij)
+## Stap 1. Back-up, migraties en publiceren (jij, één opdracht)
 
 ```
-npm run backup:data
+npm run livegang
 ```
 
-Kijk daarna of `_backup/data-<datum>/enrollment_participants.json` bestaat en
-gevuld is. Zo niet: niet verder gaan.
+Het script doet dit in vaste volgorde en stopt bij de eerste stap die niet
+klopt:
 
-## Stap 2. Laatste controles (assistent of jij)
+1. Werkmap schoon en op main.
+2. Verse back-up, en controle dat die er staat en van zojuist is.
+3. Controle vooraf: geen Moneybird-contact bij twee locaties (044), geen dubbele
+   toekenning binnen één locatie (045).
+4. Migratiestatus: 043 moet erin staan, en alleen 044 en 045 mogen klaarstaan.
+5. `supabase db push`. De CLI vraagt zelf om bevestiging: `Y`.
+6. Controle achteraf: beide migraties staan erin, het saldo rekent per locatie.
+7. `git push origin main`. Vercel publiceert daarna vanzelf.
 
-```
-npm run db:verify
-node scripts/controle-043.mjs
-npm test
-```
+Opnieuw draaien mag altijd. Wat al gedaan is, wordt overgeslagen.
 
-Verwacht: "Alle migraties en databaseregels zijn in orde", "Precies gelijk aan
-de back-up: ja", en alle tests groen.
+### Wat de migraties doen
 
-## Stap 3. De testdag opruimen (jij)
+| Migratie | Inhoud | Raakt gegevens? |
+| --- | --- | --- |
+| 044 | Eén Moneybird-contact kan bij maar één locatie horen | Nee, één index |
+| 045 | Het puntensaldo is van de locatie; vijf fouten rond punten opgelost; serverfuncties dichtgezet | Nee, alleen weergave, functies, leesrechten en indexen |
 
-De CKV Dag van De Goudse Waarden is een testdag. Eerst kijken, dan pas
-verwijderen:
+Het project zit op het gratis Supabase-abonnement. Daar zijn **geen
+automatische back-ups**. De back-up uit stap 2 van het script is dus de enige.
 
-```
-node scripts/dag-leegmaken.mjs --dag ckv-dag-2026-11-12-4c2af410
-```
+## Stap 2. De 36 losse facturen opruimen (jij)
 
-Dat verwijdert nog niets. Het laat zien wat eraan hangt en schrijft een eigen
-back-up weg. Klopt het beeld, dan:
+Pas nadat stap 1 klaar is en de nieuwe versie live staat. Anders haalt de oude
+code ze bij de volgende synchronisatie gewoon opnieuw binnen.
 
-```
-node scripts/dag-leegmaken.mjs --dag ckv-dag-2026-11-12-4c2af410 --verwijder --zeker
-```
-
-De dag zelf blijft staan, leeg en op concept. Wil je ook de dag zelf weg, doe
-dat dan daarna met de knop in het beheerscherm.
-
-Dit script raakt uitsluitend deze ene dag: elke verwijdering gaat op id's die
-eerst bij deze dag zijn opgehaald. Boekingen, facturen, organisaties, accounts
-en spaarpunten blijven ongemoeid.
-
-## Stap 4. Migratie 043 (jij)
+Eerst kijken, dat verwijdert nog niets:
 
 ```
-npm run db:push
-npm run check:productie
+node scripts/opschonen.mjs --ook-losse-facturen
 ```
 
-In de uitvoer hoort te staan: migratie 042 uitgevoerd, migratie 043 uitgevoerd,
-en of er open dagen zonder werkende toegangscode zijn.
+Klopt het beeld (36 facturen, geen organisaties), dan:
 
-**Pas hierna de code publiceren.** De versie die nu live staat merkt niets van
-043, maar de nieuwe code zoekt kolommen die zonder 043 niet bestaan.
+```
+node scripts/opschonen.mjs --ook-losse-facturen --verwijder --zeker
+```
 
-## Stap 5. Vercel klaarzetten (jij)
+Het script eist een back-upmap van vandaag; die is er dan net. In Moneybird
+zelf verandert er niets.
+
+Daarna hoort het dashboard nul facturen, nul zonder koppeling en € 0,00
+openstaand te tonen.
+
+## Stap 3. Vercel (jij)
 
 Project **skoolpartner**, omgeving Production:
 
-| Variabele | Waarde |
-| --- | --- |
-| `PUBLIEKE_INSCHRIJVING` | `uit` |
-| `CRON_SECRET` | een lange willekeurige tekst |
+| Variabele | Waarde | Wanneer |
+| --- | --- | --- |
+| `PUBLIEKE_INSCHRIJVING` | `aan` | Zodra de eerste cultuurdag open moet. Zonder deze variabele blijft de leerlingenpagina in productie dicht. |
+| `CRON_SECRET` | een lange willekeurige tekst | Zodra de nachtelijke taken mogen draaien |
 
-Zet `PUBLIEKE_INSCHRIJVING` op `uit` **voordat** je deployt, anders staat de
-leerlingenpagina open op het moment dat de nieuwe versie live komt.
+### Let op bij de nachtelijke taken
 
-### Let op bij de geplande taken
+Zolang `CRON_SECRET` ontbreekt, antwoorden alle vier de taken met 503 en doen
+ze niets. Staat hij er eenmaal, dan draait dit elke nacht:
 
-Als `CRON_SECRET` er eenmaal staat, gaan de taken draaien. Dit zou er de eerste
-nacht gebeuren:
+- **03:00 punten laten vervallen**. Werkt sinds migratie 045 per locatie.
+- **04:00 workshopresultaten opruimen**.
+- **04:30 leerlinggegevens opruimen**, dertig dagen na de cultuurdag.
+- **05:00 Gmail en Moneybird synchroniseren**.
 
-- **03:00 verval-punten**: niets. Geen enkele transactie is verlopen.
-- **04:00 opruimen-resultaten**: de bestanden van één set, "Cultuurdag
-  Graffiti", verlopen op 31 augustus, worden definitief verwijderd. Kijk eerst
-  of die nog nodig zijn.
-- **04:30 opruimen-inschrijvingen**: niets. Er is geen dag waarvan de
-  bewaartermijn voorbij is.
-- **05:00 sync (Gmail)**: dit is de grote. De laatste synchronisatie was 27
-  augustus. De zoekopdracht haalt alles van de laatste 60 dagen op rond
-  `boekingen@skoolworkshop.nl`, ruim tweehonderd gesprekken, en elke mail met
-  "bevestiging" in het onderwerp gaat door de boekingsherkenning.
+Zet vóór de eerste nacht `gmail_sync_query` bij de instellingen in het beheer
+tijdelijk op `newer_than:2d`. De Gmail-synchronisatie heeft nog nooit een
+beginpunt opgeslagen en zou anders alles van de laatste zestig dagen ophalen.
+Draai hem één keer met de hand, kijk wat er binnenkomt, en zet de zoekopdracht
+daarna terug.
 
-  **Zet daarom eerst `gmail_sync_query` tijdelijk op `newer_than:2d`** bij de
-  instellingen in het beheer. Draai de synchronisatie één keer, kijk of er geen
-  dubbele boekingen of berichten ontstaan, en zet de zoekopdracht daarna pas
-  terug op `newer_than:60d`.
+Moneybird heeft dat probleem niet: het beginpunt staat op 12 november, en
+zonder gekoppelde locatie komt er sowieso niets binnen.
 
-## Stap 6. Publiceren (jij)
+## Stap 4. De eerste echte school
 
-Push `main` met GitHub Desktop. Vercel start dan vanzelf een
-productiedeployment. Volg hem in het dashboard tot hij klaar is.
-
-## Stap 7. Nalopen op de live omgeving (samen)
-
-1. Inloggen op mijn.skoolworkshop.nl en kijken of het beheer normaal doet.
-2. Een verzonnen school en cultuurdag aanmaken, een klassenlijst inlezen,
-   rondes genereren, workshops erbij.
-3. Kijken of er een toegangscode onder de inschrijflink staat.
-4. Onder Integraties de Gmail-verbindingstest draaien. Die hoort
-   `boekingen@skoolworkshop.nl` als toegestaan afzenderadres te tonen.
-5. `PUBLIEKE_INSCHRIJVING` op `aan`, deployment afwachten, en op je telefoon de
-   hele inschrijving doorlopen: foute toegangscode, goede toegangscode, foute
-   leerlingcode, goede leerlingcode, kiezen, wisselen, een workshop vol laten
-   lopen.
-6. Inschrijving sluiten, automatisch indelen, lijsten downloaden, en één mail
-   naar je eigen adres sturen. Nog geen klantmail.
-7. `PUBLIEKE_INSCHRIJVING` weer op `uit` tot de eerste echte school zover is.
-8. Vercel Logs nalopen op fouten.
-
-## Stap 8. De eerste echte school
-
-- Testdagen leegmaken met `dag:leegmaken`.
-- De bewaartermijn van dertig dagen opnemen in de offerte of op de site.
-- Link, toegangscode en de lijst met persoonlijke codes in één mail naar de
-  contactpersoon.
+1. Organisatiebeheer → Schoollocatie toevoegen.
+2. Contactpersoon uitnodigen.
+3. Moneybird-contact koppelen.
+4. Voor een cultuurdag: zie de handleiding voor Anne.
+5. De bewaartermijn van dertig dagen opnemen in de offerte of op de site.
 
 ---
 
 ## Terug als het misgaat
 
-- **De migratie**: het terugdraaiplan staat in
-  `docs/migratie-043-toegangscode.md`, met de exacte SQL. Alles is toevoegend,
-  dus terugdraaien kost geen gegevens.
-- **De deployment**: in Vercel kun je met één klik terug naar de vorige
-  deployment. Draai de migratie dan niet terug; de oude code werkt gewoon op de
-  nieuwe database.
-- **De gegevens**: de back-up van stap 1, plus de per-dag back-up die
-  `dag:leegmaken` zelf wegschrijft. Terugzetten is beproefd; de volgorde staat
-  in `docs/migratie-043-toegangscode.md`.
+- **De migraties**: `supabase/terugdraaien-044-045.sql`. Getest door hem na de
+  migraties te draaien en 044 en 045 daarna opnieuw uit te voeren. Er valt geen
+  gegeven terug te zetten, want de migraties hebben er geen gewijzigd. Zet dan
+  ook de vorige versie van de applicatie terug.
+- **De deployment**: in Vercel met één klik terug naar de vorige deployment.
+- **De gegevens**: de back-up uit stap 1. Terugzetten is beproefd in een lege
+  database; de volgorde staat in `docs/migratie-043-toegangscode.md`.
