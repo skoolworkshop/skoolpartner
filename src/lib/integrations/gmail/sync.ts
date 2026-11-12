@@ -30,6 +30,7 @@ import {
 } from "./client";
 import { MOCK_GMAIL_MESSAGES } from "./mock";
 import type { Json, ThreadVisibility } from "@/lib/types/database";
+import { startmomentVanLocatie } from "@/lib/loyalty/locatie";
 
 export interface NormalizedEmail {
   messageId: string;
@@ -191,13 +192,12 @@ export async function storeEmail(
   // Mailhistorie van vóór de deelname hoort niet bij SkoolPartner. Wij slaan
   // die niet op, ook niet verborgen: wat er niet is, kan ook niet uitlekken.
   if (visibility.organizationId) {
-    const { data: account } = await supabase
-      .from("loyalty_accounts")
-      .select("enrolled_at")
-      .eq("organization_id", visibility.organizationId)
-      .maybeSingle();
+    // Het startmoment van de locatie: het vroegste van alle collega's. Met
+    // meerdere contactpersonen zijn er meerdere regels, en dan is de eerste de
+    // dag waarop de school ging meedoen.
+    const startmoment = await startmomentVanLocatie(supabase, visibility.organizationId);
 
-    if (account?.enrolled_at && !isWithinPartnerPeriod(email.sentAt, account.enrolled_at)) {
+    if (startmoment && !isWithinPartnerPeriod(email.sentAt, startmoment)) {
       return { stored: false, reason: "Bericht dateert van vóór deelname aan SkoolPartner" };
     }
   }

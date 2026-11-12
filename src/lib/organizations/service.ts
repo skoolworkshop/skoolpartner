@@ -6,6 +6,7 @@ import { awardWelcomeBonus } from "@/lib/loyalty/ledger";
 import { createServiceSupabase } from "@/lib/supabase/server";
 import { emailDomain, slugify } from "@/lib/utils";
 import type { MembershipSource, OrganizationRow } from "@/lib/types/database";
+import { bewaarGeverifieerdContact } from "@/lib/organizations/contacten";
 
 export interface OrganizationSuggestion {
   organization: Pick<OrganizationRow, "id" | "name" | "city" | "kind" | "street" | "house_number" | "house_number_addition" | "postal_code">;
@@ -200,9 +201,10 @@ export async function approveMembership(params: {
     p_actor: member.user_id,
   });
 
-  // Activeert deze organisatie hiermee voor het eerst, dan hoort daar het
-  // persoonlijke welkomsttegoed bij. De unieke index laat dit per gebruiker
-  // maar eenmaal toe, ook als een aanvraag dubbel wordt verwerkt.
+  // Activeert deze locatie hiermee voor het eerst, dan hoort daar het
+  // welkomsttegoed bij. De unieke index laat dit per locatie maar eenmaal toe:
+  // een tweede collega levert geen tweede bonus op, en een aanvraag die dubbel
+  // wordt verwerkt ook niet.
   await awardWelcomeBonus({
     organizationId: member.organization_id,
     actorId: member.user_id,
@@ -266,18 +268,13 @@ export async function approveMembership(params: {
   const loginEmail = authUser?.user?.email ?? profile?.email ?? null;
 
   if (loginEmail) {
-    await supabase.from("organization_contacts").upsert(
-      {
-        organization_id: member.organization_id,
-        email: loginEmail.toLowerCase(),
-        full_name: profile?.full_name ?? null,
-        user_id: member.user_id,
-        is_verified: true,
-        verified_at: new Date().toISOString(),
-        verified_by: params.adminId,
-      },
-      { onConflict: "organization_id,email" }
-    );
+    await bewaarGeverifieerdContact(supabase, {
+      organizationId: member.organization_id,
+      email: loginEmail,
+      fullName: profile?.full_name ?? null,
+      userId: member.user_id,
+      verifiedBy: params.adminId,
+    });
   }
 
   await recordAudit({
@@ -488,16 +485,11 @@ export async function acceptInvite(params: {
     p_actor: params.userId,
   });
 
-  await supabase.from("organization_contacts").upsert(
-    {
-      organization_id: invite.organization_id,
-      email: params.userEmail.toLowerCase(),
-      user_id: params.userId,
-      is_verified: true,
-      verified_at: new Date().toISOString(),
-    },
-    { onConflict: "organization_id,email" }
-  );
+  await bewaarGeverifieerdContact(supabase, {
+    organizationId: invite.organization_id,
+    email: params.userEmail,
+    userId: params.userId,
+  });
 
   await recordAudit({
     actorId: params.userId,

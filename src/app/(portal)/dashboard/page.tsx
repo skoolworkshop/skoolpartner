@@ -114,7 +114,7 @@ export default async function DashboardPage() {
               <PartnerCard
                 organizationName={organizationName}
                 memberSince={
-                  balance.account_id
+                  balance.is_active
                     ? balance.enrolled_at
                     : session.activeMembership.organization.skoolpartner_enrolled_at
                 }

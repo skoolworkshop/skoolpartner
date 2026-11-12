@@ -5,6 +5,7 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 import { getSettingsWithServiceRole, ratesFromSettings } from "@/lib/settings";
 import { calculateBookingPoints, describeWorkshopEarning } from "@/lib/loyalty/calc";
 import { bookingQualifiesForPoints } from "@/lib/loyalty/period";
+import { deelnameVanLocatie, oudsteAccountVanLocatie } from "@/lib/loyalty/locatie";
 import type { LoyaltyTransactionRow } from "@/lib/types/database";
 
 export interface AwardResult {
@@ -44,8 +45,9 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
   if (booking.needs_review) return { ok: false, skipped: "Boeking wacht nog op controle" };
   if (booking.points_awarded) return { ok: false, skipped: "Punten zijn al toegekend" };
 
-  // Een boeking levert punten op voor de bijbehorende contactpersoon, nooit
-  // voor alle medewerkers van de school samen.
+  // De punten zijn voor de schoollocatie. Wij leggen wel vast welke
+  // contactpersoon de boeking deed, en die moet een actief lid van de locatie
+  // zijn: zo weten wij zeker dat de boeking echt bij deze school hoort.
   const contactEmail = booking.contact_email?.trim().toLowerCase();
   if (!contactEmail) return { ok: false, skipped: "Boeking heeft geen contactpersoon" };
   const { data: beneficiary } = await supabase
@@ -69,12 +71,13 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
   });
   const { data: account } = await supabase
     .from("loyalty_accounts")
-    .select("id, enrolled_at, is_active")
+    .select("id")
     .eq("organization_id", booking.organization_id)
     .eq("user_id", beneficiary.id)
     .maybeSingle();
 
-  if (!account || !account.is_active) {
+  const deelname = await deelnameVanLocatie(supabase, booking.organization_id);
+  if (!account || !deelname.neemtDeel || !deelname.startmoment) {
     return { ok: false, skipped: "Organisatie neemt niet deel aan SkoolPartner" };
   }
 
@@ -82,8 +85,9 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
   // boeking tot stand kwam, niet naar de factuurdatum en niet naar het moment
   // waarop wij hem binnenhaalden. Een boeking van 1 september bij een
   // registratie van 10 september levert dus niets op, ook al komt de factuur
-  // pas op 15 september.
-  if (!bookingQualifiesForPoints(booking, account.enrolled_at)) {
+  // pas op 15 september. De grens is het startmoment van de locatie: de dag
+  // waarop de school ging meedoen, niet de dag waarop deze collega erbij kwam.
+  if (!bookingQualifiesForPoints(booking, deelname.startmoment)) {
     return { ok: false, skipped: "Boeking dateert van vóór deelname aan SkoolPartner" };
   }
 
@@ -125,7 +129,7 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
           ? new Date(booking.scheduled_date).toISOString()
           : new Date().toISOString(),
       },
-      { onConflict: "organization_id,user_id,type,external_reference", ignoreDuplicates: true }
+      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
@@ -138,6 +142,12 @@ export async function awardPointsForBooking(bookingId: string): Promise<AwardRes
     .from("bookings")
     .update({ points_awarded: true, qualifying_minutes: result.qualifyingMinutes })
     .eq("id", booking.id);
+
+  // Geen rij terug betekent: voor deze boeking stond al een toekenning bij deze
+  // locatie. Dan is er nu niets bijgekomen, en dat zeggen wij ook zo.
+  if (!transaction) {
+    return { ok: false, skipped: "Voor deze boeking waren al punten vastgelegd" };
+  }
 
   // Was de bijbehorende factuur al betaald? Dan meteen beschikbaar maken.
   const { data: links } = await supabase
@@ -218,7 +228,7 @@ export async function awardWelcomeBonus(params: {
           : null,
         created_by: params.actorId ?? null,
       },
-      { onConflict: "organization_id,user_id,type,external_reference", ignoreDuplicates: true }
+      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
@@ -227,7 +237,7 @@ export async function awardWelcomeBonus(params: {
 
   // Geen rij terug betekent: er was er al een. Dat is geen fout, dat is de
   // bedoeling.
-  if (!transaction) return { ok: false, skipped: "Deze gebruiker had de welkomstbonus al" };
+  if (!transaction) return { ok: false, skipped: "Deze locatie had de welkomstbonus al" };
 
   await recordAudit({
     actorId: params.actorId ?? null,
@@ -305,7 +315,7 @@ export async function awardReviewBonus(params: {
           : null,
         created_by: params.adminId,
       },
-      { onConflict: "organization_id,user_id,type,external_reference", ignoreDuplicates: true }
+      { onConflict: "organization_id,type,external_reference", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
@@ -325,10 +335,16 @@ export async function awardReviewBonus(params: {
   return { ok: true, points: settings.review_bonus_points, transactionId: transaction?.id };
 }
 
-/** Handmatige correctie door een admin. Een reden is verplicht. */
+/**
+ * Handmatige correctie door een admin. Een reden is verplicht.
+ *
+ * De correctie gaat op het saldo van de locatie. Een contactpersoon erbij is
+ * optioneel: handig om vast te leggen om wie het ging, maar niet nodig. Zo kan
+ * een correctie ook als de contactpersoon van toen al is vertrokken.
+ */
 export async function manualAdjustment(params: {
   organizationId: string;
-  userId: string;
+  userId?: string | null;
   points: number;
   reason: string;
   description?: string;
@@ -345,20 +361,31 @@ export async function manualAdjustment(params: {
   const supabase = createServiceSupabase();
   const settings = await getSettingsWithServiceRole();
 
-  const { data: account } = await supabase
-    .from("loyalty_accounts")
-    .select("id")
-    .eq("organization_id", params.organizationId)
-    .eq("user_id", params.userId)
-    .maybeSingle();
+  const userId = params.userId?.trim() || null;
+  let accountId: string | null = null;
+  if (userId) {
+    const { data: eigen } = await supabase
+      .from("loyalty_accounts")
+      .select("id")
+      .eq("organization_id", params.organizationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    accountId = eigen?.id ?? null;
+    if (!accountId) {
+      return { ok: false, message: "Deze contactpersoon hoort niet bij deze locatie." };
+    }
+  } else {
+    accountId = await oudsteAccountVanLocatie(supabase, params.organizationId);
+  }
 
-  if (!account) return { ok: false, message: "Deze organisatie heeft nog geen SkoolPartner-account." };
+  if (!accountId) return { ok: false, message: "Deze organisatie heeft nog geen SkoolPartner-account." };
+  const account = { id: accountId };
 
   if (params.points < 0) {
     const { data: balance } = await supabase
       .from("loyalty_balances")
       .select("available_points")
-      .eq("account_id", account.id)
+      .eq("organization_id", params.organizationId)
       .maybeSingle();
     const available = balance?.available_points ?? 0;
     if (available + params.points < 0) {
@@ -370,7 +397,7 @@ export async function manualAdjustment(params: {
     .from("loyalty_transactions")
     .insert({
       organization_id: params.organizationId,
-      user_id: params.userId,
+      user_id: userId,
       account_id: account.id,
       type: "manual_adjustment",
       status: "available",

@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { beoordeelKoppeling } from "@/lib/integrations/moneybird/sync";
+import { isWithinPartnerPeriod } from "@/lib/loyalty/period";
 
 /**
  * Facturen koppelen aan de juiste schoollocatie.
@@ -119,7 +120,7 @@ async function haalFactuurBinnen(factuur: {
   datum: string;
   bedragCenten: number;
   betaald?: boolean;
-}): Promise<"opgeslagen" | "geen-koppeling" | "meerdere-locaties"> {
+}): Promise<"opgeslagen" | "geen-koppeling" | "meerdere-locaties" | "geen-deelname" | "voor-deelname"> {
   const koppeling = await koppelingVan(factuur.contactId);
 
   // Geen koppeling en twijfel over de koppeling leiden tot hetzelfde: de
@@ -130,6 +131,20 @@ async function haalFactuurBinnen(factuur: {
 
   const organisatie = koppeling.organisatieId;
   const redenen: string[] = [];
+
+  // Een factuur die er al staat werken wij altijd bij. Een nieuwe komt alleen
+  // binnen als de locatie meedoet en de factuur van na haar startmoment is.
+  const bestaat = await rijen("select id from public.invoices where moneybird_invoice_id = $1", [
+    factuur.moneybirdId,
+  ]);
+  if (bestaat.length === 0) {
+    const start = await een<{ startmoment: string | null }>(
+      "select min(enrolled_at)::text as startmoment from public.loyalty_accounts where organization_id = $1",
+      [organisatie],
+    );
+    if (!start.startmoment) return "geen-deelname";
+    if (!isWithinPartnerPeriod(factuur.datum, new Date(start.startmoment).toISOString())) return "voor-deelname";
+  }
 
   await db.query(
     `insert into public.invoices
@@ -203,6 +218,8 @@ beforeAll(async () => {
     );
     await db.query("select public.ensure_loyalty_account($1::uuid, $2::uuid)", [locatie, gebruiker]);
   }
+  // Beide locaties doen mee sinds 1 september 2026.
+  await db.query("update public.loyalty_accounts set enrolled_at = '2026-09-01T08:00:00Z'");
 
   // En elk een eigen Moneybird-contact.
   await db.query(
@@ -298,6 +315,52 @@ describe("facturen binnenhalen", () => {
     expect(factuur.state).toBe("paid");
     expect(factuur.fully_paid).toBe(true);
     expect(factuur.total_unpaid_cents).toBe(0);
+  });
+});
+
+describe("geen historie binnenhalen", () => {
+  it("laat een factuur van vóór de deelname liggen", async () => {
+    const uitkomst = await haalFactuurBinnen({
+      moneybirdId: "mb-f-noord-oud",
+      contactId: "mb-noord",
+      nummer: "20260044",
+      datum: "2026-06-15",
+      bedragCenten: 84700,
+      betaald: true,
+    });
+    expect(uitkomst).toBe("voor-deelname");
+    expect(await rijen("select id from public.invoices where moneybird_invoice_id = 'mb-f-noord-oud'")).toHaveLength(0);
+  });
+
+  it("haalt niets binnen van een locatie die wel gekoppeld is maar nog niet meedoet", async () => {
+    const west = await een<{ id: string }>(
+      "insert into public.organizations (name, slug) values ('Stichting Zuidwest, locatie West', 'zuidwest-west') returning id",
+    );
+    await db.query(
+      "insert into public.organization_contacts (organization_id, email, full_name, moneybird_contact_id, is_verified, verified_at) values ($1, 'administratie@zuidwest-west.test', 'Administratie West', 'mb-west', true, now())",
+      [west.id],
+    );
+
+    const uitkomst = await haalFactuurBinnen({
+      moneybirdId: "mb-f-west-1",
+      contactId: "mb-west",
+      nummer: "20260120",
+      datum: "2026-10-02",
+      bedragCenten: 42350,
+    });
+    expect(uitkomst).toBe("geen-deelname");
+    expect(await rijen("select id from public.invoices where organization_id = $1", [west.id])).toHaveLength(0);
+  });
+
+  it("telt een factuur van de dag van aanmelding wel mee", async () => {
+    const uitkomst = await haalFactuurBinnen({
+      moneybirdId: "mb-f-noord-dag1",
+      contactId: "mb-noord",
+      nummer: "20260101",
+      datum: "2026-09-01",
+      bedragCenten: 30250,
+    });
+    expect(uitkomst).toBe("opgeslagen");
   });
 });
 

@@ -64,7 +64,8 @@ export default async function OrganizationDetailPage({
     external_id: string;
     external_label: string | null;
   }[];
-  const balances = detail.balances;
+  // Eén saldo per locatie. De weergave geeft per organisatie één rij terug.
+  const saldo = detail.balances[0] ?? null;
 
   return (
     <>
@@ -203,25 +204,18 @@ export default async function OrganizationDetailPage({
         <Card>
           <CardHeader title="SkoolPoints" />
           <CardBody>
-            {balances.length > 0 ? (
-              <div className="space-y-3">
-                {balances.map((balance) => {
-                  const member = members.find((item) => item.user_id === balance.user_id);
-                  return (
-                    <div key={balance.account_id} className="rounded-card border border-line-soft p-4">
-                      <p className="break-words font-semibold">
-                        {member?.profiles?.full_name ?? member?.profiles?.email ?? "Historisch account"}
-                      </p>
-                      <p className="break-all text-sm text-muted">{member?.profiles?.email}</p>
-                      <dl className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                        <div><dt className="text-sm text-muted">Beschikbaar</dt><dd className="font-display text-2xl">{formatPoints(balance.available_points)}</dd><dd className="text-sm text-muted">{formatEuroCents(pointsToCents(balance.available_points, settings.point_value_cents_per_100))}</dd></div>
-                        <div><dt className="text-sm text-muted">In behandeling</dt><dd className="font-display text-xl text-muted">{formatPoints(balance.pending_points)}</dd></div>
-                        <div><dt className="text-sm text-muted">Gereserveerd</dt><dd className="font-display text-xl text-muted">{formatPoints(balance.reserved_points)}</dd></div>
-                        <div><dt className="text-sm text-muted">Totaal gespaard</dt><dd className="font-display text-xl text-muted">{formatPoints(balance.lifetime_earned_points)}</dd></div>
-                      </dl>
-                    </div>
-                  );
-                })}
+            {saldo ? (
+              <div className="rounded-card border border-line-soft p-4">
+                <p className="font-semibold">Saldo van deze locatie</p>
+                <p className="text-sm text-muted">
+                  Alle contactpersonen van deze locatie sparen samen voor dit saldo.
+                </p>
+                <dl className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+                  <div><dt className="text-sm text-muted">Beschikbaar</dt><dd className="font-display text-2xl">{formatPoints(saldo.available_points)}</dd><dd className="text-sm text-muted">{formatEuroCents(pointsToCents(saldo.available_points, settings.point_value_cents_per_100))}</dd></div>
+                  <div><dt className="text-sm text-muted">In behandeling</dt><dd className="font-display text-xl text-muted">{formatPoints(saldo.pending_points)}</dd></div>
+                  <div><dt className="text-sm text-muted">Gereserveerd</dt><dd className="font-display text-xl text-muted">{formatPoints(saldo.reserved_points)}</dd></div>
+                  <div><dt className="text-sm text-muted">Totaal gespaard</dt><dd className="font-display text-xl text-muted">{formatPoints(saldo.lifetime_earned_points)}</dd></div>
+                </dl>
               </div>
             ) : (
               <p className="text-sm text-muted">
@@ -234,9 +228,13 @@ export default async function OrganizationDetailPage({
               <p className="mb-3 text-sm font-semibold">Handmatige correctie</p>
               <ActionForm action={manualAdjustmentAction} submitLabel="Correctie vastleggen">
                 <input type="hidden" name="organization_id" value={detail.organization.id} />
-                <Field label="Gebruiker" htmlFor="user_id" required>
-                  <Select id="user_id" name="user_id" required defaultValue="">
-                    <option value="" disabled>Kies een gebruiker</option>
+                <Field
+                  label="Betrokken contactpersoon"
+                  htmlFor="user_id"
+                  hint="Optioneel. De correctie gaat altijd op het saldo van de locatie."
+                >
+                  <Select id="user_id" name="user_id" defaultValue="">
+                    <option value="">Geen, alleen de locatie</option>
                     {members.filter((member) => member.status === "active").map((member) => (
                       <option key={member.user_id} value={member.user_id}>
                         {member.profiles?.full_name ?? member.profiles?.email}

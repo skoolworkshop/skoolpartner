@@ -30,7 +30,27 @@ export function isWithinPartnerPeriod(
 ): boolean {
   if (!enrolledAt) return false;
   if (!moment) return false;
+
+  // Een datum zonder tijd, zoals een factuurdatum, vergelijken wij per dag.
+  // Anders telt "12 november" als middernacht en valt een factuur van de dag
+  // van aanmelding altijd vóór een aanmelding van die ochtend.
+  if (ALLEEN_DATUM.test(moment)) {
+    return moment >= dagInNederland(enrolledAt);
+  }
+
   return new Date(moment).getTime() >= new Date(enrolledAt).getTime();
+}
+
+const ALLEEN_DATUM = /^\d{4}-\d{2}-\d{2}$/;
+
+/** De kalenderdag van een moment, in Nederlandse tijd, als JJJJ-MM-DD. */
+function dagInNederland(moment: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(moment));
 }
 
 /**

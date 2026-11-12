@@ -51,7 +51,10 @@ export function computeBalance(entries: LedgerEntry[]): LedgerBalance {
     pendingPoints: sumWhere((entry) => entry.status === "pending"),
     reservedPoints: negate(sumWhere((entry) => entry.status === "reserved")),
     redeemedPoints: negate(sumWhere((entry) => entry.status === "redeemed")),
-    expiredPoints: negate(sumWhere((entry) => entry.status === "expired")),
+    // Alleen de vervalregel zelf telt hier. De oorspronkelijke toekenning krijgt
+    // bij verval ook status expired, en zou het bedrag anders tegen zichzelf
+    // wegstrepen.
+    expiredPoints: negate(sumWhere((entry) => entry.status === "expired" && entry.points < 0)),
     lifetimeEarnedPoints: sumWhere(
       (entry) => entry.points > 0 && COUNTS_TOWARD_AVAILABLE.includes(entry.status)
     ),

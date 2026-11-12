@@ -6,6 +6,7 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 import { emailDomain, slugify } from "@/lib/utils";
 import type { RegistrationValues } from "@/lib/registration";
 import type { RegistrationDetails } from "@/lib/types/database";
+import { bewaarGeverifieerdContact } from "@/lib/organizations/contacten";
 
 /**
  * Registratie afronden.
@@ -260,17 +261,12 @@ export async function completeRegistration(params: {
       actorEmail: params.userEmail,
     });
 
-    await supabase.from("organization_contacts").upsert(
-      {
-        organization_id: organizationId,
-        email: params.userEmail.toLowerCase(),
-        full_name: values.fullName,
-        user_id: params.userId,
-        is_verified: true,
-        verified_at: new Date().toISOString(),
-      },
-      { onConflict: "organization_id,email" }
-    );
+    await bewaarGeverifieerdContact(supabase, {
+      organizationId,
+      email: params.userEmail,
+      fullName: values.fullName,
+      userId: params.userId,
+    });
 
     // Het e-maildomein van de eerste medewerker is een geverifieerd domein van
     // deze school. Daarmee herkennen wij collega's die zich later aanmelden.
@@ -381,17 +377,12 @@ export async function completeRegistration(params: {
       if (error) return { ok: false, message: "Uw aanmelding kon niet worden opgeslagen." };
     }
 
-    await supabase.from("organization_contacts").upsert(
-      {
-        organization_id: organizationId,
-        email: normalizedEmail,
-        full_name: values.fullName,
-        user_id: params.userId,
-        is_verified: true,
-        verified_at: new Date().toISOString(),
-      },
-      { onConflict: "organization_id,email" }
-    );
+    await bewaarGeverifieerdContact(supabase, {
+      organizationId,
+      email: normalizedEmail,
+      fullName: values.fullName,
+      userId: params.userId,
+    });
 
     await recordAudit({
       actorId: params.userId,

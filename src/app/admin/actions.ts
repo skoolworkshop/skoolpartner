@@ -894,7 +894,7 @@ export async function manualAdjustmentAction(
 ): Promise<AdminState> {
   const session = await requireAdmin();
   const organizationId = String(formData.get("organization_id") ?? "");
-  const userId = String(formData.get("user_id") ?? "");
+  const userId = String(formData.get("user_id") ?? "").trim() || null;
   const points = Number.parseInt(String(formData.get("points") ?? ""), 10);
   const reason = String(formData.get("reason") ?? "");
   const description = String(formData.get("description") ?? "").trim() || undefined;

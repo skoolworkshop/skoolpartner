@@ -365,10 +365,9 @@ export type LoyaltyTransactionEventRow = {
   created_at: string;
 };
 
+/** Het saldo van een schoollocatie. Eén rij per organisatie. */
 export type LoyaltyBalanceRow = {
   organization_id: string;
-  user_id: string | null;
-  account_id: string;
   enrolled_at: string;
   is_active: boolean;
   available_points: number;

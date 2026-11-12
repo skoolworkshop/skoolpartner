@@ -112,8 +112,8 @@ async function main() {
     insert into public.organizations (id, name, slug) values
       ('${ORG}', 'Testschool', 'testschool'),
       ('${ANDERE_ORG}', 'Andere school', 'andere-school');
-    select public.ensure_loyalty_account('${ORG}'::uuid, null);
-    select public.ensure_loyalty_account('${ANDERE_ORG}'::uuid, null);
+    select public.ensure_loyalty_account('${ORG}'::uuid, '${USER}'::uuid);
+    select public.ensure_loyalty_account('${ANDERE_ORG}'::uuid, '${USER}'::uuid);
     insert into public.bookings (id, organization_id, workshop_name, status, scheduled_date)
     values ('44444444-4444-4444-4444-444444444444', '${ORG}', 'Workshop Techniek', 'confirmed', current_date + 20),
            ('55555555-5555-5555-5555-555555555555', '${ANDERE_ORG}', 'Workshop Koken', 'confirmed', current_date + 20);

@@ -19,6 +19,7 @@ import {
   type BookingCandidate,
 } from "./matching";
 import type { InvoiceState } from "@/lib/types/database";
+import { startmomentVanLocatie } from "@/lib/loyalty/locatie";
 
 /**
  * Bij welke schoollocatie hoort dit Moneybird-contact?
@@ -86,7 +87,7 @@ async function zoekKoppeling(contactId: string | null): Promise<Koppeling> {
 export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
   invoiceId: string | null;
   releasedTransactions: number;
-  overgeslagen?: "geen-koppeling" | "meerdere-locaties" | "voor-deelname";
+  overgeslagen?: "geen-koppeling" | "meerdere-locaties" | "geen-deelname" | "voor-deelname";
 }> {
   const supabase = createServiceSupabase();
   const koppeling = await zoekKoppeling(invoice.contact_id);
@@ -135,16 +136,19 @@ export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
       .maybeSingle();
 
     if (!bestaat) {
-      const { data: account } = await supabase
-        .from("loyalty_accounts")
-        .select("enrolled_at")
-        .eq("organization_id", organizationId)
-        .maybeSingle();
+      // Het startmoment van de locatie: het vroegste van alle collega's. Met
+      // meerdere contactpersonen zijn er meerdere regels, en dan is de eerste de
+      // dag waarop de school ging meedoen.
+      const startmoment = await startmomentVanLocatie(supabase, organizationId);
 
-      if (
-        account?.enrolled_at &&
-        !isWithinPartnerPeriod(invoice.invoice_date, account.enrolled_at)
-      ) {
+      // Een locatie die wel gekoppeld is maar nog niet meedoet, heeft geen
+      // startmoment. Zonder die grens zou de eerste synchronisatie haar hele
+      // factuurhistorie binnenhalen. Dus: eerst deelname, dan pas facturen.
+      if (!startmoment) {
+        return { invoiceId: null, releasedTransactions: 0, overgeslagen: "geen-deelname" };
+      }
+
+      if (!isWithinPartnerPeriod(invoice.invoice_date, startmoment)) {
         return { invoiceId: null, releasedTransactions: 0, overgeslagen: "voor-deelname" };
       }
     }

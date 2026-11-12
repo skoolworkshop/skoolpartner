@@ -6,6 +6,7 @@ import { getSettingsWithServiceRole } from "@/lib/settings";
 import { awardPointsForBooking } from "@/lib/loyalty/ledger";
 import { parseConfirmationEmail, type ParserInput, type ParseResult } from "./parser";
 import type { Json } from "@/lib/types/database";
+import { bewaarGeverifieerdContact } from "@/lib/organizations/contacten";
 
 export interface IngestOutcome {
   status: "created" | "needs_review" | "ignored" | "duplicate";
@@ -238,16 +239,11 @@ export async function ingestConfirmationEmail(input: ParserInput): Promise<Inges
   });
 
   if (resolution.method === "name_and_location_match" && parsed.extracted.contactEmail) {
-    await supabase.from("organization_contacts").upsert(
-      {
-        organization_id: resolution.organizationId!,
-        email: parsed.extracted.contactEmail.toLowerCase(),
-        full_name: parsed.extracted.contactName,
-        is_verified: true,
-        verified_at: new Date().toISOString(),
-      },
-      { onConflict: "organization_id,email" }
-    );
+    await bewaarGeverifieerdContact(supabase, {
+      organizationId: resolution.organizationId!,
+      email: parsed.extracted.contactEmail,
+      fullName: parsed.extracted.contactName,
+    });
   }
 
   await supabase

@@ -259,6 +259,86 @@ if (url && service && /^https:\/\//.test(url)) {
     }
 
     // ---------------------------------------------------------------------
+    // Migratie 044 en 045: Moneybird-contact per locatie, punten per locatie
+    // ---------------------------------------------------------------------
+    // Eerst wat de migraties tegen zou houden. Dat wil je weten vóór db:push.
+    const { data: gekoppeld, error: koppelFout } = await supabase
+      .from("organization_contacts")
+      .select("moneybird_contact_id, organization_id")
+      .not("moneybird_contact_id", "is", null);
+    if (koppelFout) {
+      regel("fout", "Moneybird-koppelingen", koppelFout.message);
+    } else {
+      const perContact = new Map();
+      for (const rij of gekoppeld ?? []) {
+        perContact.set(rij.moneybird_contact_id, (perContact.get(rij.moneybird_contact_id) ?? 0) + 1);
+      }
+      const dubbel = [...perContact.entries()].filter(([, aantal]) => aantal > 1);
+      regel(
+        dubbel.length === 0 ? "ok" : "fout",
+        "Moneybird-koppelingen",
+        dubbel.length === 0
+          ? `${(gekoppeld ?? []).length} koppeling(en), geen enkel contact bij twee locaties. Migratie 044 kan veilig.`
+          : `${dubbel.length} Moneybird-contact(en) staan bij meer dan één locatie: ${dubbel
+              .map(([contact]) => contact)
+              .join(", ")}. Migratie 044 weigert tot dit is opgelost.`,
+      );
+    }
+
+    const { data: toekenningen, error: toekenFout } = await supabase
+      .from("loyalty_transactions")
+      .select("organization_id, type, external_reference")
+      .not("external_reference", "is", null)
+      .order("id")
+      .limit(10000);
+    if (toekenFout) {
+      regel("fout", "Dubbele toekenningen", toekenFout.message);
+    } else {
+      const perBron = new Map();
+      for (const rij of toekenningen ?? []) {
+        const sleutel = `${rij.organization_id}|${rij.type}|${rij.external_reference}`;
+        perBron.set(sleutel, (perBron.get(sleutel) ?? 0) + 1);
+      }
+      const dubbel = [...perBron.values()].filter((aantal) => aantal > 1).length;
+      regel(
+        dubbel === 0 ? "ok" : "fout",
+        "Dubbele toekenningen",
+        dubbel === 0
+          ? `${(toekenningen ?? []).length} toekenning(en), geen enkele dubbel binnen één locatie. Migratie 045 kan veilig.`
+          : `${dubbel} toekenning(en) staan dubbel binnen één locatie. Migratie 045 weigert tot dit is opgelost.`,
+      );
+    }
+
+    // Is 045 al gedraaid? Daarna heeft de saldoweergave geen kolom user_id meer:
+    // het saldo is dan van de locatie.
+    const { error: perPersoon } = await supabase.from("loyalty_balances").select("user_id").limit(1);
+    const { error: weergaveFout } = await supabase.from("loyalty_balances").select("organization_id").limit(1);
+    regel(
+      weergaveFout ? "fout" : perPersoon ? "ok" : "letop",
+      "Migratie 045 (punten per locatie)",
+      weergaveFout
+        ? weergaveFout.message
+        : perPersoon
+          ? "uitgevoerd: één saldo per schoollocatie"
+          : "nog niet uitgevoerd: het saldo rekent nog per persoon. Draai npm run db:push.",
+    );
+
+    // Losse facturen horen er niet te zijn: zonder locatie halen wij niets binnen.
+    const { count: los, error: losFout } = await supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .is("organization_id", null);
+    regel(
+      losFout ? "fout" : (los ?? 0) === 0 ? "ok" : "letop",
+      "Facturen zonder locatie",
+      losFout
+        ? losFout.message
+        : (los ?? 0) === 0
+          ? "geen"
+          : `${los} factuur/facturen zonder locatie. Opruimen met: node scripts/opschonen.mjs --ook-losse-facturen`,
+    );
+
+    // ---------------------------------------------------------------------
     // De bewaartermijn van leerlinggegevens
     // ---------------------------------------------------------------------
     const { data: alleDagen } = await supabase

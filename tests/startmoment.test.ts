@@ -60,6 +60,21 @@ describe("SkoolPartner-startmoment", () => {
     expect(invoiceBelongsToPeriod({ invoice_date: "2026-09-20" }, REGISTRATIE)).toBe(true);
     expect(invoiceBelongsToPeriod({ invoice_date: "2026-08-20" }, REGISTRATIE)).toBe(false);
   });
+
+  it("een factuur van de dag van aanmelding telt mee, ook al was de aanmelding later die dag", () => {
+    // Aanmelding 10 september om 11:00 Nederlandse tijd. Een factuurdatum heeft
+    // geen tijd; als middernacht gelezen zou hij altijd te vroeg zijn.
+    expect(isWithinPartnerPeriod("2026-09-10", REGISTRATIE)).toBe(true);
+    expect(isWithinPartnerPeriod("2026-09-09", REGISTRATIE)).toBe(false);
+    expect(isWithinPartnerPeriod("2026-09-11", REGISTRATIE)).toBe(true);
+  });
+
+  it("rekent de dag in Nederlandse tijd, niet in UTC", () => {
+    // 23:30 UTC op 9 september is in Nederland al 10 september.
+    const laat = "2026-09-09T23:30:00.000Z";
+    expect(isWithinPartnerPeriod("2026-09-09", laat)).toBe(false);
+    expect(isWithinPartnerPeriod("2026-09-10", laat)).toBe(true);
+  });
 });
 
 describe("registratieformulier", () => {

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServerSupabase } from "@/lib/supabase/server";
+import { startmomentVanLocatie } from "@/lib/loyalty/locatie";
 import {
   bookingMoment,
   bookingQualifiesForPoints,
@@ -17,8 +18,6 @@ import type {
 
 const EMPTY_BALANCE: LoyaltyBalanceRow = {
   organization_id: "",
-  user_id: null,
-  account_id: "",
   enrolled_at: new Date().toISOString(),
   is_active: false,
   available_points: 0,
@@ -76,15 +75,16 @@ export async function getOrganizationDetails(organizationId: string) {
   );
 }
 
-/** Het startmoment van deze organisatie, of null als zij niet deelneemt. */
+/**
+ * Het startmoment van deze locatie, of null als zij niet deelneemt.
+ *
+ * Een locatie kan meerdere contactpersonen hebben, elk met een eigen regel in
+ * loyalty_accounts. Het startmoment van de locatie is het vroegste daarvan:
+ * de dag waarop de eerste collega meedeed.
+ */
 export async function getEnrolledAt(organizationId: string): Promise<string | null> {
   const supabase = await createServerSupabase();
-  const { data } = await supabase
-    .from("loyalty_accounts")
-    .select("enrolled_at")
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-  return data?.enrolled_at ?? null;
+  return startmomentVanLocatie(supabase, organizationId);
 }
 
 export async function getLoyaltyBalance(organizationId: string): Promise<LoyaltyBalanceRow> {
@@ -271,10 +271,10 @@ export async function getThreadWithMessages(organizationId: string, threadId: st
 
 /** Alles wat het dashboard nodig heeft, in één keer opgehaald. */
 /**
- * Het welkomsttegoed van deze organisatie, als het er is.
+ * Het welkomsttegoed van deze locatie, als het er is.
  *
  * Gebruikt om net na de registratie te laten zien dat de eerste punten
- * klaarstaan. Er is er per organisatie maar één, want de database staat er ook
+ * klaarstaan. Er is er per locatie maar één, want de database staat er ook
  * maar één toe.
  */
 export async function getWelcomeBonus(organizationId: string) {
@@ -284,6 +284,8 @@ export async function getWelcomeBonus(organizationId: string) {
     .select("id, points, point_value_cents_per_100, created_at")
     .eq("organization_id", organizationId)
     .eq("type", "welcome_bonus")
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   if (!data) return null;

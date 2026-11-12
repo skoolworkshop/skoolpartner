@@ -169,14 +169,16 @@ async function main() {
     return;
   }
 
-  // De welkomstbonus: precies één per gebruiker, hoe vaak je het ook probeert.
+  // De welkomstbonus: precies één per locatie, hoe vaak je het ook probeert.
+  // Dit is letterlijk wat de applicatie stuurt: een upsert zonder voorwaarde
+  // erachter. Een gedeeltelijke index kan daar niet tegen, een volledige wel.
   const bonus = `
     insert into public.loyalty_transactions
       (organization_id, user_id, account_id, type, status, points, point_value_cents_per_100,
        description, source, external_reference, available_at)
     values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', '${accountId}', 'welcome_bonus', 'available',
             100, 250, 'Welkomstbonus SkoolPartner', 'portal', 'welcome', now())
-    on conflict (organization_id, user_id, type, external_reference) where external_reference is not null
+    on conflict (organization_id, type, external_reference)
     do nothing;
   `;
   // Vier pogingen: opnieuw registreren, opnieuw verifiëren, opnieuw inloggen,
@@ -197,7 +199,7 @@ async function main() {
   const bonusOk = bonusRows.aantal === 1 && bonusRows.punten === 100;
   console.log(
     bonusOk
-      ? "  Welkomstbonus: vier pogingen leveren per gebruiker precies één bonus op"
+      ? "  Welkomstbonus: vier pogingen leveren per locatie precies één bonus op"
       : `  FOUT: welkomstbonus gaf ${bonusRows.aantal} transacties met ${bonusRows.punten} punten`
   );
   if (!bonusOk) {
@@ -646,6 +648,54 @@ async function main() {
   controles.push([
     zonderZoekpad.rows.length === 0,
     'elke functie met verhoogde rechten heeft een vast zoekpad',
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Migratie 045: SkoolPoints horen bij de schoollocatie
+  // ---------------------------------------------------------------------------
+  const saldoKolommen = await db.query(`
+    select column_name from information_schema.columns
+     where table_schema = 'public' and table_name = 'loyalty_balances'
+  `);
+  controles.push([
+    !saldoKolommen.rows.some((rij) => rij.column_name === 'user_id'),
+    'de saldoweergave rekent per locatie, niet per persoon',
+  ]);
+
+  const saldoRegels = await db.query(`
+    select organization_id, count(*)::int as n from public.loyalty_balances group by organization_id
+  `);
+  controles.push([
+    saldoRegels.rows.every((rij) => rij.n === 1),
+    'elke locatie heeft precies één saldoregel',
+  ]);
+
+  const puntenIndex = await db.query(`
+    select indexdef from pg_indexes
+     where schemaname = 'public' and indexname = 'loyalty_transactions_external_key'
+  `);
+  controles.push([
+    puntenIndex.rows.length === 1 && !/where/i.test(puntenIndex.rows[0].indexdef),
+    'de index tegen dubbele toekenningen is volledig, zodat een upsert hem kan gebruiken',
+  ]);
+
+  const verzoekRechten = await db.query(`
+    select privilege_type from information_schema.role_table_grants
+     where table_schema = 'public' and table_name = 'redemption_requests'
+       and grantee in ('authenticated', 'anon') and privilege_type in ('INSERT', 'UPDATE', 'DELETE')
+  `);
+  controles.push([
+    verzoekRechten.rows.length === 0,
+    'een klant kan geen inwisselverzoek buiten de reservering om aanmaken of wijzigen',
+  ]);
+
+  const internSaldo = await db.query(`
+    select has_function_privilege('authenticated', 'public.loyalty_location_points(uuid)', 'execute') as klant,
+           has_function_privilege('anon', 'public.loyalty_available_points(uuid)', 'execute') as bezoeker
+  `);
+  controles.push([
+    internSaldo.rows[0].klant === false && internSaldo.rows[0].bezoeker === false,
+    'het saldo van een locatie is niet op te vragen zonder lidmaatschap',
   ]);
 
   let alleGoed = true;
