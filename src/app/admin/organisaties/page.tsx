@@ -3,12 +3,12 @@ import Link from "next/link";
 
 import { ActionForm } from "@/components/admin/action-form";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/form";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Field, Input } from "@/components/ui/form";
 import { requireAdmin } from "@/lib/auth/session";
 import { listOrganizations, listUnverifiedOrganizations } from "@/lib/admin/queries";
 import { formatShortDate } from "@/lib/format";
-import { verifyOrganizationAction } from "../actions";
+import { createOrganizationAction, verifyOrganizationAction } from "../actions";
 
 export const metadata: Metadata = { title: "Organisaties" };
 
@@ -67,10 +67,35 @@ export default async function AdminOrganizationsPage({
         </Card>
       ) : null}
 
+      <Card className="mb-5">
+        <CardHeader
+          title="Schoollocatie toevoegen"
+          description="Voor een school die zich niet zelf aanmeldt. Elke locatie is een eigen organisatie met een eigen puntensaldo: geef twee locaties van hetzelfde bestuur dus elk een eigen naam."
+        />
+        <CardBody>
+          <ActionForm action={createOrganizationAction} submitLabel="Locatie toevoegen">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Naam van de locatie" htmlFor="org-name" required>
+                <Input
+                  id="org-name"
+                  name="name"
+                  required
+                  minLength={2}
+                  placeholder="Stichting Zuidwest, locatie Noord"
+                />
+              </Field>
+              <Field label="Plaats" htmlFor="org-city">
+                <Input id="org-city" name="city" placeholder="Gouda" />
+              </Field>
+            </div>
+          </ActionForm>
+        </CardBody>
+      </Card>
+
       <Card>
         <CardHeader
           title={`${organizations.length} organisaties`}
-          description="Nieuwe organisaties verschijnen hier nadat een klant zichzelf heeft geregistreerd."
+          description="Hier staan de locaties die u zelf heeft toegevoegd en de scholen die zich zelf hebben aangemeld."
           action={
             <form className="flex gap-2">
               <label htmlFor="q" className="sr-only">

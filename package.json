@@ -25,6 +25,7 @@
     "backup:data": "node scripts/backup-data.mjs",
     "dag:leegmaken": "node scripts/dag-leegmaken.mjs",
     "check:productie": "node scripts/check-productie.mjs",
+    "livegang": "node scripts/livegang.mjs",
     "auth:email-templates": "node scripts/apply-supabase-email-templates.mjs",
     "auth:email-templates:check": "node scripts/apply-supabase-email-templates.mjs --dry-run"
   },

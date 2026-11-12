@@ -776,6 +776,38 @@ describe("de migratie zelf", () => {
     await oud.close();
   }, 120_000);
 
+  it("is terug te draaien, en daarna opnieuw uit te voeren", async () => {
+    const schoon = await nieuweDatabase();
+    const kolommen = async () =>
+      (
+        await schoon.query<{ column_name: string }>(
+          "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'loyalty_balances'",
+        )
+      ).rows.map((rij) => rij.column_name);
+    const index = async (naam: string) =>
+      (await schoon.query<{ indexdef: string }>("select indexdef from pg_indexes where indexname = $1", [naam])).rows;
+
+    expect(await kolommen()).not.toContain("user_id");
+
+    await schoon.exec(await readFile(path.join(process.cwd(), "supabase", "terugdraaien-044-045.sql"), "utf8"));
+    expect(await kolommen()).toContain("user_id");
+    expect(await index("organization_contacts_moneybird_uniek")).toHaveLength(0);
+    expect((await index("loyalty_transactions_external_key"))[0].indexdef).toMatch(/user_id/);
+    expect(
+      (await schoon.query("select 1 from pg_proc where proname = 'loyalty_location_points'")).rows,
+    ).toHaveLength(0);
+
+    for (const bestand of [
+      "20261112120000_moneybird_contact_per_locatie.sql",
+      "20261112130000_punten_per_schoollocatie.sql",
+    ]) {
+      await schoon.exec(await readFile(path.join(process.cwd(), "supabase", "migrations", bestand), "utf8"));
+    }
+    expect(await kolommen()).not.toContain("user_id");
+    expect(await index("organization_contacts_moneybird_uniek")).toHaveLength(1);
+    await schoon.close();
+  }, 120_000);
+
   it("kan zonder bezwaar twee keer worden gedraaid", async () => {
     const migratie = await readFile(
       path.join(process.cwd(), "supabase", "migrations", "20261112130000_punten_per_schoollocatie.sql"),

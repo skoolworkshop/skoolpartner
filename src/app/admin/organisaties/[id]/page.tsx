@@ -461,7 +461,7 @@ export default async function OrganizationDetailPage({
         <Card>
           <CardHeader
             title="Moneybird"
-            description="Bepaalt bij welke klant een factuur terechtkomt. Wij koppelen op het Moneybird-contact-ID, want dat verandert niet; een bedrijfsnaam wel."
+            description="Bepaalt bij welke locatie een factuur terechtkomt. Wij koppelen op het Moneybird-contact-ID, want dat verandert niet; een bedrijfsnaam wel. Eén contact hoort bij één locatie."
           />
           {mbContacten.length > 0 ? (
             <ul className="divide-y divide-line-soft">
@@ -490,8 +490,8 @@ export default async function OrganizationDetailPage({
             </ul>
           ) : (
             <p className="px-5 py-4 text-sm text-muted">
-              Nog geen Moneybird-contact gekoppeld. Facturen van deze klant komen daardoor binnen
-              als &quot;nog niet gekoppeld&quot; en zijn niet zichtbaar voor de klant zelf.
+              Nog geen Moneybird-contact gekoppeld. Zolang dat zo is, halen wij van deze locatie
+              geen enkele factuur binnen. In Moneybird zelf verandert er niets.
             </p>
           )}
           <CardBody className="border-t border-line-soft">

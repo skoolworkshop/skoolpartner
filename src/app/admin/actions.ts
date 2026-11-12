@@ -12,6 +12,7 @@ import { createBookingFromSource } from "@/lib/bookings/ingest";
 import { awardPointsForBooking, manualAdjustment, reverseTransaction } from "@/lib/loyalty/ledger";
 import {
   approveMembership,
+  createOrganization,
   setMembershipStatus,
 } from "@/lib/organizations/service";
 import { generateToken, hashToken } from "@/lib/crypto";
@@ -1517,6 +1518,52 @@ export async function addMemberByEmailAction(
   revalidatePath(`/admin/organisaties/${organizationId}`);
   revalidatePath("/admin/gebruikers");
   return { status: "ok", message: `${profile.email} is toegevoegd als ${role}.` };
+}
+
+/**
+ * Een schoollocatie toevoegen vanuit het beheer.
+ *
+ * Een school kan zich zelf aanmelden, maar dat hoeft niet. Voor een cultuurdag
+ * of om een contactpersoon uit te nodigen moet de locatie er eerst zijn, en dan
+ * zet de beheerder hem hier klaar. Hij staat meteen op gecontroleerd.
+ *
+ * Elke locatie is een eigen organisatie, met een eigen puntensaldo. Twee
+ * locaties van hetzelfde bestuur krijgen dus elk een eigen naam.
+ */
+export async function createOrganizationAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim() || null;
+
+  if (name.length < 2) return { status: "error", message: "Vul de naam van de locatie in." };
+
+  const result = await createOrganization({
+    name,
+    city,
+    actorId: session.userId,
+    actorEmail: session.email,
+    verified: true,
+  });
+
+  if (!result.ok) {
+    return {
+      status: "error",
+      message: `Toevoegen is niet gelukt: ${result.technicalReason ?? "onbekende fout"}`,
+    };
+  }
+  if (result.alreadyExisted) {
+    return {
+      status: "error",
+      message: `Er bestaat al een organisatie met de naam "${name}". Geef een tweede locatie een eigen naam, bijvoorbeeld met de plaats of de locatienaam erachter.`,
+    };
+  }
+
+  revalidatePath("/admin/organisaties");
+  revalidatePath("/admin");
+  return { status: "ok", message: `${name} is toegevoegd.` };
 }
 
 /** Markeert een zelf aangemelde organisatie als gecontroleerd. */
