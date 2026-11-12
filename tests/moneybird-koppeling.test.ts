@@ -119,15 +119,17 @@ async function haalFactuurBinnen(factuur: {
   datum: string;
   bedragCenten: number;
   betaald?: boolean;
-}): Promise<"opgeslagen" | "overgeslagen" | "ter-controle"> {
+}): Promise<"opgeslagen" | "geen-koppeling" | "meerdere-locaties"> {
   const koppeling = await koppelingVan(factuur.contactId);
-  if (koppeling.soort === "geen") return "overgeslagen";
 
-  const organisatie = koppeling.soort === "gevonden" ? koppeling.organisatieId : null;
-  const redenen =
-    koppeling.soort === "meerdere"
-      ? [`Dit Moneybird-contact hoort bij ${koppeling.organisaties.length} schoollocaties.`]
-      : [];
+  // Geen koppeling en twijfel over de koppeling leiden tot hetzelfde: de
+  // factuur komt niet binnen. Alleen de reden verschilt, en die gaat naar het
+  // synchronisatielogboek.
+  if (koppeling.soort === "geen") return "geen-koppeling";
+  if (koppeling.soort === "meerdere") return "meerdere-locaties";
+
+  const organisatie = koppeling.organisatieId;
+  const redenen: string[] = [];
 
   await db.query(
     `insert into public.invoices
@@ -153,7 +155,7 @@ async function haalFactuurBinnen(factuur: {
     ],
   );
 
-  return koppeling.soort === "meerdere" ? "ter-controle" : "opgeslagen";
+  return "opgeslagen";
 }
 
 beforeAll(async () => {
@@ -223,7 +225,7 @@ describe("facturen binnenhalen", () => {
       bedragCenten: 121000,
     });
 
-    expect(uitkomst).toBe("overgeslagen");
+    expect(uitkomst).toBe("geen-koppeling");
     const facturen = await rijen("select id from public.invoices");
     expect(facturen).toHaveLength(0);
   });
@@ -331,13 +333,15 @@ describe("één contact bij twee locaties", () => {
       bedragCenten: 49500,
     });
 
-    expect(uitkomst).toBe("ter-controle");
+    expect(uitkomst).toBe("meerdere-locaties");
 
-    const factuur = await een<{ organization_id: string | null; needs_review: boolean }>(
-      "select organization_id, needs_review from public.invoices where moneybird_invoice_id = 'mb-f-twijfel'",
+    // En er komt geen losse factuur binnen die later op het dashboard
+    // rondzwerft. De reden staat in het synchronisatielogboek, niet in een rij
+    // die bij de volgende synchronisatie weer terugkomt.
+    const factuur = await rijen(
+      "select id from public.invoices where moneybird_invoice_id = 'mb-f-twijfel'",
     );
-    expect(factuur.organization_id).toBeNull();
-    expect(factuur.needs_review).toBe(true);
+    expect(factuur).toHaveLength(0);
 
     await db.query("delete from public.external_record_mappings where external_id = 'mb-noord'");
   });

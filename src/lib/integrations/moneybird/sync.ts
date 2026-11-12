@@ -86,7 +86,7 @@ async function zoekKoppeling(contactId: string | null): Promise<Koppeling> {
 export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
   invoiceId: string | null;
   releasedTransactions: number;
-  overgeslagen?: "geen-koppeling" | "voor-deelname";
+  overgeslagen?: "geen-koppeling" | "meerdere-locaties" | "voor-deelname";
 }> {
   const supabase = createServiceSupabase();
   const koppeling = await zoekKoppeling(invoice.contact_id);
@@ -108,7 +108,20 @@ export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
     return { invoiceId: null, releasedTransactions: 0, overgeslagen: "geen-koppeling" };
   }
 
-  const organizationId = koppeling.soort === "gevonden" ? koppeling.organisatieId : null;
+  /*
+    Twijfel is ook geen koppeling.
+
+    Gebruiken twee schoollocaties hetzelfde Moneybird-contact, dan weten wij
+    niet bij welke van de twee deze factuur hoort. Vroeger kwam hij dan binnen
+    zonder locatie, met de vraag erbij. Dat betekent in de praktijk een rij die
+    op het dashboard blijft rondzwerven en die bij de volgende synchronisatie
+    gewoon terugkomt. Dus: niet binnenhalen, en de reden in het logboek.
+  */
+  if (koppeling.soort === "meerdere") {
+    return { invoiceId: null, releasedTransactions: 0, overgeslagen: "meerdere-locaties" };
+  }
+
+  const organizationId = koppeling.organisatieId;
 
   // Wij halen de bestaande administratie van een klant niet binnen. Hoort deze
   // factuur bij een organisatie die meedoet, en dateert zij van vóór haar
@@ -143,14 +156,8 @@ export async function upsertInvoice(invoice: MoneybirdSalesInvoice): Promise<{
   const state = mapInvoiceState(invoice.state) as InvoiceState;
   const fullyPaid = state === "paid" || (totalIncl > 0 && totalUnpaid <= 0 && totalPaid >= totalIncl);
 
+  // Hier is de koppeling altijd eenduidig: alles daarvoor is al teruggestuurd.
   const reviewReasons: string[] = [];
-  if (koppeling.soort === "meerdere") {
-    // Twee locaties met hetzelfde factuurcontact. Raden mag hier niet, dus de
-    // factuur komt zonder locatie binnen en krijgt geen punten.
-    reviewReasons.push(
-      `Dit Moneybird-contact hoort bij ${koppeling.organisaties.length} schoollocaties. Wijs de juiste locatie zelf aan.`
-    );
-  }
 
   const { data: saved, error } = await supabase
     .from("invoices")
@@ -318,22 +325,31 @@ export async function syncMoneybirdInvoices(): Promise<SyncResult> {
 
     let processed = 0;
     let released = 0;
-    let overgeslagen = 0;
+    const overgeslagen: Record<string, number> = {};
     for (const invoice of invoices) {
       const result = await upsertInvoice(invoice);
       if (result.overgeslagen) {
-        overgeslagen += 1;
+        overgeslagen[result.overgeslagen] = (overgeslagen[result.overgeslagen] ?? 0) + 1;
         continue;
       }
       processed += 1;
       released += result.releasedTransactions;
     }
 
+    const aantalOvergeslagen = Object.values(overgeslagen).reduce((totaal, n) => totaal + n, 0);
+
     const newCursor = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     await markSyncSuccess("moneybird", {
       itemsProcessed: processed,
       cursor: mode === "mock" ? null : newCursor,
-      metadata: { mode, released_transactions: released, overgeslagen_zonder_locatie: overgeslagen },
+      metadata: {
+        mode,
+        released_transactions: released,
+        // Wat er niet is binnengehaald, en waarom. Zo is in het logboek terug
+        // te zien dat er facturen langsgekomen zijn die wij bewust laten staan.
+        overgeslagen: aantalOvergeslagen,
+        overgeslagen_per_reden: overgeslagen,
+      },
     });
 
     return {
@@ -341,7 +357,11 @@ export async function syncMoneybirdInvoices(): Promise<SyncResult> {
       ok: true,
       mode,
       itemsProcessed: processed,
-      details: { released_transactions: released, overgeslagen_zonder_locatie: overgeslagen },
+      details: {
+        released_transactions: released,
+        overgeslagen: aantalOvergeslagen,
+        overgeslagen_per_reden: overgeslagen,
+      },
     };
   } catch (error) {
     await markSyncError("moneybird", error);
