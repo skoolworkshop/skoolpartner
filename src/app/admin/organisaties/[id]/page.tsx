@@ -512,7 +512,7 @@ export default async function OrganizationDetailPage({
         <Card className="lg:col-span-2 border-danger/40">
             <CardHeader
               title="Organisatie definitief verwijderen"
-              description="Onomkeerbaar. Alles van deze organisatie verdwijnt uit de database: boekingen, facturen, factuurregels, SkoolPoints, inwisselverzoeken, reviews, berichten en resultaten, inclusief de bestanden in de opslag. De accounts van de medewerkers blijven bestaan, alleen hun lidmaatschap verdwijnt."
+              description="Onomkeerbaar. Alles van deze organisatie verdwijnt uit de database: boekingen, facturen, factuurregels, SkoolPoints, inwisselverzoeken, reviews, berichten, resultaten en inschrijfdagen met hun leerlingen, inclusief de bestanden in de opslag. De accounts van de medewerkers blijven bestaan, alleen hun lidmaatschap verdwijnt."
             />
             <CardBody className="space-y-4">
               <Alert tone="warning" title="Denk aan uw administratieplicht">

@@ -118,7 +118,7 @@ export async function deleteUserPermanently(params: {
 
 /**
  * Verwijdert een organisatie met alles wat eraan hangt: boekingen, facturen,
- * SkoolPoints, berichten en resultaten. De accounts van de medewerkers blijven
+ * SkoolPoints, berichten, resultaten en inschrijfdagen. De accounts van de medewerkers blijven
  * bestaan; alleen hun lidmaatschap van deze organisatie verdwijnt.
  */
 export async function deleteOrganizationPermanently(params: {
@@ -241,6 +241,20 @@ export async function deleteOrganizationPermanently(params: {
   await supabase.from("invoices").delete().eq("organization_id", orgId);
   await supabase.from("reviews").delete().eq("organization_id", orgId);
   await supabase.from("bookings").delete().eq("organization_id", orgId);
+
+  /* --- Inschrijfdagen ------------------------------------------------------ */
+  // Een inschrijfdag houdt zijn organisatie bewust vast (on delete restrict):
+  // zonder deze stap liep het verwijderen hier vast en bleef de organisatie
+  // half verwijderd achter. Met de dag verdwijnen ook de klassen, rondes,
+  // workshops, leerlingen, keuzes, toegangen en verificatiecodes; die hangen
+  // er met on delete cascade aan.
+  const { error: dagFout } = await supabase.from("enrollment_events").delete().eq("organization_id", orgId);
+  if (dagFout) {
+    return {
+      ok: false,
+      message: `Er is een deel verwijderd, maar de inschrijfdagen niet: ${dagFout.message}`,
+    };
+  }
 
   /* --- Organisatie zelf ---------------------------------------------------- */
   await supabase.from("organization_contacts").delete().eq("organization_id", orgId);
