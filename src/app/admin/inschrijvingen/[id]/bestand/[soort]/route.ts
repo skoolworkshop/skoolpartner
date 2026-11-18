@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth/session";
-import { maakBestand, type Soort } from "@/lib/inschrijving/afronden";
+import { ALLE_SOORTEN, maakBestand, type Soort } from "@/lib/inschrijving/afronden";
 
 export const dynamic = "force-dynamic";
 
-const SOORTEN: Soort[] = ["klassen-xlsx", "workshops-xlsx", "klassen-pdf", "workshops-pdf"];
+/*
+  De beheerder mag alle lijsten ophalen, ook de codelijsten voor de mentoren.
+  Hier stond eerst een eigen lijstje zonder die twee, waardoor de knoppen
+  "Inschrijfcodes (PDF)" en "(Excel)" een 404 gaven. Daarom nu de lijst uit
+  afronden.ts, waar ook de knoppen op het scherm vandaan komen.
+*/
+const SOORTEN: Soort[] = ALLE_SOORTEN;
 
 /**
  * De lijsten als bestand, voor de beheerder.

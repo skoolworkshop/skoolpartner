@@ -145,7 +145,7 @@ export async function getOrganizationDetail(id: string) {
     supabase.from("organizations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("organization_members")
-      .select("*, profiles(email, full_name)")
+      .select("*, profiles!organization_members_user_id_fkey(email, full_name)")
       .eq("organization_id", id)
       .order("created_at"),
     supabase.from("organization_domains").select("*").eq("organization_id", id).order("domain"),
@@ -199,7 +199,7 @@ export async function listPendingMembers() {
   const supabase = createServiceSupabase();
   const { data } = await supabase
     .from("organization_members")
-    .select("*, profiles(email, full_name), organizations(name)")
+    .select("*, profiles!organization_members_user_id_fkey(email, full_name), organizations(name)")
     .eq("status", "pending")
     .order("created_at");
   return data ?? [];
