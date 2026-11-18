@@ -1,8 +1,7 @@
 # Eindrapport SkoolPartner
 
 Acceptatietest op de live omgeving, 17 en 18 november 2026. Versie in productie:
-`8d600fe` op mijn.skoolworkshop.nl, plus de wijziging in dit rapport (zie
-onderaan).
+`3114132` op mijn.skoolworkshop.nl.
 
 Alle testgegevens waren verzonnen ("ACCEPTATIETEST", "Testleerling",
 "@acceptatie.test"). Er is geen mail naar een klant, leerling of school gegaan,
@@ -99,8 +98,7 @@ controle in de tests, zodat hij niet terug kan komen.
    bleef half verwijderd achter. Opgelost en live nagekeken: beide testlocaties
    zijn daarna netjes verwijderd.
 4. **Melding na automatisch indelen.** Er stond "13 deelnemers ingedeeld" bij
-   vijf leerlingen; het getal telt plekken. Opgelost in de code, wacht nog op
-   publicatie (zie onderaan).
+   vijf leerlingen; het getal telt plekken. Opgelost en gepubliceerd.
 
 ---
 
@@ -140,21 +138,18 @@ zou gebeuren als hij er komt, met de database zoals hij nu is:
 Dit zijn handelingen in jouw accounts. Er is geen fout meer bekend die echte
 scholen in de weg zit.
 
-1. **De laatste wijziging publiceren** (de melding uit punt 4). In GitHub
-   Desktop op Push origin klikken. Gebeurt dat niet, dan werkt alles gewoon; de
-   melding telt alleen verkeerd.
-2. **Voordat `CRON_SECRET` erin gaat:** in het beheer bij Instellingen
+1. **Voordat `CRON_SECRET` erin gaat:** in het beheer bij Instellingen
    `gmail_sync_query` op `newer_than:2d -in:spam -in:trash -in:drafts` zetten.
    Dan pas het geheim in Vercel. Zonder geheim draaien vervallen, opruimen en
    synchroniseren niet vanzelf.
-3. **De leerlingenpagina aanzetten** zodra de eerste echte cultuurdag open moet:
+2. **De leerlingenpagina aanzetten** zodra de eerste echte cultuurdag open moet:
    in Vercel `PUBLIEKE_INSCHRIJVING` op `aan`, daarna opnieuw publiceren
    (Deployments, de bovenste, Redeploy). Loop dan één keer op je telefoon de
    inschrijving door met een testdag.
-4. **Back-ups.** Het Supabase-project zit op het gratis abonnement: geen
+3. **Back-ups.** Het Supabase-project zit op het gratis abonnement: geen
    automatische back-ups. Draai `npm run backup:data` vóór elke grote wijziging,
    of neem het Pro-abonnement.
-5. **Drie oude boekingsmails** staan nog in de database (uit de periode vóór de
+4. **Drie oude boekingsmails** staan nog in de database (uit de periode vóór de
    opschoning, zonder organisatie). Niet door de test ontstaan en nergens
    zichtbaar. Laten staan of meenemen bij de volgende opschoning.
 
@@ -168,8 +163,8 @@ getoetst, de vier fouten die de test vond zijn opgelost, en de omgeving is
 schoon: alleen het beheeraccount contact@skoolworkshop.nl, de instellingen en
 de koppelingen staan er nog.
 
-Twee voorwaarden. Leerlingen kunnen zich pas inschrijven als punt 3 is gedaan,
-en de automatische taken draaien pas na punt 2. Doe bij de eerste echte
+Twee voorwaarden. Leerlingen kunnen zich pas inschrijven als punt 2 is gedaan,
+en de automatische taken draaien pas na punt 1. Doe bij de eerste echte
 cultuurdag met de leerlingenpagina aan eerst zelf een korte proef op je
 telefoon; dat ene stuk is niet live doorlopen.
 
