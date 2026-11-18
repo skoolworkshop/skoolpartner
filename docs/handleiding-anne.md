@@ -3,6 +3,11 @@
 Voor Anne. Geen technische handelingen nodig, alleen de schermen. Eerst de
 schoollocatie en de punten, daarna de cultuurdag van begin tot eind.
 
+De schermafbeeldingen komen uit de echte applicatie op mijn.skoolworkshop.nl,
+gemaakt tijdens de acceptatietest van 18 november 2026. Alle namen erop zijn
+verzonnen ("ACCEPTATIETEST", "Testleerling", "@acceptatie.test") en zijn na de
+test weer verwijderd.
+
 Inloggen doe je op **mijn.skoolworkshop.nl** met je e-mailadres. Je krijgt een
 code per mail, je vult die in, en je bent binnen. Een wachtwoord is er niet.
 
@@ -16,6 +21,8 @@ Dit doe je één keer per locatie, voordat er iets anders kan.
 in, niet die van het bestuur, en de plaats. Heeft een stichting drie scholen,
 dan maak je er drie aan: "Stichting Zuidwest, locatie Noord", "locatie Zuid",
 enzovoort. Twee keer dezelfde naam weigert het systeem.
+
+![Organisatiebeheer met het formulier Schoollocatie toevoegen](schermen/beheer-organisaties.jpg)
 
 Dat is geen administratieve haarkloverij. SkoolPoints worden per locatie
 opgebouwd. Elke locatie heeft één eigen saldo. Twee locaties van hetzelfde
@@ -47,6 +54,8 @@ facturen van daarvoor tellen niet mee.
 Open de locatie en ga naar het blok **Moneybird**. Vul het contact-ID uit
 Moneybird in, of zoek op naam, en klik op **Koppelen**. Vind je op naam meer dan
 één contact, dan krijg je de lijst terug met de ID's erbij en kies je de juiste.
+
+![Het blok Moneybird bij een locatie, nog zonder koppeling](schermen/beheer-locatie-moneybird.jpg)
 
 Zolang er geen koppeling is, haalt SkoolPartner van deze locatie geen enkele
 factuur binnen. Dat is met opzet: wij tonen alleen de financiële gegevens van
@@ -84,6 +93,16 @@ Van de locatie. Niet van de docent die boekte. Boeken twee collega's van
 dezelfde school, dan telt het op bij één saldo. Bij elke regel in de
 geschiedenis blijft wel staan welke contactpersoon erbij betrokken was.
 
+Zo ziet een contactpersoon het in het klantportaal. In dit voorbeeld spaarde
+Anna de 850 punten, en ziet haar collega Bram precies hetzelfde saldo:
+
+![Het SkoolPoints-scherm in het klantportaal](schermen/klantportaal-skoolpoints.jpg)
+
+Wil je zien wat een klant ziet? **Gebruikers**, zoek de persoon op en klik
+**Ga naar klantportaal**. Bovenin staat dan een oranje balk; met **Terug naar
+beheer** ben je weer terug. Vanuit die weergave kun je geen punten inwisselen,
+dat blijft iets van de klant zelf.
+
 ### Wanneer komen er punten bij
 
 - **Welkomstbonus**: één keer per locatie, als de eerste contactpersoon zich
@@ -105,6 +124,8 @@ keer aanvragen. Er gebeurt verder niets tot jij beslist.
 
 **Inwisselen** in het menu. Bij elk verzoek kies je:
 
+![Een openstaand inwisselverzoek in het beheer](schermen/beheer-inwisselverzoek.jpg)
+
 - **Goedkeuren**: akkoord, de korting moet nog op de factuur.
 - **Verwerkt op de factuur**: de korting staat erop. Vul het factuurnummer in;
   zonder nummer gaat het niet door. Pas nu zijn de punten echt gebruikt.
@@ -119,6 +140,8 @@ Open de locatie, blok **SkoolPoints**, onderaan **Handmatige correctie**. Vul
 het aantal punten in (negatief mag) en een reden. De reden is verplicht en komt
 in het logboek. Een contactpersoon erbij kiezen mag, maar hoeft niet: de
 correctie gaat altijd op het saldo van de locatie.
+
+![Het saldo van een locatie met twee contactpersonen, en de handmatige correctie](schermen/beheer-locatie-skoolpoints.jpg)
 
 Een regel helemaal terugdraaien doe je onder **SkoolPoints** in het menu, met de
 knop **Terugdraaien** achter de regel. De regel blijft zichtbaar in de
@@ -143,6 +166,8 @@ tot die zich heeft aangemeld. Daarna pas de oude verwijderen.
 ---
 
 ## 1. De dag klaarzetten
+
+![Het scherm van een cultuurdag: status, inschrijflink en toegangscode](schermen/beheer-cultuurdag.jpg)
 
 **Inschrijfdagen → Nieuwe inschrijfdag.** Kies de school (die moet eerst als
 locatie bestaan, zie hierboven), geef de dag een naam
@@ -218,6 +243,15 @@ codes.
 Een leerling vult dus eerst de toegangscode van de dag in en daarna zijn eigen
 code. Zo kan niemand de inschrijving van een klasgenoot doen.
 
+Zo ziet de leerling het op zijn telefoon (voorbeeld met verzonnen gegevens):
+
+![De inschrijving zoals een leerling hem op de telefoon ziet](schermen/leerling-mobiel-voorbeeld.png)
+
+**Krijgt iemand "Deze pagina bestaat niet" bij de inschrijflink?** Dan staat de
+leerlingenpagina voor de hele site nog uit. Dat is een schakelaar bij Clinten,
+niet bij jou. Zolang hij uit staat, kan geen enkele leerling erin, ook niet bij
+een dag die op open staat.
+
 **Heeft de school e-mailadressen aangeleverd?** Dan kun je bij "Gegevens van de
 dag" kiezen voor "Met een cijfercode op het schooladres". De leerling kiest dan
 zijn klas en naam, en krijgt een code van zes cijfers op het adres dat de school
@@ -259,6 +293,10 @@ Druk op **Inschrijving sluiten**. Leerlingen kunnen nu niets meer wijzigen.
 4. **Definitieve planning naar leerlingen.** Alleen als de school adressen heeft
    aangeleverd. Vooral bedoeld voor wie automatisch is ingedeeld, want die weet
    nog van niets.
+
+   Zo ziet de school het, na het invullen van de code:
+
+   ![De online inzage voor de school](schermen/school-indeling.jpg)
 
 ## 8. Na de dag
 

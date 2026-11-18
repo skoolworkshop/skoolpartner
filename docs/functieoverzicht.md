@@ -1,12 +1,14 @@
 # SkoolPartner | Compleet functieoverzicht
 
-Wat de applicatie op dit moment daadwerkelijk kan. Bijgewerkt op 12 november
-2026, op basis van de code zoals die in de laatste commit staat.
+Wat de applicatie op dit moment daadwerkelijk kan. Bijgewerkt op 18 november
+2026, na de acceptatietest op de live omgeving. Wat daar precies is getest,
+staat in `docs/oplevering.md`.
 
 Elke regel heeft een stempel:
 
 | Stempel | Betekenis |
 | --- | --- |
+| **L** | Op 18 november live getest op mijn.skoolworkshop.nl |
 | **A** | Gebouwd en getest, inclusief geautomatiseerde tests tegen de echte database |
 | **B** | Gebouwd, maar nog niet op de live omgeving met echte gegevens doorlopen |
 | **C** | Niet aanwezig |
@@ -33,16 +35,17 @@ Gebruikers, Integraties, Instellingen, Controle, Logboek.
 
 | Functie | Stempel |
 | --- | --- |
-| Schoollocatie toevoegen vanuit het beheer (naam en plaats) | B |
+| Schoollocatie toevoegen vanuit het beheer (naam en plaats) | L |
 | Een school die zich zelf aanmeldt controleren en vrijgeven | B |
 | Organisatiegegevens, logo en CJP-nummer bewerken | B |
 | Contactpersoon uitnodigen met een link (veertien dagen geldig) | B |
-| Meerdere contactpersonen per locatie | A |
+| Meerdere contactpersonen per locatie | L |
 | Contactpersoon automatisch vastleggen bij aanmelding en uitnodiging | A |
 | E-maildomeinen koppelen (publieke domeinen worden geweigerd) | A |
 | Uitnodiging naar het klantenportaal sturen, intrekken, laten verlopen | B |
 | Binnen een locatie is elke contactpersoon gelijk: geen aparte rollen | B |
-| Organisatie of gebruiker definitief verwijderen, met bevestiging | B |
+| Organisatie definitief verwijderen, met bevestiging, inclusief cultuurdagen | L |
+| Gebruiker definitief verwijderen | B |
 
 ### Boekingen
 
@@ -57,14 +60,14 @@ Gebruikers, Integraties, Instellingen, Controle, Logboek.
 
 | Functie | Stempel |
 | --- | --- |
-| Facturen ophalen uit Moneybird: handmatig, via de nachtelijke taak en via de webhook, alle drie door dezelfde regels | B |
+| Facturen ophalen uit Moneybird: handmatig, via de nachtelijke taak en via de webhook, alle drie door dezelfde regels | L (handmatig), A (taak en webhook) |
 | Factuurregels en bedragen bewaren, betaalstatus bijwerken | A |
 | Moneybird-contact koppelen aan een locatie, op ID of op naam | B |
 | Eén Moneybird-contact hoort bij één locatie; een tweede koppeling wordt geweigerd | A |
-| Geen gekoppelde locatie: de factuur wordt niet binnengehaald | A |
+| Geen gekoppelde locatie: de factuur wordt niet binnengehaald | L |
 | Twijfel (één contact bij twee locaties): de factuur wordt niet binnengehaald | A |
 | Locatie doet nog niet mee, of factuur van vóór het startmoment: niet binnengehaald | A |
-| De reden van elke overgeslagen factuur in het synchronisatielogboek | A |
+| De reden van elke overgeslagen factuur in het synchronisatielogboek | L |
 | Dubbele facturen voorkomen via een unieke index op het Moneybird-id | A |
 | Nooit proefgegevens in productie: zonder Moneybird-token een foutmelding | A |
 | Factuur-PDF tonen in het klantenportaal | B |
@@ -73,8 +76,8 @@ Gebruikers, Integraties, Instellingen, Controle, Logboek.
 
 | Functie | Stempel |
 | --- | --- |
-| Eén puntensaldo per schoollocatie, gedeeld door alle contactpersonen | A |
-| Twee locaties van hetzelfde bestuur hebben gescheiden saldi | A |
+| Eén puntensaldo per schoollocatie, gedeeld door alle contactpersonen | L |
+| Twee locaties van hetzelfde bestuur hebben gescheiden saldi | L |
 | Bij elke regel blijft staan welke contactpersoon en welke boeking het was | A |
 | Punten toekennen op basis van gewerkte minuten | A |
 | Puntenwaarde en tarieven uit de instellingen | A |
@@ -84,10 +87,10 @@ Gebruikers, Integraties, Instellingen, Controle, Logboek.
 | Welkomstbonus precies één keer per locatie | A |
 | Geen punten voor boekingen van vóór het startmoment van de locatie | A |
 | Punten laten vervallen na de geldigheidsduur, per locatie | A |
-| Handmatige correctie op het locatiesaldo, verplicht met reden | A |
+| Handmatige correctie op het locatiesaldo, verplicht met reden | L |
 | Een regel terugdraaien zonder de geschiedenis te wissen | A |
 | Puntengeschiedenis per locatie, zichtbaar voor alle contactpersonen | A |
-| Inwisselverzoek op het locatiesaldo: aanvragen, goedkeuren, verwerken, afwijzen, intrekken | A |
+| Inwisselverzoek op het locatiesaldo: aanvragen, goedkeuren, verwerken, afwijzen, intrekken | L (aanvragen en verwerken), A (de rest) |
 | Reservering bij een openstaand verzoek, met een slot op de locatie | A |
 | Een verzoek ontstaat alleen via de reservering; verwerken kan alleen Skool Workshop | A |
 | Een vertrokken contactpersoon ziet niets meer en kan niets meer aanvragen | A |
@@ -104,30 +107,30 @@ Gebruikers, Integraties, Instellingen, Controle, Logboek.
 
 | Functie | Stempel |
 | --- | --- |
-| Cultuurdag aanmaken per school | B |
-| Rondes in één keer genereren, los toevoegen, aanpassen | A |
+| Cultuurdag aanmaken per school | L |
+| Rondes in één keer genereren, los toevoegen, aanpassen | L (genereren), A |
 | Pauzerondes die nergens meetellen | A |
-| Workshops kiezen uit het eigen aanbod (29 workshops) | A |
+| Workshops kiezen uit het eigen aanbod (29 workshops) | L |
 | Uitvoeringen per ronde, meerdere naast elkaar, aan en uit | A |
 | Maximum per uitvoering, ruimte en docent | A |
 | Klasbeperking per uitvoering | A |
 | Klassenlijst importeren uit Excel, Word, PDF, CSV | A |
 | Voorbeeld vóór het importeren, met kolommen aanwijzen | A |
 | Leerjaar en klas apart herkennen | A |
-| Persoonlijke inschrijfcode per leerling | A |
-| Gedeelde toegangscode per dag, intrekken en opnieuw maken | A |
+| Persoonlijke inschrijfcode per leerling | L |
+| Gedeelde toegangscode per dag, intrekken en opnieuw maken | L (aanmaken), A |
 | Verificatie per schoolmail met een cijfercode | A |
 | Pogingenteller tegen raden, werkt over meerdere servers | A |
 | Leerling schrijft zichzelf in, wisselt, ziet vol is vol | A |
 | Herhaling van dezelfde workshop toestaan of weigeren | A |
 | Vrijstellingen | A |
-| Automatisch indelen na sluiting, met voorbeeld en goedkeuring | A |
-| Klassenlijsten en workshoplijsten als Excel en PDF | A |
-| Codelijsten per klas als Excel en PDF | A |
-| Lijsten per mail naar de school, met voorbeeld vooraf | B |
-| Beveiligde klantomgeving met link en losse code | A |
+| Automatisch indelen na sluiting, met voorbeeld en goedkeuring | L |
+| Klassenlijsten en workshoplijsten als Excel en PDF | L |
+| Codelijsten per klas als Excel en PDF | L |
+| Lijsten per mail naar de school, met voorbeeld vooraf | L (voorbeeld), B (versturen) |
+| Beveiligde klantomgeving met link en losse code | L |
 | Persoonlijke bevestiging naar leerlingen, met app-links en benodigdheden | B |
-| Leerling zoeken, nieuwe code, vrijstellen, verwijderen | B |
+| Leerling zoeken, nieuwe code, vrijstellen, verwijderen | L (zoeken, nieuwe code), B |
 | Verkeerd geclaimde naam vrijgeven zonder de keuzes te raken | A |
 | Leerlinggegevens automatisch verwijderen na de bewaartermijn | A |
 
@@ -173,7 +176,7 @@ Gebruikers, Integraties, Instellingen, Controle, Logboek.
 | Gmail koppelen via Google, tokens versleuteld opgeslagen | B |
 | Verbindingstest Gmail, inclusief toegestane afzenderadressen | B |
 | Moneybird koppelen met een API-token | B |
-| Moneybird-webhook met handtekeningcontrole | B |
+| Moneybird-webhook met handtekeningcontrole | L (verkeerde sleutel geweigerd) |
 | HubSpot-token aanwezig | C (geen actieve synchronisatie in de code) |
 | Google Agenda | B (alleen lezen, voor de planning) |
 
@@ -208,12 +211,12 @@ Alle vier staan nu stil: `CRON_SECRET` is niet ingesteld, dus ze antwoorden met
 | Eigen boekingen bekijken | B |
 | Nieuwe boeking aanvragen | B |
 | Eigen facturen bekijken en de PDF downloaden | B |
-| SkoolPoints: saldo, geschiedenis, inwisselen | B |
+| SkoolPoints: saldo, geschiedenis, inwisselen | L (saldo, geschiedenis, verzoek zichtbaar), A (zelf indienen) |
 | CJP-tegoed aanvragen | B |
 | Berichten lezen en beantwoorden | B |
 | Workshopresultaten downloaden | B |
 | Accountgegevens beheren | B |
-| Toegang uitsluitend tot de eigen organisatie | A |
+| Toegang uitsluitend tot de eigen organisatie | L (op de database, als ingelogde klant) |
 
 De indelingpagina voor een cultuurdag (`/indeling/<link>`) staat los van het
 portaal: die werkt zonder account, met een link en een losse code.
@@ -245,17 +248,13 @@ portaal: die werkt zonder account, met een link en een losse code.
 
 | Soort | Omvang |
 | --- | --- |
-| Geautomatiseerde tests | 610, verdeeld over 41 bestanden |
+| Live, via de schermen | Locaties, contactpersonen, correctie, inwisselen, cultuurdag van aanmaken tot lijsten, online inzage, Moneybird-synchronisatie |
+| Live, op de database | 39 controles die zichzelf terugdraaien (`supabase/acceptatietest-live.sql`), 39 goed |
+| Geautomatiseerde tests | 618, verdeeld over 44 bestanden |
 | Databaseregels | `npm run db:verify`, tegen de echte migraties |
-| Punten per locatie | 41 tests: twee locaties van één bestuur, meerdere contactpersonen, rechten getoetst als ingelogde klant met Row Level Security aan |
-| Beveiliging | rechten op tabellen en functies, RLS, policies en zoekpaden, als vaste controle met de standaardrechten van Supabase |
-| Upserts | elke upsert in de code gecontroleerd tegen een index die de database ook herkent |
+| Beveiliging | rechten op tabellen en functies, RLS, policies en zoekpaden, met de standaardrechten van Supabase |
+| Vaste controles op de code | elke upsert heeft een passende index, elke ingesloten tabel is eenduidig, elke downloadknop heeft een bestand, verwijderen loopt niet vast |
 | Visueel | de schermen van het inschrijfsysteem op 1280 en 390 pixels, zonder horizontale overloop |
-| Herstelproef | de volledige back-up teruggezet in een lege database |
-| Migratieproef | 043 gedraaid op een dag met 353 leerlingen en 352 keuzes; 044 en 045 teruggedraaid en opnieuw uitgevoerd |
 
-Wat op A staat, is getest met de echte migraties in een database in het
-geheugen, met dezelfde functies die in productie draaien. Wat die tests niet
-dekken: de werkelijke queries tegen Supabase, de echte Gmail-verzending, en het
-klikken door de live schermen. Wat daarvan op de live omgeving is nagelopen,
-staat in het opleverbericht.
+Wat niet live is doorlopen: de leerlingenpagina zelf (de schakelaar staat uit),
+het echt versturen van mail, en inloggen als klant. Zie `docs/oplevering.md`.

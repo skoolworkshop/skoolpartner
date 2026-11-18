@@ -531,8 +531,11 @@ export async function bevestigIndelingAction(_prev: AdminState, formData: FormDa
   if (!uitkomst.ok) return { status: "error", message: uitkomst.fout };
 
   verversDag(dagId);
+  // Het getal telt plekken, niet leerlingen: wie drie rondes open had, krijgt
+  // er drie. "13 deelnemers ingedeeld" bij vijf leerlingen klopte dus niet.
   const staart = uitkomst.mislukt > 0 ? `, ${uitkomst.mislukt} niet gelukt` : "";
-  return { status: "ok", message: `${uitkomst.gelukt} deelnemers ingedeeld${staart}.` };
+  const plekken = uitkomst.gelukt === 1 ? "1 plek" : `${uitkomst.gelukt} plekken`;
+  return { status: "ok", message: `${plekken} ingedeeld${staart}.` };
 }
 
 export async function bekijkMailAction(input: {

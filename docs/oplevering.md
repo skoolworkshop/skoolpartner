@@ -1,119 +1,183 @@
-# Oplevering van SkoolPartner
+# Eindrapport SkoolPartner
 
-De volgorde waarin het live gaat, wie welke stap doet, en hoe je ziet dat het
-goed is gegaan. Bijgewerkt op 12 november 2026.
+Acceptatietest op de live omgeving, 17 en 18 november 2026. Versie in productie:
+`8d600fe` op mijn.skoolworkshop.nl, plus de wijziging in dit rapport (zie
+onderaan).
 
-## Wat alleen vanaf jouw computer kan
-
-| Stap | Waarom |
-| --- | --- |
-| Back-up en migraties | Supabase is niet bereikbaar vanuit de omgeving van de assistent, en een terminal op jouw computer mag de assistent alleen bekijken, niet bedienen. |
-| `git push` | De inloggegevens voor GitHub staan op jouw computer. |
-| Geheime waarden op Vercel | Een geheim zoals `CRON_SECRET` vult de assistent nooit zelf in. |
-
-Wat de assistent wel kan, via jouw ingelogde Chrome: de live database
-uitlezen in het Supabase-dashboard, het beheer van SkoolPartner bedienen, en de
-Vercel-deployment nakijken.
+Alle testgegevens waren verzonnen ("ACCEPTATIETEST", "Testleerling",
+"@acceptatie.test"). Er is geen mail naar een klant, leerling of school gegaan,
+en in Moneybird, Gmail en HubSpot is niets aangemaakt, gewijzigd of verwijderd.
 
 ---
 
-## Stap 1. Back-up, migraties en publiceren (jij, één opdracht)
+## Wat aantoonbaar live werkt
 
-```
-npm run livegang
-```
+Getest op de echte site en de echte database.
 
-Het script doet dit in vaste volgorde en stopt bij de eerste stap die niet
-klopt:
+### Schoollocaties en contactpersonen
 
-1. Werkmap schoon en op main.
-2. Verse back-up, en controle dat die er staat en van zojuist is.
-3. Controle vooraf: geen Moneybird-contact bij twee locaties (044), geen dubbele
-   toekenning binnen één locatie (045).
-4. Migratiestatus: 043 moet erin staan, en alleen 044 en 045 mogen klaarstaan.
-5. `supabase db push`. De CLI vraagt zelf om bevestiging: `Y`.
-6. Controle achteraf: beide migraties staan erin, het saldo rekent per locatie.
-7. `git push origin main`. Vercel publiceert daarna vanzelf.
+| Getest | Uitkomst |
+| --- | --- |
+| Twee locaties van één bestuur toevoegen in Organisatiebeheer | Werkt |
+| Dezelfde naam een tweede keer toevoegen | Geweigerd, met uitleg |
+| Twee contactpersonen bij één locatie, zichtbaar onder Gebruikers | Werkt, na herstel (zie fouten) |
+| Klantportaal bekijken als contactpersoon (Ga naar klantportaal) | Werkt |
+| Locatie definitief verwijderen, inclusief cultuurdag | Werkt, na herstel (zie fouten) |
 
-Opnieuw draaien mag altijd. Wat al gedaan is, wordt overgeslagen.
+### Moneybird
 
-### Wat de migraties doen
+| Getest | Uitkomst |
+| --- | --- |
+| Handmatige synchronisatie zonder gekoppelde locatie | 8 echte Moneybird-facturen opgehaald, alle 8 overgeslagen met reden "geen-koppeling", 0 opgeslagen |
+| Contact zoeken op naam die niet bestaat | "Geen Moneybird-contact gevonden", niets gekoppeld |
+| Webhook met een verkeerde sleutel | Geweigerd (401) |
+| Dashboard na afloop | 0 facturen, 0 zonder koppeling, € 0,00 openstaand |
 
-| Migratie | Inhoud | Raakt gegevens? |
-| --- | --- | --- |
-| 044 | Eén Moneybird-contact kan bij maar één locatie horen | Nee, één index |
-| 045 | Het puntensaldo is van de locatie; vijf fouten rond punten opgelost; serverfuncties dichtgezet | Nee, alleen weergave, functies, leesrechten en indexen |
+### SkoolPoints per locatie
 
-Het project zit op het gratis Supabase-abonnement. Daar zijn **geen
-automatische back-ups**. De back-up uit stap 2 van het script is dus de enige.
+| Getest | Uitkomst |
+| --- | --- |
+| Twee collega's sparen voor één saldo | Noord: 700 beschikbaar uit Anna's boekingen, zichtbaar voor Bram |
+| Correctie via het beheerscherm, zonder contactpersoon | +150, saldo 850 |
+| Inwisselverzoek van Bram op punten die Anna spaarde | 800 gereserveerd, 50 beschikbaar, verzoek zichtbaar voor beide |
+| Verwerken zonder factuurnummer | Geweigerd: "Vul het factuurnummer in" |
+| Verwerken met factuurnummer | Verwerkt, punten definitief afgeschreven |
+| Zusterlocatie | Eigen saldo, ziet niets van Noord |
 
-## Stap 2. De 36 losse facturen opruimen (jij)
+Daarnaast een blok van 39 controles op de live database, dat zichzelf
+volledig terugdraait (`supabase/acceptatietest-live.sql`). Uitslag:
+**39 van 39 goed**. Het blok toetst onder meer: één welkomstbonus per locatie,
+dezelfde boeking nooit twee keer punten, een betaalde factuur maakt de punten
+vrij, wie wat mag zien als ingelogde klant (met Row Level Security aan), een
+contactpersoon van Zuid kan niet op Noord inwisselen, een klant kan geen
+verzoek buiten de reservering om maken of zelf goedkeuren, verval gaat van het
+saldo af, een vertrokken contactpersoon ziet niets meer, de CJP-bonus één keer
+per locatie, en een volle workshop weigert de volgende leerling. Na afloop
+stond er aantoonbaar niets meer van in de database.
 
-Pas nadat stap 1 klaar is en de nieuwe versie live staat. Anders haalt de oude
-code ze bij de volgende synchronisatie gewoon opnieuw binnen.
+### Cultuurdag
 
-Eerst kijken, dat verwijdert nog niets:
+| Getest | Uitkomst |
+| --- | --- |
+| Dag aanmaken, rooster van 3 rondes met pauzes | Werkt |
+| 3 workshops uit het aanbod, maximum 3 | Werkt |
+| 2 klassen en 6 leerlingen plakken | Werkt |
+| Openzetten, gedeelde toegangscode zichtbaar | Werkt |
+| Leerling opzoeken, nieuwe code geven | Werkt, oude code vervalt |
+| Inschrijven langs de echte inschrijffunctie, ook "vol is vol" | Werkt |
+| Sluiten, voorstel bekijken, automatisch indelen | 13 plekken ingedeeld, iedereen elke ronde een workshop, geen workshop dubbel, nergens boven het maximum |
+| Klassen- en workshoplijsten, Excel en PDF | Alle vier downloadbaar |
+| Codelijsten voor de mentoren, Excel en PDF | Werkt, na herstel (zie fouten) |
+| Mail met lijsten aan de school | Voorbeeld bekeken, bewust niet verstuurd |
+| Online inzage voor de school | Foute code geweigerd, goede code toont de indeling, codelijsten niet op te halen |
+| Bewaartermijn | Automatisch op dagdatum plus 30 dagen |
 
-```
-node scripts/opschonen.mjs --ook-losse-facturen
-```
+### Beveiliging
 
-Klopt het beeld (36 facturen, geen organisaties), dan:
+| Getest | Uitkomst |
+| --- | --- |
+| Beheer zonder inloggen | Doorgestuurd naar inloggen |
+| Leerlingenpagina terwijl de schakelaar uit staat | 404, ook bij een dag die open staat |
+| Geplande taken zonder geheim | Alle vier 503 |
+| Functies die alleen de server mag aanroepen | Dicht voor klanten en bezoekers |
+| Pagina's in een frame op een andere site | Geweigerd (X-Frame-Options: DENY) |
 
-```
-node scripts/opschonen.mjs --ook-losse-facturen --verwijder --zeker
-```
+---
 
-Het script eist een back-upmap van vandaag; die is er dan net. In Moneybird
-zelf verandert er niets.
+## Fouten gevonden en opgelost
 
-Daarna hoort het dashboard nul facturen, nul zonder koppeling en € 0,00
-openstaand te tonen.
+Alle vier kwamen pas boven op de live omgeving. Voor elk staat nu een vaste
+controle in de tests, zodat hij niet terug kan komen.
 
-## Stap 3. Vercel (jij)
+1. **Codelijsten gaven een 404.** "Inschrijfcodes (PDF)" en "(Excel)" werkten
+   niet. Opgelost en live nagekeken.
+2. **Gebruikers per locatie onzichtbaar.** Bij elke organisatie stond "Nog geen
+   gebruikers gekoppeld", en "Wachten op goedkeuring" bleef altijd leeg, ook als
+   er wel iemand wachtte. Daardoor was bij een correctie ook geen contactpersoon
+   te kiezen. Opgelost en live nagekeken.
+3. **Verwijderen liep vast op een cultuurdag.** Een locatie met een inschrijfdag
+   bleef half verwijderd achter. Opgelost en live nagekeken: beide testlocaties
+   zijn daarna netjes verwijderd.
+4. **Melding na automatisch indelen.** Er stond "13 deelnemers ingedeeld" bij
+   vijf leerlingen; het getal telt plekken. Opgelost in de code, wacht nog op
+   publicatie (zie onderaan).
 
-Project **skoolpartner**, omgeving Production:
+---
 
-| Variabele | Waarde | Wanneer |
-| --- | --- | --- |
-| `PUBLIEKE_INSCHRIJVING` | `aan` | Zodra de eerste cultuurdag open moet. Zonder deze variabele blijft de leerlingenpagina in productie dicht. |
-| `CRON_SECRET` | een lange willekeurige tekst | Zodra de nachtelijke taken mogen draaien |
+## Wat alleen geautomatiseerd is getest
 
-### Let op bij de nachtelijke taken
+| Onderdeel | Waarom niet live |
+| --- | --- |
+| De leerlingenpagina (toegangscode, eigen code, kiezen, wisselen) | De schakelaar `PUBLIEKE_INSCHRIJVING` staat uit. De onderliggende inschrijffunctie is wel live getest. |
+| Inschrijven met een cijfercode per schoolmail | Idem, en het zou mail versturen |
+| Bevestigingen naar leerlingen en de lijstenmail echt versturen | Bewust niet: geen mail naar verzonnen of echte adressen |
+| Inloggen als klant en zelf een inwisselverzoek indienen in het portaal | Inloggen gaat met een code per mail; ik log niet in als een ander. De databasefunctie erachter is live getest als ingelogde klant. |
+| Factuur koppelen en punten vrijgeven via Moneybird | Er is geen echte school gekoppeld, en ik koppel geen echt Moneybird-contact voor een test. De regels zijn live getest op de database. |
+| Mobiel | Het browservenster liet zich niet verkleinen. Elk scherm is in de visuele controle op 390 pixels gemaakt, zonder horizontale overloop. |
 
-Zolang `CRON_SECRET` ontbreekt, antwoorden alle vier de taken met 503 en doen
-ze niets. Staat hij er eenmaal, dan draait dit elke nacht:
+Geautomatiseerd: 618 tests in 44 bestanden, `db:verify`, de CJP-controle, en
+de visuele controle op 1280 en 390 pixels. Allemaal groen.
 
-- **03:00 punten laten vervallen**. Werkt sinds migratie 045 per locatie.
-- **04:00 workshopresultaten opruimen**.
-- **04:30 leerlinggegevens opruimen**, dertig dagen na de cultuurdag.
-- **05:00 Gmail en Moneybird synchroniseren**.
+---
 
-Zet vóór de eerste nacht `gmail_sync_query` bij de instellingen in het beheer
-tijdelijk op `newer_than:2d`. De Gmail-synchronisatie heeft nog nooit een
-beginpunt opgeslagen en zou anders alles van de laatste zestig dagen ophalen.
-Draai hem één keer met de hand, kijk wat er binnenkomt, en zet de zoekopdracht
-daarna terug.
+## Geplande taken
 
-Moneybird heeft dat probleem niet: het beginpunt staat op 12 november, en
-zonder gekoppelde locatie komt er sowieso niets binnen.
+Ze staan alle vier stil zolang `CRON_SECRET` ontbreekt. Wat er de eerste nacht
+zou gebeuren als hij er komt, met de database zoals hij nu is:
 
-## Stap 4. De eerste echte school
+| Taak | Effect |
+| --- | --- |
+| 03:00 punten laten vervallen | Niets, er zijn geen punten |
+| 04:00 resultaten opruimen | Niets, er zijn geen resultaten |
+| 04:30 leerlinggegevens opruimen | Niets, er zijn geen dagen |
+| 05:00 Moneybird | Niets opgeslagen zolang er geen locatie gekoppeld is (live aangetoond) |
+| 05:00 Gmail | **Let op.** De zoekopdracht staat op 60 dagen en er is nog nooit een beginpunt opgeslagen. Elke mail met "bevestiging" in het onderwerp komt dan als boekingsmail onder Controle nodig, met de tekst van de mail erbij, ook van scholen die niet meedoen. Gewone mailgesprekken worden niet opgeslagen zolang er geen geverifieerde contactpersonen zijn. |
 
-1. Organisatiebeheer → Schoollocatie toevoegen.
-2. Contactpersoon uitnodigen.
-3. Moneybird-contact koppelen.
-4. Voor een cultuurdag: zie de handleiding voor Anne.
-5. De bewaartermijn van dertig dagen opnemen in de offerte of op de site.
+---
+
+## Wat nog openstaat
+
+Dit zijn handelingen in jouw accounts. Er is geen fout meer bekend die echte
+scholen in de weg zit.
+
+1. **De laatste wijziging publiceren** (de melding uit punt 4). In GitHub
+   Desktop op Push origin klikken. Gebeurt dat niet, dan werkt alles gewoon; de
+   melding telt alleen verkeerd.
+2. **Voordat `CRON_SECRET` erin gaat:** in het beheer bij Instellingen
+   `gmail_sync_query` op `newer_than:2d -in:spam -in:trash -in:drafts` zetten.
+   Dan pas het geheim in Vercel. Zonder geheim draaien vervallen, opruimen en
+   synchroniseren niet vanzelf.
+3. **De leerlingenpagina aanzetten** zodra de eerste echte cultuurdag open moet:
+   in Vercel `PUBLIEKE_INSCHRIJVING` op `aan`, daarna opnieuw publiceren
+   (Deployments, de bovenste, Redeploy). Loop dan één keer op je telefoon de
+   inschrijving door met een testdag.
+4. **Back-ups.** Het Supabase-project zit op het gratis abonnement: geen
+   automatische back-ups. Draai `npm run backup:data` vóór elke grote wijziging,
+   of neem het Pro-abonnement.
+5. **Drie oude boekingsmails** staan nog in de database (uit de periode vóór de
+   opschoning, zonder organisatie). Niet door de test ontstaan en nergens
+   zichtbaar. Laten staan of meenemen bij de volgende opschoning.
+
+---
+
+## Kan SkoolPartner veilig met echte scholen gebruikt worden?
+
+Ja, voor het loyaliteitsprogramma en het beheer van cultuurdagen. De
+toegangsregels, de puntenregels en de factuurregels zijn op de echte database
+getoetst, de vier fouten die de test vond zijn opgelost, en de omgeving is
+schoon: alleen het beheeraccount contact@skoolworkshop.nl, de instellingen en
+de koppelingen staan er nog.
+
+Twee voorwaarden. Leerlingen kunnen zich pas inschrijven als punt 3 is gedaan,
+en de automatische taken draaien pas na punt 2. Doe bij de eerste echte
+cultuurdag met de leerlingenpagina aan eerst zelf een korte proef op je
+telefoon; dat ene stuk is niet live doorlopen.
 
 ---
 
 ## Terug als het misgaat
 
-- **De migraties**: `supabase/terugdraaien-044-045.sql`. Getest door hem na de
-  migraties te draaien en 044 en 045 daarna opnieuw uit te voeren. Er valt geen
-  gegeven terug te zetten, want de migraties hebben er geen gewijzigd. Zet dan
-  ook de vorige versie van de applicatie terug.
-- **De deployment**: in Vercel met één klik terug naar de vorige deployment.
-- **De gegevens**: de back-up uit stap 1. Terugzetten is beproefd in een lege
-  database; de volgorde staat in `docs/migratie-043-toegangscode.md`.
+- **Code**: in Vercel met één klik terug naar de vorige deployment.
+- **Migraties 044 en 045**: `supabase/terugdraaien-044-045.sql`.
+- **Gegevens**: de back-up in `_backup/` van 12 november, gemaakt vlak voor de
+  livegang.
